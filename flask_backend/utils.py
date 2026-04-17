@@ -1,4 +1,5 @@
 from flask import Flask, jsonify
+from flask_cors import CORS
 import hashlib
 from flask_mail import Mail, Message
 import os
@@ -12,6 +13,7 @@ ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
 DOMAIN = os.getenv("DOMAIN")
 
 app = Flask(__name__)
+CORS(app) # Isto permite que o Moodle aceda à API
 
 # Flask-Mail Configuration
 app.config["MAIL_SERVER"] = "smtp.gmail.com"  # Use your SMTP provider

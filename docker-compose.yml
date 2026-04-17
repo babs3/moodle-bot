@@ -66,30 +66,30 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       DOMAIN: ${DOMAIN}
 
-  streamlit-server:
-    build:
-      context: .
-      dockerfile: streamlit_frontend/Dockerfile
-    volumes:
-      - ./streamlit_frontend:/app/streamlit_frontend
-      - ./shared:/app/shared
-      - ./materials:/app/materials
-    ports:
-      - "80:8501"
-    networks:
-      - my-project
-    environment:
-      CURRENT_CLASS: "${CURRENT_CLASS}"
-      ADMIN_EMAIL: ${ADMIN_EMAIL}
-      FORM_URL: ${FORM_URL}
-      FINAL_FORM_URL: ${FINAL_FORM_URL}
-      TEACHER_FINAL_FORM_URL: ${TEACHER_FINAL_FORM_URL}
-      QUIZ_URL: ${QUIZ_URL}
-      INITIAL_SPREADSHEET_ID: ${INITIAL_SPREADSHEET_ID}
-      FINAL_SPREADSHEET_ID: ${FINAL_SPREADSHEET_ID}
-      TEACHER_FINAL_SPREADSHEET_ID: ${TEACHER_FINAL_SPREADSHEET_ID}
-      QUIZ_SPREADSHEET_ID: ${QUIZ_SPREADSHEET_ID}
-      IS_PRODUCTION: ${IS_PRODUCTION}
+  #streamlit-server:
+  #  build:
+  #    context: .
+  #    dockerfile: streamlit_frontend/Dockerfile
+  #  volumes:
+  #    - ./streamlit_frontend:/app/streamlit_frontend
+  #    - ./shared:/app/shared
+  #    - ./materials:/app/materials
+  #  ports:
+  #    - "80:8501"
+  #  networks:
+  #    - my-project
+  #  environment:
+  #    CURRENT_CLASS: "${CURRENT_CLASS}"
+  #    ADMIN_EMAIL: ${ADMIN_EMAIL}
+  #    FORM_URL: ${FORM_URL}
+  #    FINAL_FORM_URL: ${FINAL_FORM_URL}
+  #    TEACHER_FINAL_FORM_URL: ${TEACHER_FINAL_FORM_URL}
+  #    QUIZ_URL: ${QUIZ_URL}
+  #    INITIAL_SPREADSHEET_ID: ${INITIAL_SPREADSHEET_ID}
+  #    FINAL_SPREADSHEET_ID: ${FINAL_SPREADSHEET_ID}
+  #    TEACHER_FINAL_SPREADSHEET_ID: ${TEACHER_FINAL_SPREADSHEET_ID}
+  #    QUIZ_SPREADSHEET_ID: ${QUIZ_SPREADSHEET_ID}
+  #    IS_PRODUCTION: ${IS_PRODUCTION}
 
 networks:
   my-project:

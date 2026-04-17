@@ -4,6 +4,19 @@ import random
 from datetime import datetime, timezone, timedelta
 from flask_backend.utils import *
 
+@app.route('/')
+def index():
+    return "Flask está a correr na porta 8080!"
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    user_message = data.get("message")
+    
+    # Aqui podes pôr a tua lógica ou chamar o Rasa via REST
+    # Por agora, vamos apenas devolver uma resposta de teste
+    return jsonify([{"text": f"Recebi: {user_message}"}])
+
 @app.route("/api/save_reset_token", methods=["POST"])
 def save_reset_token():
     data = request.json
@@ -339,5 +352,5 @@ if __name__ == "__main__":
     # wait for models.py to be imported
     sleep(5)
     seed_database()
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080, debug=True)
     
