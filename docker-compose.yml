@@ -1,0 +1,98 @@
+services:
+  rasa:
+    image: rasa/rasa:3.6.20-full
+    volumes:
+      - .:/app
+    ports:
+      - 5005:5005
+    networks:
+      - my-project
+    command: run --enable-api --cors "*" #--connector socketio
+
+  action-server:
+    build:
+      context: .
+      dockerfile: actions/Dockerfile
+    volumes:
+      - ./actions:/app/actions
+      - ./vector_store:/app/vector_store
+      - ./shared:/app/shared
+    ports:
+      - 5055:5055
+    networks:
+      - my-project
+    environment:
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY}"  # Load API key from .env
+      CURRENT_CLASS: "${CURRENT_CLASS}"
+
+  db:
+    image: postgres:13
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - my-project
+    environment:
+      POSTGRES_USER: ${APP_DATABASE_USER}
+      POSTGRES_PASSWORD: ${APP_DATABASE_PASS}
+      POSTGRES_DB: ${APP_DATABASE_NAME}
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "8081:8080"  # Map container's 8080 to host's 8081
+    networks:
+      - my-project
+
+  flask-server:
+    build:
+      context: .
+      dockerfile: flask_backend/Dockerfile
+    depends_on:
+      - db
+    volumes:
+      - ./flask_backend:/app/flask_backend
+    ports:
+      - 8080:8080
+    networks:
+      - my-project
+    environment:
+      POSTGRES_USER: ${APP_DATABASE_USER}
+      POSTGRES_PASSWORD: ${APP_DATABASE_PASS}
+      POSTGRES_DB: ${APP_DATABASE_NAME}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      DOMAIN: ${DOMAIN}
+
+  streamlit-server:
+    build:
+      context: .
+      dockerfile: streamlit_frontend/Dockerfile
+    volumes:
+      - ./streamlit_frontend:/app/streamlit_frontend
+      - ./shared:/app/shared
+      - ./materials:/app/materials
+    ports:
+      - "80:8501"
+    networks:
+      - my-project
+    environment:
+      CURRENT_CLASS: "${CURRENT_CLASS}"
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      FORM_URL: ${FORM_URL}
+      FINAL_FORM_URL: ${FINAL_FORM_URL}
+      TEACHER_FINAL_FORM_URL: ${TEACHER_FINAL_FORM_URL}
+      QUIZ_URL: ${QUIZ_URL}
+      INITIAL_SPREADSHEET_ID: ${INITIAL_SPREADSHEET_ID}
+      FINAL_SPREADSHEET_ID: ${FINAL_SPREADSHEET_ID}
+      TEACHER_FINAL_SPREADSHEET_ID: ${TEACHER_FINAL_SPREADSHEET_ID}
+      QUIZ_SPREADSHEET_ID: ${QUIZ_SPREADSHEET_ID}
+      IS_PRODUCTION: ${IS_PRODUCTION}
+
+networks:
+  my-project:
+
+volumes:
+  postgres_data:

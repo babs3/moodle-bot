@@ -1,0 +1,11 @@
+chromadb
+PyMuPDF
+numpy
+python-dotenv
+rank_bm25
+scikit_learn
+sentence_transformers
+pytesseract 
+Pillow
+spacy
+nltk

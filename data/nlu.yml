@@ -1,0 +1,205 @@
+version: "3.1"
+
+nlu:
+- intent: greet
+  examples: |
+    - hey
+    - hello
+    - hi
+    - hello there
+    - good morning
+    - good evening
+    - hey there
+    - hey dude
+    - goodmorning
+    - goodevening
+    - good afternoon
+    - hi there
+
+- intent: goodbye
+  examples: |
+    - good by
+    - cee you later
+    - good night
+    - bye
+    - goodbye
+    - have a nice day
+    - see you around
+    - bye bye
+    - see you later
+    - see ya
+    - see u
+
+#- intent: affirm
+#  examples: |
+#    - yes
+#    - y
+#    - indeed
+#    - of course
+#    - that sounds good
+#    - correct
+
+#- intent: deny
+#  examples: |
+#    - no
+#    - n
+#    - never
+#    - I don't think so
+#    - don't like that
+#    - no way
+#    - not really
+
+
+- intent: welcome
+  examples: |
+    - thank you
+    - thank u
+    - thanks
+    - thanks a lot
+    - thank you very much
+
+- intent: bot_challenge
+  examples: |
+    - are you a bot?
+    - are you a human?
+    - am I talking to a bot?
+    - am I talking to a human?
+
+- intent: ask_for_definition
+  examples: |
+    - What is
+    - What are
+    - What are business 
+    - What does
+    - What is the definition of
+    - What does it mean to
+    - What does it mean by
+    - What is the definition of
+    - What does it mean to
+    - What does it mean by
+    - What do you mean by
+    - What is the meaning of
+    - What is the definition of
+    - How do you define
+    - How to define
+    - Give me the meaning of
+    - Give me the definition of
+    - Tell me the meaning of
+    - Tell me the definition of
+    - Define the meaning of
+    - Can you define
+    - What is the definition of
+    - define
+
+- intent: ask_for_examples
+  examples: |
+    - give me an example of
+    - give me some examples of
+    - give me an example of the topic of
+    - give me some examples of the topic of
+    - give me an example of the subject of
+    - give me some examples of the subject of
+    - give me an example of the content of
+    - give me some examples of the content of
+    - give me an example of the text of
+    - give me some examples of the text of
+    - name
+    - name an example of
+    - name one 
+    - list
+    - list one
+    - list some
+    - list some examples of
+    - enumerate
+    - enumerate one
+    - enumerate some
+    - enumerate some examples of
+
+
+- intent: ask_for_explanation
+  examples: |
+    - explain
+    - explain what
+    - explain the topic of
+    - explain the subject of
+    - explain the content of
+    - explain the text of
+    - explain the information of
+    - explain the material of
+    - explain the document of
+    - explain the reference of
+    - explain the pdf of
+    - explain the slides of
+    - What is the explanation of
+    - What is the clarification of
+    - How do you explain
+    - How to explain
+    - Help me understand
+    - Help me learn about
+    - How to make
+    - How to do
+    - How to use
+    - How do
+    - how do they differ
+    - How does
+    - Tell me the explanation of
+    - Tell me the clarification of
+    - Tell me about 
+    - Clarify the meaning of
+    - clarify
+    - Can you clarify
+    - Can you explain
+    - Help me know more about
+    - Help me clarify
+    - Help me explain
+    - Why should
+    - Why is it important to
+    - Why is it necessary to
+    - Why is it important to know about
+    - Why is it necessary to know about
+    - Why is it important to understand
+    - Why is it necessary to understand
+    - Why is it important to learn about
+    - talk about
+    - talk more about
+    - talk about the topic of
+    - describe
+    - describe the
+    - describe how
+
+- intent: ask_for_summary
+  examples: |
+    - summarize
+    - summarize the topic of
+    - summarize the subject of
+    - summarize the content of
+    - summarize the text of
+    - summarize the information of
+    - summarize the material of
+    - summarize the document of
+    - summarize the reference of
+    - summarize the pdf of
+    - summarize the slides of
+    - Resume
+    - Resume the meaning of
+    - Resume the definition of
+    - Summarize
+    - Summarize the meaning of
+    - Summarize the definition of
+    - Sum up
+    - Sum up the meaning of
+    - Help me resume
+    - Help me summarize
+    - Can you resume
+    - Can you summarize
+    - Can you sum up
+    - Synthesise the
+
+- intent: get_insights
+  examples: |
+    - buttons for insights
+
+- intent: set_username
+  examples: |
+    - set username trigger
+  

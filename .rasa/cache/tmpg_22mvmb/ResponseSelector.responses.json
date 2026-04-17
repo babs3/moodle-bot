@@ -1,0 +1,25 @@
+{
+  "utter_chitchat/ask_name": [
+    {
+      "image": "https://i.imgur.com/zTvA58i.jpeg",
+      "text": "Hello, my name is Engi-Bot."
+    },
+    {
+      "text": "I am called Engi-Bot!"
+    }
+  ],
+  "utter_chitchat/bot_challenge": [
+    {
+      "text": "I am a bot, powered by Rasa."
+    },
+    {
+      "text": "I am a bot, created to assist you with your learning."
+    },
+    {
+      "text": "I am a bot, designed to help you with your class materials."
+    },
+    {
+      "text": "I am a bot, here to assist you with your learning needs."
+    }
+  ]
+}

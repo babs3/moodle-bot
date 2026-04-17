@@ -1,0 +1,130 @@
+/* styles.css */
+.element-container:has(style){
+    display: none;
+}
+
+/* ---------- green btns ---------- */
+#button-after-green {
+    display: none;
+}
+.element-container:has(#button-after-green) {
+    display: none;
+}
+.element-container:has(#button-after-green) + div button {
+    background-color: #32CD32;
+    color: white;
+}   
+/* Hover state */
+.element-container:has(#button-after-green) + div button:first-child:hover {
+    background-color: #228B22;
+    color: white;
+    border-color: #228B22;
+}    
+/* Focus state (after click) */
+.element-container:has(#button-after-green) + div button:first-child:focus {
+    background-color: #228B22 !important;
+    color: white !important;
+    border-color: #228B22 !important;
+    outline: none !important;
+}
+/* Active state (clicking) */
+.element-container:has(#button-after-green) + div button:first-child:active {
+    background-color: #32CD32 !important; /* even darker green */
+    color: white !important;
+    border-color: #32CD32 !important;
+}
+
+
+/* ---------- red btns ---------- */
+#button-after-red {
+    display: none;
+}
+.element-container:has(#button-after-red) {
+    display: none;
+}
+.element-container:has(#button-after-red) + div button {
+    background-color: #ff4b4b;
+    color: white;
+}
+/* Hover state */
+.element-container:has(#button-after-red) + div button:first-child:hover {
+    background-color: #ff3333;
+    color: white;
+    border-color: #ff4b4b;
+    }
+/* Focus state (after click) */
+.element-container:has(#button-after-red) + div button:first-child:focus {
+    background-color:#ff3333 !important;
+    color: white !important;
+    border-color: #ff3333 !important;
+    outline: none !important;
+}
+/* Active state (clicking) */
+.element-container:has(#button-after-red) + div button:first-child:active {
+    background-color: #ff3333 !important; /* even darker green */
+    color: white !important;
+    border-color: #ff3333 !important;
+}
+
+
+/* ---------- basic btns ---------- */
+#button-after-basic {
+    display: none;
+}
+.element-container:has(#button-after-basic) {
+    display: none;
+    color: black;
+}
+.element-container:has(#button-after-basic) + div button:first-child:hover {
+    border-color: #32CD32;
+    color: #1e1e1e;
+}
+/* Focus state (after click) */
+.element-container:has(#button-after-basic) + div button:first-child:focus {
+    background-color: white !important;
+    color: #1e1e1e !important;
+    border-color: #32CD32 !important;
+    outline: none !important;
+}
+/* Active state (clicking) */
+.element-container:has(#button-after-basic) + div button:first-child:active {
+    background-color: white !important;
+    color: #1e1e1e !important;
+    border-color: #32CD32 !important;
+}
+    
+/* ---------- link btns ---------- */
+#button-after-link {
+    display: none;
+}
+.element-container:has(#button-after-link) {
+    display: none;
+}
+.element-container:has(#button-after-link) + div button:first-child {
+    font-style: italic;
+    font-weight: bold;
+    }
+.element-container:has(#button-after-link) + div button:first-child:hover {
+    color: SteelBlue;
+    font-style: italic;
+    font-weight: bold;
+}
+
+/* ---------- Form btns ---------- */
+#button-after-form {
+    display: none;
+}
+.element-container:has(#button-after-form) {
+    display: none;
+} 
+.element-container:has(#button-after-form) + div button:first-child {
+    background-color: #32CD32;
+    color: #1e1e1e;
+    border-color: #32CD32;
+}
+/* Hover state */
+.element-container:has(#button-after-form) + div button:first-child:hover {
+    background-color: #228B22;
+    color: #1e1e1e;
+    border-color: #228B22;
+}

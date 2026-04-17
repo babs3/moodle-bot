@@ -1,0 +1,12 @@
+.env
+materials
+vector_store
+vector_store_gee
+vector_store_sci
+vector_store_lgp
+generic_words.json
+secrets.toml
+credentials.json
+documents
+all-MiniLM-L6-v2
+cleaned_output.sql

@@ -1,0 +1,12 @@
+.git
+.gitignore
+.env
+__pycache__/
+flask-backend/
+streamlit-frontend/
+docker-compose.yml
+materials/
+tests/
+generic_words.py
+process_pdfs.py
+README.md

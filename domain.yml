@@ -1,0 +1,104 @@
+version: "3.1"
+
+intents:
+  - greet
+  - goodbye
+  - get_insights
+  - set_username
+  - most_popular_topics
+  - total_questions
+  - most_referenced_pdfs
+  - custom_teacher_query
+  - bot_challenge
+  - welcome
+  - ask_for_definition
+  - ask_for_examples
+  - ask_for_explanation
+  - ask_for_summary
+
+slots:
+
+  user_query:
+    type: text
+    mappings:
+      - type: custom
+
+  materials_location:
+    type: list
+    mappings:
+      - type: custom
+
+  bot_response:
+    type: text
+    mappings:
+      - type: custom
+  
+  sender_id:
+    type: text
+    mappings:
+      - type: custom
+
+  input_time:
+    type: text
+    mappings:
+      - type: custom
+
+  username:
+    type: text
+    initial_value: "there"
+    mappings:
+      - type: custom 
+  
+responses:
+
+  utter_greet:
+  - text: "Hello {username}! How can I help you today?"
+  - text: "Hi {username}! How can I assist you today?"
+  - text: "Hey {username}!👋 What can I do for you today?"
+
+  utter_goodbye:
+  - text: "Goodbye! Have a great day!"
+  - text: "See you later! Take care!"
+  - text: "Bye! If you need anything else, just let me know."
+  - text: "Goodbye! If you have more questions, feel free to ask."
+  - text: "See you later! If you need anything else, just let me know."
+
+  utter_welcome:
+  - text: "You're welcome! If you have any more questions, feel free to ask."
+  - text: "You're welcome! If you need anything else, just let me know."
+  - text: "You don't need to thank me! I'm here to help you."
+  - text: "You're welcome! I'm here to assist you with your learning."
+
+  utter_bot_challenge:
+  - text: "I am Engi-Bot, created to assist you with your learning."
+  - text: "I am Engi-Bot, designed to help you with your class materials."
+  - text: "My name is Engi-Bot, I'am here to assist you with your learning needs."
+  - text: "I am Engi-Bot. I specialize in assisting with course-related questions. Do you need help with something specific?"
+  - text: "My name is Engi-Bot, I can help you with your class materials. Do you have any questions?"
+  - text: "I am Engi-Bot, I'm here to help with class materials and learning support. Let me know what you need!"
+
+  utter_get_insights:
+  - text: "Hey! How are you?"
+    buttons:
+    - title: "Get most popular topics"
+      payload: "/most_popular_topics"
+    - title: "Get total questions"
+      payload: "/total_questions"
+    - title: "Get most referenced PDFs"
+      payload: "/most_referenced_pdfs"
+
+actions:
+- action_set_username
+- action_get_definition
+- action_get_examples
+- action_get_explanation
+- action_get_summary
+- action_get_class_material_location
+- action_get_most_popular_topics
+- action_get_total_questions
+- action_get_most_referenced_pdfs
+- action_teacher_custom_question
+
+session_config:
+  session_expiration_time: 60
+  carry_over_slots_to_new_session: true

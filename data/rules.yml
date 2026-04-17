@@ -1,0 +1,77 @@
+version: "3.1"
+
+rules:
+
+- rule: user challenges bot
+  steps:
+  - intent: bot_challenge
+  - action: utter_bot_challenge
+
+- rule: user welcomes bot
+  steps:
+  - intent: welcome
+  - action: utter_welcome
+
+- rule: Greet the user
+  steps:
+    - intent: greet
+    - action: utter_greet
+
+- rule: Say goodbye anytime the user says goodbye
+  steps:
+  - intent: goodbye
+  - action: utter_goodbye
+
+- rule: Set username
+  steps:
+    - intent: set_username
+    - action: action_set_username
+
+- rule: Handle definition request
+  steps:
+    - intent: ask_for_definition
+    - action: action_get_definition
+    - action: action_get_class_material_location
+
+- rule: Handle examples request
+  steps:
+    - intent: ask_for_examples
+    - action: action_get_examples
+    - action: action_get_class_material_location
+
+- rule: Handle explanation request
+  steps:
+    - intent: ask_for_explanation
+    - action: action_get_explanation
+    - action: action_get_class_material_location
+
+- rule: Handle summarization request
+  steps:
+    - intent: ask_for_summary
+    - action: action_get_summary
+    - action: action_get_class_material_location
+
+- rule: Handle insights request
+  steps:
+    - intent: get_insights
+    - action: utter_get_insights
+
+- rule: Show most popular topics
+  steps:
+    - intent: most_popular_topics
+    - action: action_get_most_popular_topics
+
+- rule: Show total number of questions
+  steps:
+    - intent: total_questions
+    - action: action_get_total_questions
+
+- rule: Show most referenced PDFs
+  steps:
+    - intent: most_referenced_pdfs
+    - action: action_get_most_referenced_pdfs
+
+- rule: Handle teacher's query
+  steps:
+    - intent: custom_teacher_query
+    - action: action_teacher_custom_question
