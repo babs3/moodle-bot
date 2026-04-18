@@ -2,6 +2,8 @@ from time import sleep
 from flask import request
 import random
 from datetime import datetime, timezone, timedelta
+import requests
+import json
 from flask_backend.utils import *
 
 @app.route('/')
@@ -14,6 +16,40 @@ def chat():
     user_message = data.get("message")
     
     # Aqui podes pôr a tua lógica ou chamar o Rasa via REST
+    user_email = "EMAIL@EXAMPLE.COM"
+    username = "JOAO"#user.get("name").split()[0] # Get the first name
+    url = "http://rasa:5005/webhooks/rest/webhook"
+    current_time = datetime.now(timezone.utc).isoformat() #datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    payload = {
+        "sender": user_email,
+        "message": user_message, #user_input,
+        "metadata": {"username": username,"input_time":current_time, "selected_class_name": "class_name", "selected_class_number": "3", "selected_group":"01", "teacher_question": ""}
+    }
+    headers = {"Content-Type": "application/json"}
+
+    try:
+        response = requests.post(url, data=json.dumps(payload), headers=headers)
+        response.raise_for_status()
+        messages = response.json()
+
+        bot_reply = ""
+        buttons = []
+
+        for message in messages:
+            if "text" in message:
+                bot_reply += f"\n\n {message['text']}"
+            if "buttons" in message:
+                buttons = message["buttons"]
+
+        #return bot_reply.strip(), buttons  # Return both text and buttons
+        return jsonify([{"text": f"{bot_reply.strip()}"}])
+
+    except requests.RequestException as e:
+        print(f"⚠️ Error connecting to Rasa: {e}")
+        return None
+    
+    
+    
     # Por agora, vamos apenas devolver uma resposta de teste
     return jsonify([{"text": f"Recebi: {user_message}"}])
 
