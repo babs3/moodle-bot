@@ -147,7 +147,7 @@ def action_process(dispatcher, user_message, sender_id, input_time, intent):
 
         # === PREPARE QUERY FOR GEMINI === #
         raw_text = "\n".join(results_text)
-        prompt = f" Use the following raw educational content to answer the student query '{query}': \n{raw_text} "
+        prompt = f" Use the following raw educational content to answer the student query '{query}': \n{raw_text} \nDon's exceed 50 words and be concise and precise in your answer. If you don't find relevant information, say you couldn't find relevant content in the course materials."
         
         formatted_response = "Sorry, I couldn't generate a response..."
         try:
