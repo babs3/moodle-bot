@@ -7,6 +7,7 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+import requests
 from flask_backend.models import *
 
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
@@ -33,6 +34,45 @@ db.init_app(app)
 migrate = Migrate(app, db)  # For database migrations
 jwt = JWTManager(app)
 
+def get_moodle_user_data(user_id):
+    # 1. Usa o IP direto e verifica se precisas de porta (ex: :80)
+    MOODLE_URL = "http://host.docker.internal" # Este endereço diz ao Docker: "Sai do contentor e vai buscar o localhost da máquina real".
+    TOKEN = "0ddbc49e8fb40d350050c17ec5b8dd46"
+    FUNCTION = "core_user_get_users"
+    
+    app.logger.info(f"--- INÍCIO DA BUSCA MOODLE ---")
+    app.logger.info(f"ID: {user_id} | URL: {MOODLE_URL}")
+
+    params = {
+        'wstoken': TOKEN,
+        'wsfunction': FUNCTION,
+        'moodlewsrestformat': 'json',
+        'criteria[0][key]': 'id',
+        'criteria[0][value]': user_id
+    }
+
+    try:
+        # 2. Adiciona um timeout para o código não ficar "pendurado" para sempre
+        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=5)
+        response_data = response.json()
+        app.logger.info(f"Resposta bruta do Moodle: {response_data}")
+
+        if 'users' in response_data and len(response_data['users']) > 0:
+            user = response_data['users'][0]
+            return {
+                "nome": user['firstname'],
+                "apelido": user['lastname'],
+                "email": user['email'],
+            }
+        
+        app.logger.warning(f"Utilizador {user_id} não encontrado no Moodle.")
+        return None
+            
+    except Exception as e:
+        # 3. Usa o logger para o erro também, para teres a certeza que vês na consola
+        app.logger.error(f"ERRO CRÍTICO ao ligar ao Moodle: {str(e)}")
+        return None
+    
 def send_email_to_admin_about_teacher_request(user):
     subject = "New Teacher Registration Request"
     html_body = f"""

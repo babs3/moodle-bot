@@ -2,7 +2,6 @@ from time import sleep
 from flask import request
 import random
 from datetime import datetime, timezone, timedelta
-import requests
 import json
 from flask_backend.utils import *
 
@@ -11,13 +10,21 @@ def index():
     return "Flask está a correr na porta 8080!"
 
 @app.route('/chat', methods=['POST'])
-def chat():
+def chat():    
     data = request.json
-    user_message = data.get("message")
+    app.logger.info(f"Received data: {data}")
+    moodle_id = data.get('user_id') # Recebe o "2" do teu Javascript
+    print(f"Received message from user_id: {moodle_id}")
+    app.logger.info(f"Received userID: {moodle_id}")
+    user_message = data.get('message')
+
+    # Busca os dados reais no Moodle
+    info_utilizador = get_moodle_user_data(moodle_id)
     
     # Aqui podes pôr a tua lógica ou chamar o Rasa via REST
-    user_email = "EMAIL@EXAMPLE.COM"
-    username = "JOAO"#user.get("name").split()[0] # Get the first name
+    user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
+    username = info_utilizador.get("nome") if info_utilizador else "NOME_"
+
     url = "http://rasa:5005/webhooks/rest/webhook"
     current_time = datetime.now(timezone.utc).isoformat() #datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     payload = {
@@ -38,8 +45,8 @@ def chat():
         for message in messages:
             if "text" in message:
                 bot_reply += f"\n\n {message['text']}"
-            if "buttons" in message:
-                buttons = message["buttons"]
+        #    if "buttons" in message:
+        #        buttons = message["buttons"]
 
         #return bot_reply.strip(), buttons  # Return both text and buttons
         return jsonify([{"text": f"{bot_reply.strip()}"}])
@@ -48,10 +55,6 @@ def chat():
         print(f"⚠️ Error connecting to Rasa: {e}")
         return None
     
-    
-    
-    # Por agora, vamos apenas devolver uma resposta de teste
-    return jsonify([{"text": f"Recebi: {user_message}"}])
 
 @app.route("/api/save_reset_token", methods=["POST"])
 def save_reset_token():
