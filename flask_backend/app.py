@@ -55,6 +55,46 @@ def chat():
         print(f"⚠️ Error connecting to Rasa: {e}")
         return None
     
+@app.route("/api/get_moodle_user/<email>", methods=["GET"])
+def get_moodle_user(email):
+    moodle_user = MoodleUsers.query.filter(MoodleUsers.email == email).first()
+    if not moodle_user:
+        return jsonify({"error": "Moodle user not found"}), 404
+    return jsonify({"id":str(moodle_user.id), "moodle_id": moodle_user.moodle_id, "email": moodle_user.email}) # "name": moodle_user.name
+
+@app.route("/api/save_moodle_progress/<user_id>", methods=["POST"])
+def save_moodle_progress(user_id):
+    data = request.json
+    topic_name = data["topic"]
+
+    if topic_name is not None:
+        topic_obj = Topics.query.filter(Topics.topic == topic_name).first()
+        if topic_obj:
+            topic_id = topic_obj.id
+        else:
+            # create new topic
+            new_topic = Topics(topic=topic_name)
+            db.session.add(new_topic)
+            db.session.commit()
+            topic_id = new_topic.id  # we can get the id directly from the object
+    else:
+        topic_id = None
+
+    progress = UserProgress(
+        user_id=user_id,
+        class_id=data["class_id"],
+        question=data["question"],
+        response=data["response"],
+        topic_id=topic_id,
+        pdfs=data["pdfs"],
+        response_time=data["response_time"],
+        timestamp=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+
+    db.session.add(progress)
+    db.session.commit()
+
+    return jsonify({"message": "Moodle progress saved"})
 
 @app.route("/api/save_reset_token", methods=["POST"])
 def save_reset_token():
@@ -271,17 +311,22 @@ def register_student():
 @app.route("/api/create_moodle_user", methods=["POST"])
 def create_moodle_user():
     data = request.json
+    app.logger.info(f"Creating Moodle user with data: {data}")
     
-    moodle_user = moodleUsers(moodle_id=int(data["moodle_id"]), email=data["email"])
+    moodle_user = MoodleUsers(moodle_id=int(data["moodle_id"]), email=data["email"])
     db.session.add(moodle_user)
     db.session.commit()
+    
+    # return the error if needed, to now what happen:
+    if not moodle_user:
+        return jsonify({"error": "Failed to create Moodle user"}), 500
     
     return jsonify({"message": "Moodle user created successfully"}), 200
 
 @app.route("/api/save_moodle_user_history/<user_id>", methods=["POST"])
 def save_moodle_user_history(user_id):
     data = request.json
-    history = moodleUserHistory(moodle_user_id=user_id, question=data["question"], response=data["response"], timestamp=datetime.now())
+    history = MoodleUserHistory(moodle_user_id=user_id, question=data["question"], response=data["response"], timestamp=datetime.now())
     db.session.add(history)
     db.session.commit()
     return jsonify({"message": "Moodle user history saved successfully"}), 200
