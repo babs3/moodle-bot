@@ -31,25 +31,25 @@ rules:
   steps:
     - intent: ask_for_definition
     - action: action_get_definition
-    - action: action_get_class_material_location
+    #- action: action_get_class_material_location
 
 - rule: Handle examples request
   steps:
     - intent: ask_for_examples
     - action: action_get_examples
-    - action: action_get_class_material_location
+    #- action: action_get_class_material_location
 
 - rule: Handle explanation request
   steps:
     - intent: ask_for_explanation
     - action: action_get_explanation
-    - action: action_get_class_material_location
+    #- action: action_get_class_material_location
 
 - rule: Handle summarization request
   steps:
     - intent: ask_for_summary
     - action: action_get_summary
-    - action: action_get_class_material_location
+    #- action: action_get_class_material_location
 
 - rule: Handle insights request
   steps:

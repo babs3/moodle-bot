@@ -33,7 +33,12 @@ slots:
     mappings:
       - type: custom
   
-  sender_id:
+  user_id:
+    type: text
+    mappings:
+      - type: custom
+
+  user_email:
     type: text
     mappings:
       - type: custom

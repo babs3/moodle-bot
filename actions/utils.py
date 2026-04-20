@@ -111,12 +111,14 @@ def normalize_topic(new_topic, known_topics, threshold=0.85):
         print(f"💾  New topic '{new_topic}' saved!")
         return new_topic
 
-def save_user_progress(user_email, user_message, bot_response, topic, pfds, input_time_str):
+def save_user_progress(user_email, user_message, bot_response, topic, pfds, input_time_str, user_id):
 
     user = fetch_user(user_email)
     #print(f"\n📗 User: {user}")
     if not user:
-        print(f"\n❌ User not found for email: {user_email}.")
+        #print(f"\n❌ User not found for email: {user_email}.")
+        # create moodle user
+        user = create_moodle_user(user_id, user_email)
         return
     user_id = str(user.get("id"))
     

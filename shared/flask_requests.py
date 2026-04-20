@@ -1,5 +1,9 @@
 import requests
 
+def create_moodle_user(moodle_id, email):
+    response = requests.post("http://flask-server:8080/api/create_moodle_user/", json={"moodle_id": moodle_id, "email": email})
+    return response.json() if response.status_code == 200 else {}
+
 def send_password_reset_email(email):
     response = requests.post("http://flask-server:8080/api/send_password_reset_email/" + email)
     return response.json() if response.status_code == 200 else {}

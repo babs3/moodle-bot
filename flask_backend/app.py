@@ -30,7 +30,7 @@ def chat():
     payload = {
         "sender": user_email,
         "message": user_message, #user_input,
-        "metadata": {"username": username,"input_time":current_time, "selected_class_name": "class_name", "selected_class_number": "3", "selected_group":"01", "teacher_question": ""}
+        "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id}
     }
     headers = {"Content-Type": "application/json"}
 
@@ -266,6 +266,26 @@ def register_student():
     db.session.commit()
     
     return send_confirmation_email(data["email"], confirmation_otp)
+
+
+@app.route("/api/create_moodle_user", methods=["POST"])
+def create_moodle_user():
+    data = request.json
+    
+    moodle_user = moodleUsers(moodle_id=int(data["moodle_id"]), email=data["email"])
+    db.session.add(moodle_user)
+    db.session.commit()
+    
+    return jsonify({"message": "Moodle user created successfully"}), 200
+
+@app.route("/api/save_moodle_user_history/<user_id>", methods=["POST"])
+def save_moodle_user_history(user_id):
+    data = request.json
+    history = moodleUserHistory(moodle_user_id=user_id, question=data["question"], response=data["response"], timestamp=datetime.now())
+    db.session.add(history)
+    db.session.commit()
+    return jsonify({"message": "Moodle user history saved successfully"}), 200
+
 
 
 @app.route("/confirm/<otp>", methods=["GET"]) # TODO check if this is used

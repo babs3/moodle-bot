@@ -96,8 +96,8 @@ def keywords_to_tokens(keywords, query):
     
     
  
-def action_process(dispatcher, user_message, sender_id, input_time, intent):
-    print(f"\n🧒  User ({sender_id}) said: {user_message} 📩")
+def action_process(dispatcher, user_message, user_email, input_time, intent, user_id):
+    print(f"\n🧒  User ({user_email}) said: {user_message} 📩")
     query = treat_raw_query(user_message)
     
     # Keywords Extraction Process 
@@ -116,7 +116,8 @@ def action_process(dispatcher, user_message, sender_id, input_time, intent):
             SlotSet("user_query", query),  # Store the query
             SlotSet("materials_location", ""), #gemini_results),  # Store selected materials
             SlotSet("bot_response", "no_response"),  # Store the bot response
-            SlotSet("sender_id", sender_id),  # Store the sender ID
+            SlotSet("user_email", user_email),  # Store the sender ID
+            SlotSet("user_id", user_id),  # Store the user ID
             SlotSet("input_time", input_time)
             ]
         
@@ -169,7 +170,8 @@ def action_process(dispatcher, user_message, sender_id, input_time, intent):
                 SlotSet("user_query", query),  # Store the query
                 SlotSet("materials_location", ""), #gemini_results),  # Store selected materials
                 SlotSet("bot_response", "no_response"),  # Store the bot response
-                SlotSet("sender_id", sender_id),  # Store the sender ID
+                SlotSet("user_email", user_email),  # Store the sender ID
+                SlotSet("user_id", user_id),  # Store the user ID
                 SlotSet("input_time", input_time)
             ]
 
@@ -177,7 +179,8 @@ def action_process(dispatcher, user_message, sender_id, input_time, intent):
         SlotSet("user_query", user_message),  # Store the query
         SlotSet("materials_location", selected_results), #gemini_results),  # Store selected materials
         SlotSet("bot_response", formatted_response),  # Store the bot response
-        SlotSet("sender_id", sender_id),  # Store the sender ID
+        SlotSet("user_email", user_email),  # Store the sender ID
+        SlotSet("user_id", user_id),  # Store the user ID
         SlotSet("input_time", input_time)
         ]
     
@@ -192,7 +195,8 @@ class ActionGetDefinition(Action):
         print("\n📊  Generating bot 'action_get_definition' response...")
 
         user_message = tracker.latest_message.get("text")
-        sender_id = tracker.sender_id  # ✅ Retrieves the "sender" field
+        user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
+        user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         print(f"\n🕓  latest_message INPUT TIME: {input_time}")
         # Convert ISO 8601 timestamp string back to a datetime object
@@ -204,7 +208,7 @@ class ActionGetDefinition(Action):
         
         intent = "definition of "
         
-        return action_process(dispatcher, user_message, sender_id, input_time, intent)
+        return action_process(dispatcher, user_message, user_email, input_time, intent, user_id=user_id)
     
 # === ACTION 2: GET EXPLANATION === #
 class ActionGetExplanation(Action):
@@ -216,11 +220,11 @@ class ActionGetExplanation(Action):
         print("\n📊  Generating bot 'action_get_explanation' response...")
 
         user_message = tracker.latest_message.get("text")
-        sender_id = tracker.sender_id  # ✅ Retrieves the "sender" field
+        user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         intent = "explanation of "
         
-        return action_process(dispatcher, user_message, sender_id, input_time, intent)
+        return action_process(dispatcher, user_message, user_email, input_time, intent)
 
 # === ACTION 3: GET EXAMPLES === #
 class ActionGetExamples(Action):
@@ -232,11 +236,11 @@ class ActionGetExamples(Action):
         print("\n📊  Generating bot 'action_get_examples' response...")
 
         user_message = tracker.latest_message.get("text")
-        sender_id = tracker.sender_id  # ✅ Retrieves the "sender" field
+        user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         intent = "examples of "
         
-        return action_process(dispatcher, user_message, sender_id, input_time, intent)
+        return action_process(dispatcher, user_message, user_email, input_time, intent)
 
 # === ACTION 4: SUMMARIZE === #
 class ActionGetSummary(Action):
@@ -248,11 +252,11 @@ class ActionGetSummary(Action):
         print("\n📊  Generating bot 'action_get_summary' response...")
 
         user_message = tracker.latest_message.get("text")
-        sender_id = tracker.sender_id  # ✅ Retrieves the "sender" field
+        user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         intent = "summary of "
         
-        return action_process(dispatcher, user_message, sender_id, input_time, intent)
+        return action_process(dispatcher, user_message, user_email, input_time, intent)
 
 
 # === FINAL ACTION: GET PDF NAMES & PAGE LOCATIONS === #
@@ -266,13 +270,14 @@ class ActionGetClassMaterialLocation(Action):
         input_time = tracker.get_slot("input_time")
         print(f"\n🕓  materialsLocation INPUT TIME: {input_time}")
         selected_results = tracker.get_slot("materials_location")
-        sender_id = tracker.get_slot("sender_id")
+        user_id = tracker.get_slot("user_id")
+        user_email = tracker.get_slot("user_email")
         user_message = tracker.get_slot("user_query")
         query = treat_raw_query(user_message)
         
         if bot_response == "no_response":
             response = f"I couldn't find any relevant content on this topic in the course materials. Please try again."
-            save_user_progress(sender_id, user_message, response, None, [], input_time)
+            save_user_progress(user_email, user_message, response, None, [], input_time, user_id=user_id)
             dispatcher.utter_message(text=response)
             return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
 
@@ -293,14 +298,14 @@ class ActionGetClassMaterialLocation(Action):
             location_results, pdfs_insights = get_materials_location(selected_results, complex_tokens, simple_tokens)
 
             if location_results:
-                response = save_user_progress(sender_id, query, bot_response, topic, ", ".join(pdfs_insights), input_time)
+                response = save_user_progress(user_email, query, bot_response, topic, ", ".join(pdfs_insights), input_time)
                 print(f"--> SAVED USER PROGRESS: {response}")
                 print_results(location_results)              
             
                 # check if the user is logged with g.uporto accout
-                if is_uporto_email(sender_id) == False:
-                    print(f"⚠️  User with ID {sender_id} is not part of FEUP's community.")
-                    return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
+                if is_uporto_email(user_email) == False:
+                    print(f"⚠️  User with ID {user_email} is not part of FEUP's community.")
+                    return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("user_email", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
                 
                 dispatcher.utter_message(text="You can find related information in:\n" + "\n".join(location_results))
             else:
@@ -308,22 +313,22 @@ class ActionGetClassMaterialLocation(Action):
                 if selected_results:
                     
                     location_results, pdfs_insights = update_materials_location(selected_results)
-                    response = save_user_progress(sender_id, query, bot_response, topic, ", ".join(pdfs_insights), input_time)
+                    response = save_user_progress(user_email, query, bot_response, topic, ", ".join(pdfs_insights), input_time)
                     
                     # check if the user is logged with g.uporto accout
-                    if is_uporto_email(sender_id) == False:
-                        print(f"⚠️  User with ID {sender_id} is not part of FEUP's community.")
-                        return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
+                    if is_uporto_email(user_email) == False:
+                        print(f"⚠️  User with ID {user_email} is not part of FEUP's community.")
+                        return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("user_email", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
                 
                     dispatcher.utter_message(text="You can find related information in:\n" + "\n".join(location_results))
                 
                 else:                
                     print("\n ⚠️  No exact references found, but you might check related PDFs.")
                     
-                    response = save_user_progress(sender_id, user_message, bot_response, topic, [], input_time)
+                    response = save_user_progress(user_email, user_message, bot_response, topic, [], input_time)
                     # check if the user is logged with g.uporto accout
-                    if is_uporto_email(sender_id) == False:
-                        print(f"⚠️  User with ID {sender_id} is not part of FEUP's community.")
+                    if is_uporto_email(user_email) == False:
+                        print(f"⚠️  User with ID {user_email} is not part of FEUP's community.")
                         return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
                 
                     dispatcher.utter_message(text="I couldn't find specific page references for your question.")

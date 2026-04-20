@@ -22,6 +22,22 @@ class Users(db.Model):
     progress = db.relationship('UserProgress', backref='user', cascade="all, delete-orphan", passive_deletes=True)  
     resetToken = db.relationship('PasswordResetTokens', backref='user', cascade="all, delete-orphan", passive_deletes=True)
     
+    
+    
+class MoodleUsers(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    moodle_id = db.Column(db.Integer, unique=True, nullable=False)  # Moodle user ID
+    email = db.Column(db.String(100), unique=True, nullable=False)  # User's email
+
+class MoodleUserHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    moodle_user_id = db.Column(db.Integer, db.ForeignKey('moodle_users.id', ondelete="CASCADE"), nullable=False)
+    question = db.Column(db.Text, nullable=False)
+    response = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.now())
+    
+    
+
 class PasswordResetTokens(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(100), db.ForeignKey('users.email', ondelete="CASCADE"), nullable=False)
