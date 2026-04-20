@@ -114,8 +114,6 @@ def normalize_topic(new_topic, known_topics, threshold=0.85):
 def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_str, user_id):
 
     print(f"\n📍  Saving user progress for email: {user_email}, ID: {user_id}")
-    print(f"    - User message: {user_message}")
-    print(f"    - Bot response: {bot_response[:100]}...")
     moodle_user = fetch_moodle_user(user_email)
     #print(f"\n📗 User: {user}")
     if not moodle_user:
@@ -213,7 +211,7 @@ def format_gemini_response(text: str) -> str:
         str: The formatted text with ** tags instead of triple backticks and escaped $ symbols.
     """
     # Replace triple backticks with bold (**)
-    text = re.sub(r'```(.*?)```', r'**\1**', text, flags=re.DOTALL)
+    text = re.sub(r'```(.*?)```', r'*\1*', text, flags=re.DOTALL)
     
     # Escape $ symbols (replace single $ with \$ to prevent LaTeX formatting in Streamlit)
     text = text.replace("$", "\\$")
@@ -390,7 +388,7 @@ def format_page_range(file_name, pages):
     else:
         ranges.append(f"{start}-{pages[-1]}")
 
-    return f"📄 **{file_name} (Pages {', '.join(ranges)})**"
+    return f"📄 {file_name} (Pages {', '.join(ranges)})"
 
 def treat_raw_query(query):
     # === Treat user query === #

@@ -34,6 +34,7 @@ class MoodleUserHistory(db.Model):
     moodle_user_id = db.Column(db.Integer, db.ForeignKey('moodle_users.moodle_id', ondelete="CASCADE"), nullable=False)
     question = db.Column(db.Text, nullable=False)
     response = db.Column(db.Text, nullable=False)
+    pdfs = db.Column(db.String(255), nullable=True)  # Comma-separated PDF references
     timestamp = db.Column(db.DateTime, default=datetime.now())
     
     

@@ -158,7 +158,6 @@ def action_process(dispatcher, user_message, user_email, input_time, intent, use
                 print("\n🎯  Gemini Response Generated Successfully!")
                 formatted_response = format_gemini_response(response.text)
                 dispatcher.utter_message(text=formatted_response)
-                save_user_progress(user_email, user_message, formatted_response, [], input_time, user_id)
             else:
                 print("\n ⚠️  Gemini Response is empty.")
                 dispatcher.utter_message(text=formatted_response)
@@ -221,10 +220,11 @@ class ActionGetExplanation(Action):
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
+        user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         intent = "explanation of "
         
-        return action_process(dispatcher, user_message, user_email, input_time, intent)
+        return action_process(dispatcher, user_message, user_email, input_time, intent, user_id=user_id)
 
 # === ACTION 3: GET EXAMPLES === #
 class ActionGetExamples(Action):
@@ -238,9 +238,10 @@ class ActionGetExamples(Action):
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
+        user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         intent = "examples of "
         
-        return action_process(dispatcher, user_message, user_email, input_time, intent)
+        return action_process(dispatcher, user_message, user_email, input_time, intent, user_id=user_id)
 
 # === ACTION 4: SUMMARIZE === #
 class ActionGetSummary(Action):
@@ -254,9 +255,10 @@ class ActionGetSummary(Action):
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
+        user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         intent = "summary of "
         
-        return action_process(dispatcher, user_message, user_email, input_time, intent)
+        return action_process(dispatcher, user_message, user_email, input_time, intent, user_id=user_id)
 
 
 # === FINAL ACTION: GET PDF NAMES & PAGE LOCATIONS === #
@@ -268,7 +270,6 @@ class ActionGetClassMaterialLocation(Action):
 
         bot_response = tracker.get_slot("bot_response")
         input_time = tracker.get_slot("input_time")
-        print(f"\n🕓  materialsLocation INPUT TIME: {input_time}")
         selected_results = tracker.get_slot("materials_location")
         user_id = tracker.get_slot("user_id")
         user_email = tracker.get_slot("user_email")
@@ -277,13 +278,10 @@ class ActionGetClassMaterialLocation(Action):
         
         if bot_response == "no_response":
             response = f"I couldn't find any relevant content on this topic in the course materials. Please try again."
-            save_user_progress(user_email, user_message, response, None, [], input_time, user_id=user_id)
+            save_user_progress(user_email, user_message, response, [], input_time, user_id=user_id)
             dispatcher.utter_message(text=response)
             return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
 
-        topic = get_query_topic(query, bot_response)
-        
-        
         print(f"\n\n 🔖  --------- Getting class materials location --------- 🔖 ")
         
         if len(selected_results) == 0:
@@ -298,39 +296,27 @@ class ActionGetClassMaterialLocation(Action):
             location_results, pdfs_insights = get_materials_location(selected_results, complex_tokens, simple_tokens)
 
             if location_results:
-                response = save_user_progress(user_email, query, bot_response, topic, ", ".join(pdfs_insights), input_time)
-                print(f"--> SAVED USER PROGRESS: {response}")
+                response = save_user_progress(user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id=user_id)
                 print_results(location_results)              
-            
-                # check if the user is logged with g.uporto accout
-                if is_uporto_email(user_email) == False:
-                    print(f"⚠️  User with ID {user_email} is not part of FEUP's community.")
-                    return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("user_email", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
-                
-                dispatcher.utter_message(text="You can find related information in:\n" + "\n".join(location_results))
+                dispatcher.utter_message(
+                    text="</br></br>You can find related information in:</br><i><span style='font-size: 8px;'>" 
+                    + "</br>".join(location_results) + 
+                    "</span></i>"
+                )
             else:
                 # no exact references found, so return related PDFs found in previous function
                 if selected_results:
-                    
                     location_results, pdfs_insights = update_materials_location(selected_results)
-                    response = save_user_progress(user_email, query, bot_response, topic, ", ".join(pdfs_insights), input_time)
-                    
-                    # check if the user is logged with g.uporto accout
-                    if is_uporto_email(user_email) == False:
-                        print(f"⚠️  User with ID {user_email} is not part of FEUP's community.")
-                        return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("user_email", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
-                
-                    dispatcher.utter_message(text="You can find related information in:\n" + "\n".join(location_results))
-                
+                    response = save_user_progress(user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id=user_id)
+                    #dispatcher.utter_message(text="</br></br>You can find related information in:</br>" + "</br>".join(location_results))
+                    dispatcher.utter_message(
+                        text="</br></br>You can find related information in:</br><i><span style='font-size: 8px;'>" 
+                        + "</br>".join(location_results) + 
+                        "</span></i>"
+                )
                 else:                
                     print("\n ⚠️  No exact references found, but you might check related PDFs.")
-                    
-                    response = save_user_progress(user_email, user_message, bot_response, topic, [], input_time)
-                    # check if the user is logged with g.uporto accout
-                    if is_uporto_email(user_email) == False:
-                        print(f"⚠️  User with ID {user_email} is not part of FEUP's community.")
-                        return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
-                
+                    response = save_user_progress(user_email, user_message, bot_response, [], input_time, user_id=user_id)
                     dispatcher.utter_message(text="I couldn't find specific page references for your question.")
 
         #clear the slots
