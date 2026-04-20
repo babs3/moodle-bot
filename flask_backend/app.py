@@ -65,14 +65,15 @@ def get_moodle_user(email):
 @app.route("/api/save_moodle_progress", methods=["POST"])
 def save_moodle_progress():
     data = request.json
+    app.logger.info(f"Received data for saving Moodle progress: {data}")
     user_id = data.get("user_id")
+    app.logger.info(f"Saving Moodle progress for user_id: {user_id} with data: {data}")
     
     progress = MoodleUserHistory(
         moodle_user_id=int(user_id),
         question=data["question"],
         response=data["response"],
         #pdfs=data["pdfs"], TODO: add pdfs to moodle user history
-        response_time=data["response_time"],
         timestamp=datetime.now(timezone.utc) + timedelta(hours=1),
     )
 

@@ -31,7 +31,7 @@ class MoodleUsers(db.Model):
 
 class MoodleUserHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    moodle_user_id = db.Column(db.Integer, db.ForeignKey('moodle_users.id', ondelete="CASCADE"), nullable=False)
+    moodle_user_id = db.Column(db.Integer, db.ForeignKey('moodle_users.moodle_id', ondelete="CASCADE"), nullable=False)
     question = db.Column(db.Text, nullable=False)
     response = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.now())

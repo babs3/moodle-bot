@@ -114,6 +114,8 @@ def normalize_topic(new_topic, known_topics, threshold=0.85):
 def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_str, user_id):
 
     print(f"\n📍  Saving user progress for email: {user_email}, ID: {user_id}")
+    print(f"    - User message: {user_message}")
+    print(f"    - Bot response: {bot_response[:100]}...")
     moodle_user = fetch_moodle_user(user_email)
     #print(f"\n📗 User: {user}")
     if not moodle_user:
@@ -122,7 +124,6 @@ def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_
         moodle_user = create_moodle_user(user_id, user_email)
         print(f"\n📗 Created Moodle User: {moodle_user}")
         #return   
-
 
     # Extracting the timestamp part
     input_time_cleaned = input_time_str.split("input_time: ")[-1].strip()
@@ -148,11 +149,8 @@ def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_
         "pdfs": pdfs,
         "response_time": response_timestamp
     }
-
-    message = save_moodle_progress(data)
-    print(f"\n📗 Progress saved: {message}")
-
-    return message
+    
+    return save_moodle_progress(data)
 
 QUESTION_WORDS = {"what", "who", "where", "when", "why", "how"}
 

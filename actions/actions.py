@@ -157,10 +157,8 @@ def action_process(dispatcher, user_message, user_email, input_time, intent, use
             if hasattr(response, "text") and response.text:
                 print("\n🎯  Gemini Response Generated Successfully!")
                 formatted_response = format_gemini_response(response.text)
-                print(formatted_response[:100] + "...")
                 dispatcher.utter_message(text=formatted_response)
-                
-                save_user_progress(user_email, user_message, response, [], input_time, user_id)
+                save_user_progress(user_email, user_message, formatted_response, [], input_time, user_id)
             else:
                 print("\n ⚠️  Gemini Response is empty.")
                 dispatcher.utter_message(text=formatted_response)
