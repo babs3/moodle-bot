@@ -160,7 +160,7 @@ def action_process(dispatcher, user_message, user_email, input_time, intent, use
                 print(formatted_response[:100] + "...")
                 dispatcher.utter_message(text=formatted_response)
                 
-                save_user_progress(user_email, user_message, response, None, [], input_time, user_id)
+                save_user_progress(user_email, user_message, response, [], input_time, user_id)
             else:
                 print("\n ⚠️  Gemini Response is empty.")
                 dispatcher.utter_message(text=formatted_response)

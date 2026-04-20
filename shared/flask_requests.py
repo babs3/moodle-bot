@@ -8,8 +8,8 @@ def fetch_moodle_user(user_email):
     response = requests.get("http://flask-server:8080/api/get_moodle_user/" + user_email)
     return response.json() if response.status_code == 200 else {}
 
-def save_moodle_progress(user_id, data):
-    response = requests.post("http://flask-server:8080/api/save_moodle_progress/" + str(user_id), json=data)
+def save_moodle_progress(data):
+    response = requests.post("http://flask-server:8080/api/save_moodle_progress", json=data)
     return response.json() if response.status_code == 200 else {}
 
 def send_password_reset_email(email):

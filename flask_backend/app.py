@@ -62,39 +62,27 @@ def get_moodle_user(email):
         return jsonify({"error": "Moodle user not found"}), 404
     return jsonify({"id":str(moodle_user.id), "moodle_id": moodle_user.moodle_id, "email": moodle_user.email}) # "name": moodle_user.name
 
-@app.route("/api/save_moodle_progress/<user_id>", methods=["POST"])
-def save_moodle_progress(user_id):
+@app.route("/api/save_moodle_progress", methods=["POST"])
+def save_moodle_progress():
     data = request.json
-    topic_name = data["topic"]
-
-    if topic_name is not None:
-        topic_obj = Topics.query.filter(Topics.topic == topic_name).first()
-        if topic_obj:
-            topic_id = topic_obj.id
-        else:
-            # create new topic
-            new_topic = Topics(topic=topic_name)
-            db.session.add(new_topic)
-            db.session.commit()
-            topic_id = new_topic.id  # we can get the id directly from the object
-    else:
-        topic_id = None
-
-    progress = UserProgress(
-        user_id=user_id,
-        class_id=data["class_id"],
+    user_id = data.get("user_id")
+    
+    progress = MoodleUserHistory(
+        moodle_user_id=int(user_id),
         question=data["question"],
         response=data["response"],
-        topic_id=topic_id,
-        pdfs=data["pdfs"],
+        #pdfs=data["pdfs"], TODO: add pdfs to moodle user history
         response_time=data["response_time"],
         timestamp=datetime.now(timezone.utc) + timedelta(hours=1),
     )
 
     db.session.add(progress)
     db.session.commit()
+    
+    if not progress:
+        return jsonify({"error": "Failed to save Moodle progress"}), 500
 
-    return jsonify({"message": "Moodle progress saved"})
+    return jsonify({"message": "Moodle progress saved"}), 200
 
 @app.route("/api/save_reset_token", methods=["POST"])
 def save_reset_token():

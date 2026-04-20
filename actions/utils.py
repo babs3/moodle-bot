@@ -111,7 +111,7 @@ def normalize_topic(new_topic, known_topics, threshold=0.85):
         print(f"💾  New topic '{new_topic}' saved!")
         return new_topic
 
-def save_user_progress(user_email, user_message, bot_response, topic, pfds, input_time_str, user_id):
+def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_str, user_id):
 
     print(f"\n📍  Saving user progress for email: {user_email}, ID: {user_id}")
     moodle_user = fetch_moodle_user(user_email)
@@ -121,8 +121,7 @@ def save_user_progress(user_email, user_message, bot_response, topic, pfds, inpu
         # create moodle user
         moodle_user = create_moodle_user(user_id, user_email)
         print(f"\n📗 Created Moodle User: {moodle_user}")
-        #return
-    user_id = str(moodle_user.get("moodle_id"))
+        #return   
 
 
     # Extracting the timestamp part
@@ -143,16 +142,17 @@ def save_user_progress(user_email, user_message, bot_response, topic, pfds, inpu
 
     # Saving
     data = {
+        "user_id": user_id,  # Use Moodle user ID
         "question": user_message,
         "response": bot_response,
-        "topic": topic,
-        "pdfs": pfds,
+        "pdfs": pdfs,
         "response_time": response_timestamp
     }
 
-    #message = save_progress(user_id, data)
+    message = save_moodle_progress(data)
+    print(f"\n📗 Progress saved: {message}")
 
-    return #message
+    return message
 
 QUESTION_WORDS = {"what", "who", "where", "when", "why", "how"}
 
@@ -669,7 +669,7 @@ def get_query_topic(query, response):
         else:
             print("\n  ⚠️ Gemini Response is empty.")
     except Exception as e:
-        print(f"\n❌  Error calling Gemini API: {e}")
+        print(f"\n❌  Error calling Gemini API.: {e}")
     
     return topic
 
