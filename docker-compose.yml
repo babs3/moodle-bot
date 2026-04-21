@@ -66,6 +66,8 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       DOMAIN: ${DOMAIN}
       MOODLE_TOKEN: ${MOODLE_TOKEN}
+      MOODLE_COURSE_ID: ${MOODLE_COURSE_ID}
+      MOODLE_URL: ${MOODLE_URL}
 
   #streamlit-server:
   #  build:
