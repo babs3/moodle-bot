@@ -96,7 +96,7 @@ def keywords_to_tokens(keywords, query):
     
     
  
-def action_process(dispatcher, user_message, user_email, input_time, intent, user_id):
+def action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id):
     print(f"\n🧒  User ({user_email}) said: {user_message} 📩")
     query = treat_raw_query(user_message)
     
@@ -106,9 +106,10 @@ def action_process(dispatcher, user_message, user_email, input_time, intent, use
     complex_tokens, simple_tokens, split_keywords = keywords_to_tokens(keywords, no_punct_query)  
     print(f"\n🔍  Extracted keywords: \n    {complex_tokens} \n    {simple_tokens} \n    Split keywords flag: {split_keywords}")
     
+    print(f"\n🔍  Starting search process in resources: {authorized_resources[0]}")
     # Hybrid Search Process    
-    vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(keywords, query, split_keywords, collection, intent)
-    bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens)
+    vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(keywords, query, split_keywords, collection, authorized_resources, intent)
+    bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources)
         
     if normalized_bm25_scores == []:
         dispatcher.utter_message(text="Sorry, I couldn't find any relevant class materials for that subject.")
@@ -197,17 +198,20 @@ class ActionGetDefinition(Action):
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
-        print(f"\n🕓  latest_message INPUT TIME: {input_time}")
+        print(f"🕓  latest_message INPUT TIME: {input_time}")
+        authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
+        print(f"📚  Authorized resources from metadata: {authorized_resources}")
+        
+        intent = "definition of "
+        
         # Convert ISO 8601 timestamp string back to a datetime object
         timestamp_str = input_time
         timestamp = None
         if timestamp_str:
             timestamp = datetime.fromisoformat(timestamp_str)
-        print(f"   Decripted timestamp: {timestamp}")
+        print(f"   Decripted timestamp: {timestamp}")        
         
-        intent = "definition of "
-        
-        return action_process(dispatcher, user_message, user_email, input_time, intent, user_id=user_id)
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id=user_id)
     
 # === ACTION 2: GET EXPLANATION === #
 class ActionGetExplanation(Action):
@@ -222,9 +226,10 @@ class ActionGetExplanation(Action):
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
+        authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
         intent = "explanation of "
         
-        return action_process(dispatcher, user_message, user_email, input_time, intent, user_id=user_id)
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id=user_id)
 
 # === ACTION 3: GET EXAMPLES === #
 class ActionGetExamples(Action):
@@ -239,9 +244,10 @@ class ActionGetExamples(Action):
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
-        intent = "examples of "
+        authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
         
-        return action_process(dispatcher, user_message, user_email, input_time, intent, user_id=user_id)
+        intent = "examples of "
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id=user_id)
 
 # === ACTION 4: SUMMARIZE === #
 class ActionGetSummary(Action):
@@ -256,9 +262,10 @@ class ActionGetSummary(Action):
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
-        intent = "summary of "
+        authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
         
-        return action_process(dispatcher, user_message, user_email, input_time, intent, user_id=user_id)
+        intent = "summary of "
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id=user_id)  
 
 
 # === FINAL ACTION: GET PDF NAMES & PAGE LOCATIONS === #

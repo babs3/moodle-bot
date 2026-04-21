@@ -388,7 +388,7 @@ def format_page_range(file_name, pages):
     else:
         ranges.append(f"{start}-{pages[-1]}")
 
-    return f"📄 {file_name} (Pages {', '.join(ranges)})"
+    return f"📄 {file_name} (p. {', '.join(ranges)})"
 
 def treat_raw_query(query):
     # === Treat user query === #
@@ -466,7 +466,7 @@ def get_progress(teacher_email, class_code, class_number, class_group):
         #progress = fetch_progress()
         #return pd.DataFrame(progress, columns=["user_id", "class_id", "question", "response", "topic", "pdfs", "timestamp"])
     
-def dense_vector_search(keywords, query, split_keywords, collection, intent="definition of "):
+def dense_vector_search(keywords, query, split_keywords, collection, authorized_resources, intent="definition of "):
 
     if keywords != []:
         if not split_keywords:
@@ -476,7 +476,11 @@ def dense_vector_search(keywords, query, split_keywords, collection, intent="def
     print(f"\n🔛  Getting query embeddings for query: '{query}'\n...")
     
     query_embedding = model.encode(query, convert_to_numpy=True).tolist()
-    vector_results = collection.query(query_embeddings=[query_embedding], n_results=20)
+    vector_results = collection.query(query_embeddings=[query_embedding], n_results=20, where={
+        "file": {
+            "$in": authorized_resources  # O Chroma só procura nestes ficheiros
+        }
+    })
 
     vector_docs = vector_results["documents"][0]
     vector_metadata = vector_results["metadatas"][0]
@@ -497,7 +501,7 @@ def dense_vector_search(keywords, query, split_keywords, collection, intent="def
     return vector_docs, vector_metadata, normalized_vector_scores
 
 
-def hybrid_bm25_search(complex_tokens, simple_tokens, alpha=0.8):
+def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, alpha=0.8):
     # === Perform Hybrid BM25 search === #
     print(f"\n🔛 Getting BM25 sparse vectors for both:\n - {complex_tokens}\n - {simple_tokens}")
     
@@ -546,9 +550,41 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, alpha=0.8):
                     else:
                         print(f"--> Complex Tokens match with len == 2: {[token]}")
 
-    # Step 4: Perform BM25 Search
+    # Perform BM25 Search
     bm25_scores_simple = bm25_simple.get_scores(simple_tokens)
-    # Step 2: Normalize BM25 Scores
+    
+    
+    # Filter scores to only have words from authorized resources (files)
+    filtered_bm25_scores_simple = []
+    filtered_bm25_scores_complex = []
+
+    for i, score in enumerate(bm25_scores_simple):
+        # Verificar se o ficheiro deste chunk está na lista de visíveis
+        file_name = bm25_metadata[i]['file']
+        
+        if file_name in authorized_resources:
+            #print(f"    ✅  File '{file_name}' is authorized. Keeping this BM25 score.")
+            filtered_bm25_scores_simple.append({
+                "score": score,
+                "text": bm25_documents[i],
+                "metadata": bm25_metadata[i]
+            })
+            
+    for i, score in enumerate(bm25_scores_complex):
+        # Verificar se o ficheiro deste chunk está na lista de visíveis
+        file_name = bm25_metadata[i]['file']
+        
+        if file_name in authorized_resources:
+            filtered_bm25_scores_complex.append({
+                "score": score,
+                "text": bm25_documents[i],
+                "metadata": bm25_metadata[i]
+            })
+
+    # 5. Ordenar pelos melhores scores e pegar nos top N
+    filtered_bm25_scores_simple = sorted(filtered_bm25_scores_simple, key=lambda x: x['score'], reverse=True)
+    
+    # Normalize BM25 Scores
     bm25_scores_complex = normalize_bm25_indexes(bm25_scores_complex)
     bm25_scores_simple = normalize_bm25_indexes(bm25_scores_simple)
         
@@ -692,7 +728,7 @@ def get_materials_location(selected_results, complex_tokens, simple_tokens):
     pdfs_insights = []
     bm25_results = []
     
-    bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, 1.0)  # Get BM25 results with alpha=1.0 for complex keyword search only
+    bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, [], 1.0)  # Get BM25 results with alpha=1.0 for complex keyword search only
     for doc, meta, score in zip(bm25_docs, bm25_meta, normalized_bm25_scores):
         bm25_results.append((doc, meta, score))
     

@@ -26,6 +26,8 @@ def chat():
     else:
         resources = extract_visible_resources(moodle_contents)
         app.logger.info(f"Recursos autorizados: {resources}")
+        # lista com os filenames dos recursos autorizados, ex: ["slides1.pdf", "exercicio2.pdf"]
+        filenames = [resource.get("filename") for resource in resources]
 
     
     # Aqui podes pôr a tua lógica ou chamar o Rasa via REST
@@ -37,7 +39,7 @@ def chat():
     payload = {
         "sender": user_email,
         "message": user_message, #user_input,
-        "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id}
+        "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": filenames}
     }
     headers = {"Content-Type": "application/json"}
 
