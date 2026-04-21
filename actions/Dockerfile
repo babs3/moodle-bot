@@ -5,7 +5,6 @@ WORKDIR /app
 COPY ./actions/requirements.txt /app/requirements.txt
 COPY ./vector_store /app/vector_store
 COPY ./actions /app/actions
-COPY ./shared /app/shared
 
 USER root
 

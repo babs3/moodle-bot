@@ -4,12 +4,12 @@ from thefuzz import fuzz, process
 import pickle
 from difflib import get_close_matches
 import re
+import requests
 from itertools import product
 from nltk.corpus import wordnet
 import json
 import pandas as pd
 from datetime import datetime, timezone
-from shared.flask_requests import *
 from sentence_transformers import SentenceTransformer, util
 import numpy as np
 import google.generativeai as genai
@@ -114,14 +114,15 @@ def normalize_topic(new_topic, known_topics, threshold=0.85):
 def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_str, user_id):
 
     print(f"\n📍  Saving user progress for email: {user_email}, ID: {user_id}")
-    moodle_user = fetch_moodle_user(user_email)
+    #moodle_user = fetch_moodle_user(user_email)
+    moodle_user = requests.get("http://flask-server:8080/api/get_moodle_user/" + user_email)
     #print(f"\n📗 User: {user}")
     if not moodle_user:
         print(f"\n❌ User not found for email: {user_email}. Let'screate one.")
         # create moodle user
-        moodle_user = create_moodle_user(user_id, user_email)
+        #moodle_user = create_moodle_user(user_id, user_email)
+        moodle_user = requests.post("http://flask-server:8080/api/create_moodle_user", json={"moodle_id": user_id, "email": user_email})
         print(f"\n📗 Created Moodle User: {moodle_user}")
-        #return   
 
     # Extracting the timestamp part
     input_time_cleaned = input_time_str.split("input_time: ")[-1].strip()
@@ -148,7 +149,9 @@ def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_
         "response_time": response_timestamp
     }
     
-    return save_moodle_progress(data)
+    requests.post("http://flask-server:8080/api/save_moodle_progress", json=data)
+    
+    #return save_moodle_progress(data)
 
 QUESTION_WORDS = {"what", "who", "where", "when", "why", "how"}
 

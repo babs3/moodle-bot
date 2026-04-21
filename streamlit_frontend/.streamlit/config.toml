@@ -1,6 +1,0 @@
-[theme]
-base = "dark"
-primaryColor = "#84ccfc"
-
-[logger]
-level = "warning"
