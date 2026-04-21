@@ -12,6 +12,8 @@ from flask_backend.models import *
 
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
 DOMAIN = os.getenv("DOMAIN")
+MOODLE_URL = "http://host.docker.internal" # Este endereço diz ao Docker: "Sai do contentor e vai buscar o localhost da máquina real".
+TOKEN = os.getenv("MOODLE_TOKEN")
 
 app = Flask(__name__)
 CORS(app) # Isto permite que o Moodle aceda à API
@@ -36,16 +38,14 @@ jwt = JWTManager(app)
 
 def get_moodle_user_data(user_id):
     # 1. Usa o IP direto e verifica se precisas de porta (ex: :80)
-    MOODLE_URL = "http://host.docker.internal" # Este endereço diz ao Docker: "Sai do contentor e vai buscar o localhost da máquina real".
-    TOKEN = "0ddbc49e8fb40d350050c17ec5b8dd46"
-    FUNCTION = "core_user_get_users"
+    function = "core_user_get_users"
     
     app.logger.info(f"--- INÍCIO DA BUSCA MOODLE ---")
     app.logger.info(f"ID: {user_id} | URL: {MOODLE_URL}")
 
     params = {
         'wstoken': TOKEN,
-        'wsfunction': FUNCTION,
+        'wsfunction': function,
         'moodlewsrestformat': 'json',
         'criteria[0][key]': 'id',
         'criteria[0][value]': user_id
@@ -73,6 +73,57 @@ def get_moodle_user_data(user_id):
         app.logger.error(f"ERRO CRÍTICO ao ligar ao Moodle: {str(e)}")
         return None
     
+def get_moodle_contents(course_id):
+    function = "core_course_get_contents"
+    app.logger.info(f"--- INÍCIO DA BUSCA DE CONTEÚDOS MOODLE --- | Course ID: {course_id}")
+    params = {
+        'wstoken': TOKEN,
+        'wsfunction': function,
+        'moodlewsrestformat': 'json',
+        'courseid': course_id
+    }
+    
+    try:
+        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=5)
+        contents = response.json()
+        #app.logger.info(f"Resposta bruta do Moodle para conteúdos: {contents}")
+        
+        # Se o Moodle retornar um erro no JSON (ex: token inválido)
+        if isinstance(contents, dict) and "exception" in contents:
+            app.logger.error(f"Erro na API Moodle: {contents['message']}")
+            return None
+
+        app.logger.info(f"Conteúdos obtidos com sucesso para o curso {course_id}")
+        return contents
+
+    except requests.exceptions.RequestException as e:
+        app.logger.error(f"Erro na requisição ao Moodle: {e}")
+        return None
+    
+def extract_visible_resources(moodle_json):
+    allowed_materials = []
+    
+    # Percorrer cada secção (Geral, aula 0, aula 1...)
+    for section in moodle_json:
+        # Percorrer cada módulo dentro da secção
+        for module in section.get('modules', []):
+            
+            # Filtro 1: É um recurso (ficheiro)?
+            # Filtro 2: Está visível para o aluno?
+            if module['modname'] == 'resource' and module['visible'] == 1:
+                
+                # Extraímos o ID e o Nome
+                resource_info = {
+                    'moodle_id': module['id'],
+                    'display_name': module['name'],
+                    # Opcional: extrair o nome real do ficheiro se existir
+                    'filename': module['contents'][0]['filename'] if 'contents' in module else module['name']
+                }
+                allowed_materials.append(resource_info)
+                
+    return allowed_materials
+
+
 def send_email_to_admin_about_teacher_request(user):
     subject = "New Teacher Registration Request"
     html_body = f"""

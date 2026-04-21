@@ -65,6 +65,7 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       DOMAIN: ${DOMAIN}
+      MOODLE_TOKEN: ${MOODLE_TOKEN}
 
   #streamlit-server:
   #  build:

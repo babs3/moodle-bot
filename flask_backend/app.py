@@ -12,14 +12,21 @@ def index():
 @app.route('/chat', methods=['POST'])
 def chat():    
     data = request.json
-    app.logger.info(f"Received data: {data}")
     moodle_id = data.get('user_id') # Recebe o "2" do teu Javascript
-    print(f"Received message from user_id: {moodle_id}")
-    app.logger.info(f"Received userID: {moodle_id}")
+    app.logger.info(f"Received message from user_id: {moodle_id}")
     user_message = data.get('message')
 
     # Busca os dados reais no Moodle
     info_utilizador = get_moodle_user_data(moodle_id)
+    # Busca contents do Moodle
+    moodle_contents = get_moodle_contents(2) # TODO: get course_id from user
+
+    if moodle_contents is None:
+        app.logger.error("Failed to fetch Moodle contents.")
+    else:
+        resources = extract_visible_resources(moodle_contents)
+        app.logger.info(f"Recursos autorizados: {resources}")
+
     
     # Aqui podes pôr a tua lógica ou chamar o Rasa via REST
     user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
