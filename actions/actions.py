@@ -299,7 +299,7 @@ class ActionGetClassMaterialLocation(Action):
                 response = save_user_progress(user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id=user_id)
                 print_results(location_results)              
                 dispatcher.utter_message(
-                    text="</br></br>You can find related information in:</br><i><span style='font-size: 8px;'>" 
+                    text="</br></br><span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>" 
                     + "</br>".join(location_results) + 
                     "</span></i>"
                 )
@@ -310,7 +310,7 @@ class ActionGetClassMaterialLocation(Action):
                     response = save_user_progress(user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id=user_id)
                     #dispatcher.utter_message(text="</br></br>You can find related information in:</br>" + "</br>".join(location_results))
                     dispatcher.utter_message(
-                        text="</br></br>You can find related information in:</br><i><span style='font-size: 8px;'>" 
+                        text="</br></br><span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>" 
                         + "</br>".join(location_results) + 
                         "</span></i>"
                 )
