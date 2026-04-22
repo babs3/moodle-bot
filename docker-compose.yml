@@ -23,7 +23,6 @@ services:
       - my-project
     environment:
       GOOGLE_API_KEY: "${GOOGLE_API_KEY}"  # Load API key from .env
-      CURRENT_CLASS: "${CURRENT_CLASS}"
 
   db:
     image: postgres:13

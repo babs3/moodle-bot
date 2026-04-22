@@ -14,47 +14,11 @@ COOKIES_SECRET_KEY=MY_COOKIES_SECRET_KEY_HERE
 MOODLE_TOKEN=MY_MOODLE_TOKEN_HERE
 MOODLE_COURSE_ID=CORRESPONDENT_COURSE_ID_HERE
 MOODLE_URL=http://host.docker.internal # or other
-CURRENT_CLASS=GEE   # GEE, SCI, LGP or GEE_LGP
+MOODLE_COURSE_SHORTNAME=SCI
 APP_DATABASE_USER=MY_DB_USER
 APP_DATABASE_PASS=MY_DB_PASSWORD
 APP_DATABASE_NAME=MY_DB_NAME
-ADMIN_EMAIL=YOUR_EMAIL_HERE
-MAIL_USERNAME=NO-REPLY_EMAIL_HERE
-MAIL_PASSWORD=NO-REPLY_EMAIL_APP_PASSWORD_HERE
 IS_PRODUCTION=True # True or False
-DOMAIN=localhost #engi-bot-gee.duckdns.org or other
-#--- for GEE
-INITIAL_SPREADSHEET_ID=1tPsTARWtyvpedZVDgkBW0ezP9HzGztYfhPReTq1ExyU
-FORM_URL=https://forms.gle/RrxV3fnCyqv5cYBb9
-QUIZ_SPREADSHEET_ID=1Uns7r9X2ENXcJdV3vQfRq6Dw3rqFk6imGYE66vfMxHk
-QUIZ_URL=https://forms.gle/eVmKWH8o9mo8Zd5fA
-#--- for SCI
-#INITIAL_SPREADSHEET_ID=1_UeINZTkZBH7n-PCyVrki65S3cVUup_-JWWpKcYdYko
-#FORM_URL=https://forms.gle/cUf3QwTTFQwiHraB7
-#QUIZ_SPREADSHEET_ID=14iGhTJFvhl9p3AVyI5iDW5gKxuwqG6x_O0C5gJTEmcY
-#QUIZ_URL=https://forms.gle/6mefQuZLPJFhdVTi6
-#--- for LGP
-#INITIAL_SPREADSHEET_ID=170XqVYEWiCirXZUJOPbbwND0g27PbkLqWL3Os_sjrO0
-#FORM_URL=https://forms.gle/NgDeXJpXjfKTc4L1A
-#QUIZ_SPREADSHEET_ID=1yY7HBDJsHLVH-AWgkv3UrewFyj651ac89j9Jvhx9mFU
-#QUIZ_URL=https://forms.gle/UyZoApqZziuV3PVa6
-#--- common in all classes:
-FINAL_SPREADSHEET_ID=1olGNcw2PaeKFbSPwmdRpi61hBcm5Ye6ykdWWFBlVL1I
-FINAL_FORM_URL=https://forms.gle/oeriyzjA6ELou6L66
-TEACHER_FINAL_FORM_URL=https://forms.gle/n9kv7DRSFF8feNAH8
-TEACHER_FINAL_SPREADSHEET_ID=1QRSf3ULa7J_gIMBKasaSjqdKam-zWXkWp-D4QMz3Pz0
-```
-
-Inside `.streamlit` folder of `./streamlit_frontend`, create a `secrets.toml` file and change to the right domain (DOMAIN_HERE). My dommains are currently mapped using **Duck DNS**. If running locally, the domain is *localhost*.
-
-`secrets.toml` file template:
-```
-[auth]
-redirect_uri = "http://DOMAIN_HERE/oauth2callback"
-cookie_secret = MY_COOKIES_SECRET_KEY_HERE
-client_id = MY_CLIENT_ID_HERE
-client_secret = MY_CLIENT_SECRET_HERE
-server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"`
 ```
 
 Create a `credentials.json` file inside `flask-backend`:
