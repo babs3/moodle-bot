@@ -7,7 +7,18 @@ from flask_backend.utils import *
 
 @app.route('/')
 def index():
-    return "Flask está a correr na porta 8080!"
+    # test here use core_course_get_courses_by_field
+    course_data = get_moodle_courses_by_field("shortname", "SCI")
+    if course_data.get('courses'):
+        # Extrai o ID do primeiro curso encontrado
+        course_id = course_data['courses'][0]['id']
+        course_fullname = course_data['courses'][0]['fullname']
+        app.logger.info(f"Curso encontrado: {course_fullname} (ID: {course_id})")
+    else:
+        app.logger.warning("Nenhum curso encontrado para este utilizador.")
+        course_id = None
+    
+    return f"<h1>Course ID: {course_id}</h1><p><strong>Course Name:</strong> {course_fullname}</p>" # "Flask está a correr na porta 8080!"
 
 @app.route('/chat', methods=['POST'])
 def chat():    

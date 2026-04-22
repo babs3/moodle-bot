@@ -122,3 +122,31 @@ def extract_visible_resources(moodle_json):
                 allowed_materials.append(resource_info)
                 
     return allowed_materials
+
+def get_moodle_courses_by_field(field, value):
+    function = "core_course_get_courses_by_field"
+    app.logger.info(f"--- INÍCIO DA BUSCA DE CURSOS MOODLE --- | Field: {field}, Value: {value}")
+    params = {
+        'wstoken': TOKEN,
+        'wsfunction': function,
+        'moodlewsrestformat': 'json',
+        'field': field,
+        'value': value
+    }
+    
+    try:
+        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=5)
+        courses = response.json()
+        app.logger.info(f"Resposta bruta do Moodle para cursos: {courses}")
+        
+        # Se o Moodle retornar um erro no JSON (ex: token inválido)
+        if isinstance(courses, dict) and "exception" in courses:
+            app.logger.error(f"Erro na API Moodle: {courses['message']}")
+            return None
+
+        app.logger.info(f"Cursos obtidos com sucesso para {field}={value}")
+        return courses
+
+    except requests.exceptions.RequestException as e:
+        app.logger.error(f"Erro na requisição ao Moodle: {e}")
+        return None
