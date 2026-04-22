@@ -1,3 +1,5 @@
+import logging
+
 from flask import Flask, jsonify
 from flask_cors import CORS
 import hashlib
@@ -15,6 +17,7 @@ TOKEN = os.getenv("MOODLE_TOKEN")
 COURSE_SHORTNAME = os.getenv("MOODLE_COURSE_SHORTNAME")
 
 app = Flask(__name__)
+app.logger.setLevel(logging.INFO)
 CORS(app) # Isto permite que o Moodle aceda à API
 
 app.config["SQLALCHEMY_DATABASE_URI"] = f'postgresql://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@db/{os.getenv("POSTGRES_DB")}'
@@ -113,6 +116,118 @@ def extract_visible_resources(moodle_json):
                 
     return allowed_materials
 
+def get_quiz_attempt_review(attempt_id):
+    """
+    Obtém os detalhes de uma tentativa de quiz, incluindo perguntas e respostas.
+    """
+    function = "mod_quiz_get_attempt_review"
+    app.logger.info(f"--- INÍCIO DA REVISÃO DE TENTATIVA --- | Attempt ID: {attempt_id}")
+    
+    params = {
+        'wstoken': TOKEN,
+        'wsfunction': function,
+        'moodlewsrestformat': 'json',
+        'attemptid': attempt_id,
+        # 'page': -1  # Opcional: -1 retorna todas as páginas de perguntas de uma vez
+    }
+    
+    try:
+        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=10)
+        review_data = response.json()
+        
+        # Verificação de erro na resposta da API
+        if isinstance(review_data, dict) and "exception" in review_data:
+            app.logger.error(f"Erro na API Moodle (Review): {review_data['message']}")
+            return None
+
+        app.logger.info(f"Dados da tentativa {attempt_id} obtidos com sucesso.")
+        return review_data
+
+    except requests.exceptions.RequestException as e:
+        app.logger.error(f"Erro na requisição ao Moodle: {e}")
+        return None
+    
+def get_quiz_id_by_name(course_id, quiz_name):
+    """
+    Procura o ID de um questionário dentro de um curso através do nome.
+    """
+    function = "mod_quiz_get_quizzes_by_courses"
+    app.logger.info(f"--- PROCURANDO ID DO QUIZ: '{quiz_name}' no curso {course_id} ---")
+    
+    params = {
+        'wstoken': TOKEN,
+        'wsfunction': function,
+        'moodlewsrestformat': 'json',
+        'courseids[0]': course_id  # A API espera um array de IDs
+    }
+
+    try:
+        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=10)
+        data = response.json()
+
+        if isinstance(data, dict) and "exception" in data:
+            app.logger.error(f"Erro na API: {data['message']}")
+            return None
+
+        # A resposta contém uma chave 'quizzes' que é uma lista
+        quizzes = data.get('quizzes', [])
+        
+        for quiz in quizzes:
+            # Compara o nome (podes usar .strip().lower() para ser mais flexível)
+            if quiz['name'].strip().lower() == quiz_name.strip().lower():
+                app.logger.info(f"Quiz encontrado! ID: {quiz['id']}")
+                return quiz['id']
+
+        app.logger.warning(f"Nenhum questionário com o nome '{quiz_name}' foi encontrado.")
+        return None
+
+    except Exception as e:
+        app.logger.error(f"Erro ao procurar quiz por nome: {e}")
+        return None
+    
+def get_last_attempt_id(quiz_id, user_id):
+    """
+    Obtém o ID da última tentativa de um aluno num questionário específico.
+    """
+    function = "mod_quiz_get_user_quiz_attempts"
+    app.logger.info(f"--- BUSCANDO TENTATIVAS --- | Quiz ID: {quiz_id} | User ID: {user_id}")
+    
+    params = {
+        'wstoken': TOKEN,
+        'wsfunction': function,
+        'moodlewsrestformat': 'json',
+        'quizid': quiz_id,
+        'userid': user_id,
+        'status': 'finished'  # apenas as finalizadas
+    }
+    
+    try:
+        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=10)
+        data = response.json()
+        
+        if isinstance(data, dict) and "exception" in data:
+            app.logger.error(f"Erro na API Moodle: {data['message']}")
+            return None
+
+        attempts = data.get('attempts', [])
+        
+        if not attempts:
+            app.logger.warning(f"Nenhuma tentativa encontrada para o User {user_id} no Quiz {quiz_id}")
+            return None
+
+        # Ordenar tentativas pelo ID (a mais recente terá o ID maior)
+        # Ou podes filtrar apenas as que têm o state 'finished'
+        attempts.sort(key=lambda x: x['id'], reverse=True)
+        
+        last_attempt = attempts[0]
+        app.logger.info(f"Tentativa encontrada! ID: {last_attempt['id']} | Estado: {last_attempt['state']}")
+        
+        return last_attempt['id']
+
+    except Exception as e:
+        app.logger.error(f"Erro ao obter tentativas: {e}")
+        return None
+    
 def get_moodle_courses_by_field(field, value):
     function = "core_course_get_courses_by_field"
     app.logger.info(f"--- INÍCIO DA BUSCA DE CURSOS MOODLE --- | Field: {field}, Value: {value}")
@@ -127,7 +242,7 @@ def get_moodle_courses_by_field(field, value):
     try:
         response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=5)
         courses = response.json()
-        app.logger.info(f"Resposta bruta do Moodle para cursos: {courses}")
+        #app.logger.info(f"Resposta bruta do Moodle para cursos: {courses}")
         
         # Se o Moodle retornar um erro no JSON (ex: token inválido)
         if isinstance(courses, dict) and "exception" in courses:
