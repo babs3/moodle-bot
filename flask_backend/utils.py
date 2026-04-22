@@ -10,6 +10,7 @@ from flask_jwt_extended import JWTManager
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import requests
+from bs4 import BeautifulSoup
 from flask_backend.models import *
 
 MOODLE_URL = "http://host.docker.internal" # Este endereço diz ao Docker: "Sai do contentor e vai buscar o localhost da máquina real".
@@ -27,6 +28,61 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 migrate = Migrate(app, db)  # For database migrations
 jwt = JWTManager(app)
+
+def analisar_desempenho_aluno(quiz_data):
+    erros = []
+    
+    for q in quiz_data.get('questions', []):
+        # Convertemos primeiro para string com str(), e só depois fazemos o replace
+        mark_str = str(q.get('mark', '0'))
+        max_mark_str = str(q.get('maxmark', '0'))
+
+        mark = float(mark_str.replace(',', '.'))
+        max_mark = float(max_mark_str.replace(',', '.'))
+        
+        # Se o aluno não teve a nota máxima na pergunta
+        if mark < max_mark:
+            soup = BeautifulSoup(q['html'], 'html.parser')
+            
+            # 1. Extrair o texto da pergunta
+            qtext_div = soup.find('div', class_='qtext')
+            pergunta_texto = qtext_div.get_text(strip=True) if qtext_div else "Não encontrado"
+            
+            # 2. Extrair a resposta que o aluno deu
+            # O Moodle guarda a resposta selecionada em inputs 'checked' ou campos de texto
+            resposta_aluno = "Sem resposta"
+            
+            if q['type'] in ['multichoice', 'truefalse']:
+                # Procura o label associado ao rádio/checkbox marcado
+                checked_input = soup.find('input', checked=True)
+                if checked_input:
+                    # Tenta encontrar o texto da opção ao lado do input
+                    label = soup.find('label', {'for': checked_input.get('id')})
+                    if label:
+                        resposta_aluno = label.get_text(strip=True)
+            
+            elif q['type'] == 'shortanswer':
+                input_text = soup.find('input', type='text')
+                if input_text:
+                    resposta_aluno = input_text.get('value', 'Vazio')
+
+            # 3. Extrair a resposta correta (Feedback do Moodle)
+            right_answer_div = soup.find('div', class_='rightanswer')
+            resposta_correta = right_answer_div.get_text(strip=True) if right_answer_div else "Não disponível"
+            # retirar o "Resposta correta: " do início da resposta correta
+            resposta_correta = resposta_correta.replace("Resposta correta: ", "")
+
+            erros.append({
+                'slot': q['slot'],
+                'tipo': q['type'],
+                'pergunta': pergunta_texto,
+                'resposta_aluno': resposta_aluno,
+                'resposta_correta': resposta_correta,
+                'nota_obtida': mark,
+                'nota_maxima': max_mark
+            })
+            
+    return erros
 
 
 def get_moodle_user_data(user_id):

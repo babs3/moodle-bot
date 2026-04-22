@@ -34,9 +34,6 @@ def chat():
     info_utilizador = get_moodle_user_data(moodle_id)
     # Busca contents do Moodle
     moodle_contents = get_moodle_contents(COURSE_ID)
-    quiz_id = get_quiz_id_by_name(COURSE_ID, "Quiz - SCI")
-    attempt_id = get_last_attempt_id(quiz_id, moodle_id)
-    quiz_review = get_quiz_attempt_review(attempt_id) # Exemplo de chamada, substitui pelo ID real da tentativa do quiz
     
     if moodle_contents is None:
         app.logger.error("Failed to fetch Moodle contents.")
@@ -46,6 +43,11 @@ def chat():
         # lista com os filenames dos recursos autorizados, ex: ["slides1.pdf", "exercicio2.pdf"]
         filenames = [resource.get("filename") for resource in resources]
 
+    quiz_id = get_quiz_id_by_name(COURSE_ID, "Quiz - SCI")
+    attempt_id = get_last_attempt_id(quiz_id, moodle_id)
+    quiz_review = get_quiz_attempt_review(attempt_id) # Exemplo de chamada, substitui pelo ID real da tentativa do quiz
+    erros = analisar_desempenho_aluno(quiz_review) # Analisa o desempenho do aluno e gera feedback personalizado
+    app.logger.info(f"Desempenho do aluno: {erros}")
     
     # Aqui podes pôr a tua lógica ou chamar o Rasa via REST
     user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
