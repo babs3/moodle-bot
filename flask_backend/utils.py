@@ -10,31 +10,21 @@ from googleapiclient.discovery import build
 import requests
 from flask_backend.models import *
 
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
-DOMAIN = os.getenv("DOMAIN")
 MOODLE_URL = "http://host.docker.internal" # Este endereço diz ao Docker: "Sai do contentor e vai buscar o localhost da máquina real".
 TOKEN = os.getenv("MOODLE_TOKEN")
+COURSE_SHORTNAME = os.getenv("MOODLE_COURSE_SHORTNAME")
 
 app = Flask(__name__)
 CORS(app) # Isto permite que o Moodle aceda à API
-
-# Flask-Mail Configuration
-app.config["MAIL_SERVER"] = "smtp.gmail.com"  # Use your SMTP provider
-app.config["MAIL_PORT"] = 587
-app.config["MAIL_USE_TLS"] = True
-app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")  # Your no-reply email address
-app.config["MAIL_DEFAULT_SENDER"] = os.getenv("MAIL_USERNAME") 
-app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")  # App-specific password
 
 app.config["SQLALCHEMY_DATABASE_URI"] = f'postgresql://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@db/{os.getenv("POSTGRES_DB")}'
 app.config["JWT_SECRET_KEY"] = "super-secret-key"  # Change in production!
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-mail = Mail(app)
-
 db.init_app(app)
 migrate = Migrate(app, db)  # For database migrations
 jwt = JWTManager(app)
+
 
 def get_moodle_user_data(user_id):
     # 1. Usa o IP direto e verifica se precisas de porta (ex: :80)
@@ -150,3 +140,10 @@ def get_moodle_courses_by_field(field, value):
     except requests.exceptions.RequestException as e:
         app.logger.error(f"Erro na requisição ao Moodle: {e}")
         return None
+    
+course_data = get_moodle_courses_by_field("shortname", COURSE_SHORTNAME)
+if course_data.get('courses'):
+    # Extrai o ID do primeiro curso encontrado
+    COURSE_ID = course_data['courses'][0]['id']
+else:
+    COURSE_ID = None

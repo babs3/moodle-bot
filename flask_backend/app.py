@@ -5,10 +5,12 @@ from datetime import datetime, timezone, timedelta
 import json
 from flask_backend.utils import *
 
+
+
 @app.route('/')
 def index():
     # test here use core_course_get_courses_by_field
-    course_data = get_moodle_courses_by_field("shortname", "SCI")
+    course_data = get_moodle_courses_by_field("shortname", COURSE_SHORTNAME)
     if course_data.get('courses'):
         # Extrai o ID do primeiro curso encontrado
         course_id = course_data['courses'][0]['id']
@@ -17,20 +19,21 @@ def index():
     else:
         app.logger.warning("Nenhum curso encontrado para este utilizador.")
         course_id = None
-    
+        course_fullname = None
+        
     return f"<h1>Course ID: {course_id}</h1><p><strong>Course Name:</strong> {course_fullname}</p>" # "Flask está a correr na porta 8080!"
 
 @app.route('/chat', methods=['POST'])
 def chat():    
     data = request.json
-    moodle_id = data.get('user_id') # Recebe o "2" do teu Javascript
+    moodle_id = data.get('user_id')
     app.logger.info(f"Received message from user_id: {moodle_id}")
     user_message = data.get('message')
 
     # Busca os dados reais no Moodle
     info_utilizador = get_moodle_user_data(moodle_id)
     # Busca contents do Moodle
-    moodle_contents = get_moodle_contents(2) # TODO: get course_id from user
+    moodle_contents = get_moodle_contents(COURSE_ID)
 
     if moodle_contents is None:
         app.logger.error("Failed to fetch Moodle contents.")
