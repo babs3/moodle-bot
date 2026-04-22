@@ -142,7 +142,9 @@ def get_moodle_courses_by_field(field, value):
         return None
     
 course_data = get_moodle_courses_by_field("shortname", COURSE_SHORTNAME)
-if course_data.get('courses'):
+if course_data is None:
+    app.logger.error("Failed to fetch courses from Moodle. Check the logs for details.")
+elif course_data.get('courses'):
     # Extrai o ID do primeiro curso encontrado
     COURSE_ID = course_data['courses'][0]['id']
 else:
