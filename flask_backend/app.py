@@ -1,6 +1,5 @@
 from time import sleep
 from flask import request
-import random
 from datetime import datetime, timezone, timedelta
 import json
 from flask_backend.utils import *
@@ -32,6 +31,10 @@ def chat():
 
     # Busca os dados reais no Moodle
     info_utilizador = get_moodle_user_data(moodle_id)
+    user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
+    username = info_utilizador.get("nome") if info_utilizador else "NOME_"
+    check_moodle_user_in_db(moodle_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
+    
     # Busca contents do Moodle
     moodle_contents = get_moodle_contents(COURSE_ID)
     
@@ -43,16 +46,13 @@ def chat():
         # lista com os filenames dos recursos autorizados, ex: ["slides1.pdf", "exercicio2.pdf"]
         filenames = [resource.get("filename") for resource in resources]
 
-    quiz_id = get_quiz_id_by_name(COURSE_ID, "Quiz - SCI")
-    attempt_id = get_last_attempt_id(quiz_id, moodle_id)
-    quiz_review = get_quiz_attempt_review(attempt_id) # Exemplo de chamada, substitui pelo ID real da tentativa do quiz
-    erros = analisar_desempenho_aluno(quiz_review) # Analisa o desempenho do aluno e gera feedback personalizado
-    app.logger.info(f"Desempenho do aluno: {erros}")
+    #quiz_id = get_quiz_id_by_name(COURSE_ID, "Quiz - SCI")
+    #attempt_id = get_last_attempt_id(quiz_id, moodle_id)
+    #quiz_review = get_quiz_attempt_review(attempt_id) # Exemplo de chamada, substitui pelo ID real da tentativa do quiz
+    #erros = analisar_desempenho_aluno(quiz_review) # Analisa o desempenho do aluno e gera feedback personalizado
+    #app.logger.info(f"Desempenho do aluno: {erros}")
     
     # Aqui podes pôr a tua lógica ou chamar o Rasa via REST
-    user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
-    username = info_utilizador.get("nome") if info_utilizador else "NOME_"
-
     url = "http://rasa:5005/webhooks/rest/webhook"
     current_time = datetime.now(timezone.utc).isoformat() #datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     payload = {
@@ -78,6 +78,85 @@ def chat():
     except requests.RequestException as e:
         print(f"⚠️ Error connecting to Rasa: {e}")
         return None
+
+@app.route('/tutor_toggle', methods=['POST'])
+def tutor_toggle():
+    data = request.json
+    user_id = data.get('user_id')
+    active = data.get('active')
+
+    # 1. Atualizar o estado do utilizador na BD
+    user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
+    app.logger.info(f"Received tutor toggle for user_id: {user_id} with active: {active}")
+    app.logger.info(f"Current user in DB before toggle: {user}")
+    if not user:
+        # Se o user não existir na nossa BD, criamos
+        info_utilizador = get_moodle_user_data(user_id)
+        user_email = info_utilizador.get("email") if info_utilizador else f"user_{user_id}@example.com"
+        check_moodle_user_in_db(user_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
+        user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
+
+    user.tutor_mode_active = active
+    db.session.commit()
+
+    if not active:
+        app.logger.info(f"Modo Tutor desligado para user_id: {user_id}")
+        #return jsonify({"message": "Modo Tutor desligado."})
+        return jsonify([{"text": "Modo Tutor desligado."}])
+
+    # 2. Lógica de Verificação de Quizzes (O Trigger)
+    # Vamos buscar todos os quizzes do curso que o aluno tem acesso e verificar se há tentativas novas para analisar. Se houver, fazemos a análise e preparamos um feedback personalizado.
+    quizzes = get_user_quizzes_by_course(COURSE_ID, user_id) 
+    app.logger.info(f"Quizzes encontrados para user_id {user_id}: {[quiz['name'] for quiz in quizzes]}")
+    
+    novos_erros_encontrados = []
+    
+    for quiz in quizzes:
+        quiz_id = quiz['id']
+        attempt_id = get_last_attempt_id(quiz_id, user_id)
+        
+        if attempt_id == None:
+            continue
+        
+        app.logger.info(f"Verificando quiz_id: {quiz_id} para user_id: {user_id} com attempt_id: {attempt_id}")
+        
+        # Verificar se já analisámos esta tentativa
+        analise = MoodleQuizAnalysis.query.filter_by(
+            moodle_user_id=user_id, 
+            quiz_id=quiz_id
+        ).first()
+
+        if not analise or analise.last_attempt_id < attempt_id:
+            # Temos uma tentativa nova! Analisar...
+            review_data = get_quiz_attempt_review(attempt_id)
+            
+            erros = analisar_desempenho_aluno(review_data) # A tua função BS4
+            
+            if erros:
+                novos_erros_encontrados.extend(erros)
+            
+            # Atualizar ou criar o registo de análise
+            if not analise:
+                analise = MoodleQuizAnalysis(
+                    moodle_user_id=user_id, 
+                    quiz_id=quiz_id, 
+                    last_attempt_id=attempt_id
+                )
+                db.session.add(analise)
+            else:
+                analise.last_attempt_id = attempt_id
+            
+            db.session.commit()
+
+    # 3. Preparar Resposta para o Aluno
+    if novos_erros_encontrados:
+        temas = list(set([e['pergunta'][:30] + "..." for e in novos_erros_encontrados]))
+        msg = f"Hello! I have found some issues in your answers: {', '.join(temas)}. Would you like to review these points with me?"
+    else:
+        msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
+
+    return jsonify({"text": f"{msg}"})
+
     
 @app.route("/api/get_moodle_user/<email>", methods=["GET"])
 def get_moodle_user(email):

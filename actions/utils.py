@@ -87,43 +87,11 @@ def normalize_bm25_indexes(scores):
     scores = np.array(scores)
     max_score = scores.max()
     return scores / max_score if max_score > 0 else scores
-    
-def normalize_topic(new_topic, known_topics, threshold=0.85):
-    new_vec = model.encode(new_topic, convert_to_tensor=True)
-    if not known_topics:
-        known_topics.append(new_topic)
-        response = save_topic(new_topic)  # Add new topic to the database
-        print(f"⚠️  New topic '{new_topic}'saved!")
-        return new_topic
-    known_vecs = model.encode(known_topics, convert_to_tensor=True)
-
-    sims = util.cos_sim(new_vec, known_vecs)[0]
-    max_score, best_idx = sims.max(), sims.argmax()
-
-    #print(f"...max_score: {max_score}")
-    if max_score >= threshold:
-        print(f"\n ⚖️  Normalized topic '{new_topic}' to '{known_topics[best_idx]}' with score {max_score:.2f}")
-        return known_topics[best_idx]  # Use existing normalized topic
-    else:
-        known_topics.append(new_topic)  # Add new unique topic
-        # add the new topic to the database
-        save_topic(new_topic)
-        print(f"💾  New topic '{new_topic}' saved!")
-        return new_topic
 
 def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_str, user_id):
 
     print(f"\n📍  Saving user progress for email: {user_email}, ID: {user_id}")
-    #moodle_user = fetch_moodle_user(user_email)
-    moodle_user = requests.get("http://flask-server:8080/api/get_moodle_user/" + user_email)
-    #print(f"\n📗 User: {user}")
-    if not moodle_user:
-        print(f"\n❌ User not found for email: {user_email}. Let'screate one.")
-        # create moodle user
-        #moodle_user = create_moodle_user(user_id, user_email)
-        moodle_user = requests.post("http://flask-server:8080/api/create_moodle_user", json={"moodle_id": user_id, "email": user_email})
-        print(f"\n📗 Created Moodle User: {moodle_user}")
-
+    
     # Extracting the timestamp part
     input_time_cleaned = input_time_str.split("input_time: ")[-1].strip()
     #print(f"\n🕓  Input time cleaned: {input_time_cleaned}")
@@ -151,7 +119,6 @@ def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_
     
     requests.post("http://flask-server:8080/api/save_moodle_progress", json=data)
     
-    #return save_moodle_progress(data)
 
 QUESTION_WORDS = {"what", "who", "where", "when", "why", "how"}
 

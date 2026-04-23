@@ -29,6 +29,17 @@ db.init_app(app)
 migrate = Migrate(app, db)  # For database migrations
 jwt = JWTManager(app)
 
+def check_moodle_user_in_db(moodle_id, email):
+    # Ver se o utilizador já existe na nossa BD, se não existir, criar
+    moodle_user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
+    if not moodle_user:
+        moodle_user = MoodleUsers(moodle_id=moodle_id, email=email)
+        db.session.add(moodle_user)
+        db.session.commit()
+        app.logger.info(f"Created new Moodle user in DB: {email} (ID: {moodle_id})")
+    else:
+        app.logger.info(f"Moodle user already exists in DB: {email} (ID: {moodle_id})")
+
 def analisar_desempenho_aluno(quiz_data):
     erros = []
     
@@ -104,7 +115,7 @@ def get_moodle_user_data(user_id):
         # 2. Adiciona um timeout para o código não ficar "pendurado" para sempre
         response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=5)
         response_data = response.json()
-        app.logger.info(f"Resposta bruta do Moodle: {response_data}")
+        #app.logger.info(f"Resposta bruta do Moodle: {response_data}")
 
         if 'users' in response_data and len(response_data['users']) > 0:
             user = response_data['users'][0]
@@ -239,6 +250,37 @@ def get_quiz_id_by_name(course_id, quiz_name):
 
     except Exception as e:
         app.logger.error(f"Erro ao procurar quiz por nome: {e}")
+        return None
+    
+def get_user_quizzes_by_course(course_id, user_id):
+    """
+    Obtém a lista de quizzes de um curso e verifica quais o aluno já tentou.
+    """
+    function = "mod_quiz_get_quizzes_by_courses"
+    app.logger.info(f"--- BUSCANDO QUIZZES DO CURSO PARA O USUÁRIO --- | Course ID: {course_id} | User ID: {user_id}")
+    
+    params = {
+        'wstoken': TOKEN,
+        'wsfunction': function,
+        'moodlewsrestformat': 'json',
+        'courseids[0]': course_id
+    }
+
+    try:
+        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=10)
+        data = response.json()
+
+        if isinstance(data, dict) and "exception" in data:
+            app.logger.error(f"Erro na API Moodle: {data['message']}")
+            return None
+
+        quizzes = data.get('quizzes', [])
+        app.logger.info(f"Total de quizzes encontrados no curso: {len(quizzes)}")
+        
+        return quizzes
+
+    except Exception as e:
+        app.logger.error(f"Erro ao obter quizzes do curso: {e}")
         return None
     
 def get_last_attempt_id(quiz_id, user_id):
