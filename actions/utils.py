@@ -117,7 +117,7 @@ def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_
         "response_time": response_timestamp
     }
     
-    requests.post("http://flask-server:8080/api/save_moodle_progress", json=data)
+    requests.post("http://flask-server:8080/api/save_moodle_messages", json=data)
     
 
 QUESTION_WORDS = {"what", "who", "where", "when", "why", "how"}

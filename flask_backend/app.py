@@ -166,8 +166,8 @@ def get_moodle_user(email):
         return jsonify({"error": "Moodle user not found"}), 404
     return jsonify({"id":str(moodle_user.id), "moodle_id": moodle_user.moodle_id, "email": moodle_user.email}) # "name": moodle_user.name
 
-@app.route("/api/save_moodle_progress", methods=["POST"])
-def save_moodle_progress():
+@app.route("/api/save_moodle_messages", methods=["POST"])
+def save_moodle_messages(): # TODO: refactor para os novos campos da BD, como o is_tutor_interaction
     data = request.json
     user_id = data.get("user_id")
     app.logger.info(f"Saving Moodle progress for user_id: {user_id} with data: {data}")
@@ -187,29 +187,6 @@ def save_moodle_progress():
         return jsonify({"error": "Failed to save Moodle progress"}), 500
 
     return jsonify({"message": "Moodle progress saved"}), 200
-
-@app.route("/api/create_moodle_user", methods=["POST"])
-def create_moodle_user():
-    data = request.json
-    app.logger.info(f"Creating Moodle user with data: {data}")
-    
-    moodle_user = MoodleUsers(moodle_id=int(data["moodle_id"]), email=data["email"])
-    db.session.add(moodle_user)
-    db.session.commit()
-    
-    # return the error if needed, to now what happen:
-    if not moodle_user:
-        return jsonify({"error": "Failed to create Moodle user"}), 500
-    
-    return jsonify({"message": "Moodle user created successfully"}), 200
-
-@app.route("/api/save_moodle_user_history/<user_id>", methods=["POST"])
-def save_moodle_user_history(user_id):
-    data = request.json
-    history = MoodleUserHistory(moodle_user_id=user_id, question=data["question"], response=data["response"], timestamp=datetime.now())
-    db.session.add(history)
-    db.session.commit()
-    return jsonify({"message": "Moodle user history saved successfully"}), 200
 
 
 if __name__ == "__main__":
