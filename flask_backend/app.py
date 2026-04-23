@@ -150,6 +150,7 @@ def tutor_toggle():
 
     # 3. Preparar Resposta para o Aluno
     if novos_erros_encontrados:
+        app.logger.info(f"Novos erros encontrados para user_id {user_id}: {novos_erros_encontrados}")
         temas = list(set([e['pergunta'][:30] + "..." for e in novos_erros_encontrados]))
         msg = f"Hello! I have found some issues in your answers: {', '.join(temas)}. Would you like to review these points with me?"
     else:

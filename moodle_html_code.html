@@ -161,7 +161,7 @@ async function toggleTutorMode() {
     if (isTutorMode) {
         msgsDiv.innerHTML += `
             <div id="tutor-loading" style="align-self: center; font-size: 11px; color: #7300ff; margin: 5px 0;">
-                ✨ Modo Tutor Ativado: Analisando performance...
+                ✨ Tutor mode activated: Analyzing performance...
             </div>
         `;
         msgsDiv.scrollTop = msgsDiv.scrollHeight;
@@ -204,7 +204,7 @@ async function toggleTutorMode() {
             // 2. Pequena nota de sistema (opcional, para dar feedback do clique)
             msgsDiv.innerHTML += `
                 <div style="align-self: center; font-size: 11px; color: #999; margin: 10px 0;">
-                    — Modo Tutor Desativado —
+                    — Tutor mode disabled —
                 </div>
             `;
 
