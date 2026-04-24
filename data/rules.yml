@@ -75,3 +75,9 @@ rules:
   steps:
     - intent: custom_teacher_query
     - action: action_teacher_custom_question
+
+
+- rule: Create initial menu buttons
+  steps:
+    - intent: generate_menu_buttons
+    - action: action_generate_initial_menu_buttons

@@ -222,54 +222,91 @@ async function toggleTutorMode() {
     msgsDiv.scrollTop = msgsDiv.scrollHeight;
 }
 
-async function enviarMensagem() {
-    const isTutorMode = document.getElementById('tutor-mode-checkbox').checked;
-    const input = document.getElementById('chat-input');
+async function renderizarRespostaBot(data, isTutorMode = false) {
     const msgsDiv = document.getElementById('chat-msgs');
-    const msg = input.value.trim();
-    
-    if (!msg) return;
+    let buttonsHTML = '';
 
-    // 1. Bolha do Aluno
-    msgsDiv.innerHTML += `
-        <div style="align-self: flex-end; background: #7300ff; color: white; padding: 8px 12px; border-radius: 15px 15px 0 15px; font-size: 13px; max-width: 85%; line-height: 1.4;">
-            ${msg}
+    if (data[1] && data[1].buttons) {
+        buttonsHTML = data[1].buttons.map(button => `
+            <button class="tutor-button" data-payload="${button.payload}" 
+                    style="margin-top: 8px; background: #7300ff; color: white; border: none; padding: 6px 10px; border-radius: 12px; font-size: 11px; cursor: pointer;">
+                ${button.title}
+            </button>
+        `).join('');
+    }
+
+    if (isTutorMode) {
+        msgsDiv.innerHTML += `
+        <div style="align-self: flex-start; background: #f0e6ff; border-left: 4px solid #7300ff; padding: 8px 12px; border-radius: 0 15px 15px 0; font-size: 13px; max-width: 85%; color: #333;">
+            ${data[0].text}
+            ${buttonsHTML}
         </div>
     `;
+    }
+    else {
+        msgsDiv.innerHTML += `
+        <div style="align-self: flex-start; background: #e9ecef; padding: 8px 12px; border-radius: 15px 15px 15px 0; font-size: 13px; max-width: 85%; color: #333; line-height: 1.4; margin-bottom: 5px;">
+            ${data[0].text}
+            ${buttonsHTML}
+        </div>
+    `;
+    }
+
     
-    input.value = '';
+    msgsDiv.scrollTop = msgsDiv.scrollHeight;
+}
+
+// Esta função faz o trabalho pesado de falar com o Flask
+async function comunicarComServidor(mensagemVisual, payloadReal) {
+    const msgsDiv = document.getElementById('chat-msgs');
+    const isTutorMode = document.getElementById('tutor-mode-checkbox').checked;
+
+    // 1. Mostrar a bolha no chat (o que o utilizador clicou ou escreveu)
+    msgsDiv.innerHTML += `
+        <div style="align-self: flex-end; background: #7300ff; color: white; padding: 8px 12px; border-radius: 15px 15px 0 15px; font-size: 13px; max-width: 85%; line-height: 1.4;">
+            ${mensagemVisual}
+        </div>
+    `;
     msgsDiv.scrollTop = msgsDiv.scrollHeight;
 
     try {
-        // 2. Chamada ao Flask
         const response = await fetch('http://localhost:8080/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 user_id: M.cfg.userId, 
-                message: msg, 
-                //course_id: "2",
-                tutor_mode: isTutorMode // <--- Enviamos o estado do botão
+                message: payloadReal, // Enviamos o payload (ex: "tutor_explicar_3")
+                tutor_mode: isTutorMode 
             })
         });
 
         const data = await response.json();
-
-        // 3. Resposta do Bot
-        data.forEach(item => {
-            msgsDiv.innerHTML += `
-                <div style="align-self: flex-start; background: #e9ecef; padding: 8px 12px; border-radius: 15px 15px 15px 0; font-size: 13px; max-width: 85%; color: #333; line-height: 1.4;">
-                    ${item.text}
-                </div>
-            `;
-        });
+        renderizarRespostaBot(data, isTutorMode); // Função auxiliar para mostrar a resposta
         
     } catch (err) {
         console.error("Erro:", err);
-        msgsDiv.innerHTML += `<div style="font-size: 11px; color: red; text-align: center;">Erro de ligação ao servidor.</div>`;
     }
-    
-    msgsDiv.scrollTop = msgsDiv.scrollHeight;
+}
+
+// Event Listener para capturar cliques nos botões (Event Delegation)
+document.getElementById('chat-msgs').addEventListener('click', function(e) {
+    if (e.target && e.target.classList.contains('tutor-button')) {
+        const payload = e.target.getAttribute('data-payload');
+        const tituloBotao = e.target.innerText;
+        
+        // Chamamos o servidor usando o payload do botão
+        comunicarComServidor(tituloBotao, payload);
+    }
+});
+
+async function enviarMensagem() {
+    const input = document.getElementById('chat-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    input.value = '';
+    await comunicarComServidor(msg, msg);
+        
 }
 
 // Enter key trigger

@@ -330,6 +330,26 @@ class ActionGetClassMaterialLocation(Action):
         return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
 
 
+class ActionGenerateInitialMenuButtons(Action):
+    def name(self):
+        return "action_generate_initial_menu_buttons"
+
+    def run(self, dispatcher, tracker, domain):
+        print("\n📊 Generating initial menu buttons...")
+        dispatcher.utter_message(
+            text="Please select an option:",
+            buttons=[
+                {"title": "option 1", "payload": "/options_menu"},
+                {"title": "option 2", "payload": "/options_menu"},
+                {"title": "option 3", "payload": "/options_menu"}
+            ]
+        )
+        return []
+    
+    
+    
+    
+    
 class ActionGetTotalQuestions(Action):
     def name(self):
         return "action_get_total_questions"
@@ -352,6 +372,7 @@ class ActionGetTotalQuestions(Action):
         result = df.shape[0]
         dispatcher.utter_message(text=f"📊 Students have asked **{result}** questions in total.")
         return []
+    
     
 class ActionGetMostPopularTopics(Action):
     def name(self):

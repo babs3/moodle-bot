@@ -361,4 +361,4 @@ elif course_data.get('courses'):
     # Extrai o ID do primeiro curso encontrado
     COURSE_ID = course_data['courses'][0]['id']
 else:
-    COURSE_ID = None
+    COURSE_ID = "2"  # Fallback para um ID padrão, mas idealmente deves lidar com isso melhor

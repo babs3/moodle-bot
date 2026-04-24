@@ -15,6 +15,7 @@ intents:
   - ask_for_examples
   - ask_for_explanation
   - ask_for_summary
+  - generate_menu_buttons
 
 slots:
 
@@ -92,6 +93,14 @@ responses:
     - title: "Get most referenced PDFs"
       payload: "/most_referenced_pdfs"
 
+  utter_generate_menu_buttons:
+  - text: "creating menu..."
+    buttons:
+    - title: "Generate initial menu"
+      payload: "/generate_initial_menu"
+    - title: "Generate themes menu"
+      payload: "/generate_themes_menu"
+
 actions:
 - action_set_username
 - action_get_definition
@@ -103,6 +112,7 @@ actions:
 - action_get_total_questions
 - action_get_most_referenced_pdfs
 - action_teacher_custom_question
+- action_generate_initial_menu_buttons
 
 session_config:
   session_expiration_time: 60

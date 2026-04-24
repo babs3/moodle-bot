@@ -35,9 +35,7 @@ def chat():
     username = info_utilizador.get("nome") if info_utilizador else "NOME_"
     check_moodle_user_in_db(moodle_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
     
-    # Busca contents do Moodle
     moodle_contents = get_moodle_contents(COURSE_ID)
-    
     if moodle_contents is None:
         app.logger.error("Failed to fetch Moodle contents.")
     else:
@@ -45,39 +43,76 @@ def chat():
         app.logger.info(f"Recursos autorizados: {resources}")
         # lista com os filenames dos recursos autorizados, ex: ["slides1.pdf", "exercicio2.pdf"]
         filenames = [resource.get("filename") for resource in resources]
-
-    #quiz_id = get_quiz_id_by_name(COURSE_ID, "Quiz - SCI")
-    #attempt_id = get_last_attempt_id(quiz_id, moodle_id)
-    #quiz_review = get_quiz_attempt_review(attempt_id) # Exemplo de chamada, substitui pelo ID real da tentativa do quiz
-    #erros = analisar_desempenho_aluno(quiz_review) # Analisa o desempenho do aluno e gera feedback personalizado
-    #app.logger.info(f"Desempenho do aluno: {erros}")
     
-    # Aqui podes pôr a tua lógica ou chamar o Rasa via REST
-    url = "http://rasa:5005/webhooks/rest/webhook"
-    current_time = datetime.now(timezone.utc).isoformat() #datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    payload = {
-        "sender": user_email,
-        "message": user_message, #user_input,
-        "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": filenames}
-    }
-    headers = {"Content-Type": "application/json"}
+    # check if user is in tutor mode
+    user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
+    if user and user.tutor_mode_active:
+        app.logger.info(f"User {moodle_id} is in tutor mode.")
+        
+        url = "http://rasa:5005/webhooks/rest/webhook"
+        current_time = datetime.now(timezone.utc).isoformat() #datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        payload = {
+            "sender": user_email,
+            "message": "tutor menu buttons trigger",
+            "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": filenames}
+        }
+        headers = {"Content-Type": "application/json"}
 
-    try:
-        response = requests.post(url, data=json.dumps(payload), headers=headers)
-        response.raise_for_status()
-        messages = response.json()
+        try:
+            response = requests.post(url, data=json.dumps(payload), headers=headers)
+            response.raise_for_status()
+            messages = response.json()
 
-        bot_reply = ""
+            bot_reply = ""
 
-        for message in messages:
-            if "text" in message:
-                bot_reply += f"\n\n {message['text']}"
-                
-        return jsonify([{"text": f"{bot_reply.strip()}"}])
+            for message in messages:
+                if "text" in message:
+                    bot_reply += f"\n\n {message['text']}"
+                if "buttons" in message:
+                    buttons = message["buttons"]
+                    
+            return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
 
-    except requests.RequestException as e:
-        print(f"⚠️ Error connecting to Rasa: {e}")
-        return None
+        except requests.RequestException as e:
+            print(f"⚠️ Error connecting to Rasa: {e}")
+            return None
+        
+    else:
+        app.logger.info(f"User {moodle_id} is in normal mode.")
+        # Busca contents do Moodle
+
+        #quiz_id = get_quiz_id_by_name(COURSE_ID, "Quiz - SCI")
+        #attempt_id = get_last_attempt_id(quiz_id, moodle_id)
+        #quiz_review = get_quiz_attempt_review(attempt_id) # Exemplo de chamada, substitui pelo ID real da tentativa do quiz
+        #erros = analisar_desempenho_aluno(quiz_review) # Analisa o desempenho do aluno e gera feedback personalizado
+        #app.logger.info(f"Desempenho do aluno: {erros}")
+        
+        # Aqui podes pôr a tua lógica ou chamar o Rasa via REST
+        url = "http://rasa:5005/webhooks/rest/webhook"
+        current_time = datetime.now(timezone.utc).isoformat() #datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        payload = {
+            "sender": user_email,
+            "message": user_message, #user_input,
+            "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": filenames}
+        }
+        headers = {"Content-Type": "application/json"}
+
+        try:
+            response = requests.post(url, data=json.dumps(payload), headers=headers)
+            response.raise_for_status()
+            messages = response.json()
+
+            bot_reply = ""
+
+            for message in messages:
+                if "text" in message:
+                    bot_reply += f"\n\n {message['text']}"
+                    
+            return jsonify([{"text": f"{bot_reply.strip()}"}])
+
+        except requests.RequestException as e:
+            print(f"⚠️ Error connecting to Rasa: {e}")
+            return None
 
 @app.route('/tutor_toggle', methods=['POST'])
 def tutor_toggle():

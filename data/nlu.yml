@@ -203,3 +203,6 @@ nlu:
   examples: |
     - set username trigger
   
+- intent: generate_menu_buttons
+  examples: |
+    - tutor menu buttons trigger
