@@ -677,7 +677,17 @@ def generate_topic(question, correct_answer, course_fullname="Ciber-physical Sys
 
 def normalize_topic(new_topic, threshold=0.85):
     # get available topics from the database
-    available_topics = requests.post("http://flask-server:8080/api/get_topics")
+    response = requests.get("http://flask-server:8080/api/get_topics")
+    if response.status_code == 200:
+        # Só aqui é que convertes para JSON
+        available_topics = response.json() 
+        # Agora 'data' pode ser serializado à vontade
+        print(f"DEBUG COMPLETO RASA: {json.dumps(available_topics, indent=2)}") # Vê a estrutura real aqui  
+        
+    else:
+        print(f"Erro no servidor: {response.status_code}")
+        available_topics = [] # Fallback
+    
     print(f"\n🔍  Available topics: {available_topics}")        
     if not available_topics:
         # save the first topic if there are no topics in the database
