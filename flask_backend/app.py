@@ -250,7 +250,30 @@ def tutor_toggle():
 
     return jsonify({"text": f"{msg}"})
 
+@app.route("/api/get_topics", methods=["GET"])
+def get_topics():
+    topics = Topics.query.all()
+    return jsonify([{"id": topic.id, "name": topic.name} for topic in topics])
+
+@app.route("/api/save_topic", methods=["POST"])
+def save_topic():
+    data = request.json
+    topic_name = data.get("topic_name")
     
+    if not topic_name:
+        return jsonify({"error": "Topic name is required"}), 400
+
+    topic = Topics.query.filter_by(name=topic_name).first()
+    if not topic:
+        topic = Topics(name=topic_name)
+        db.session.add(topic)
+        db.session.commit()
+        app.logger.info(f"New topic created: {topic_name} with ID {topic.id}")
+    else:
+        app.logger.info(f"Topic already exists: {topic_name}")
+
+    return jsonify({"message": "Topic saved", "id": topic.id})
+
 @app.route("/api/get_moodle_user/<email>", methods=["GET"])
 def get_moodle_user(email):
     moodle_user = MoodleUsers.query.filter(MoodleUsers.email == email).first()

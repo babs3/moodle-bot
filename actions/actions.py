@@ -195,7 +195,7 @@ class ActionCreateTopic(Action):
         
         updated_errors = []
         for error in errors:
-            topic = get_topic(error["question"], error["correct_answer"])
+            topic = generate_topic(error["question"], error["correct_answer"])
             updated_errors.append({**error, "topic": topic})
         print(f"\n🔍  Updated errors with topics: {updated_errors}")       
         

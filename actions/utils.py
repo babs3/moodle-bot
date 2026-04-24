@@ -650,8 +650,8 @@ def hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_d
     return selected_results
     
     
-def get_topic(question, correct_answer, course_fullname="Ciber-physical Systems and Internet of Things"):
-    print(f"\n\n 🌞  --------- Getting Question Topic --------- 🌞 ")
+def generate_topic(question, correct_answer, course_fullname="Ciber-physical Systems and Internet of Things"):
+    print(f"\n\n 🌞  --------- Generating Question Topic --------- 🌞 ")
             
     topic = None
     prompt = f"Given the following question and correspondent expected answer of one of the evaluations in the course of {course_fullname}, what is the most relevant *canonical* topic keyword for the question? \nQuestion: {question}\nExpected Answer: {correct_answer}\nTopic: ? \n\nReply only with the topic keyword."
@@ -666,7 +666,7 @@ def get_topic(question, correct_answer, course_fullname="Ciber-physical Systems 
             topic = topic.replace("\n", "").strip()
             
             # Normalize the topic
-            #topic = get_normalized_topic(topic)
+            topic = normalize_topic(topic)
         else:
             print("\n  ⚠️ Gemini Response is empty.")
     
@@ -675,22 +675,32 @@ def get_topic(question, correct_answer, course_fullname="Ciber-physical Systems 
     
     return topic
 
-def get_normalized_topic(topic):
+def normalize_topic(new_topic, threshold=0.85):
+    # get available topics from the database
+    available_topics = requests.post("http://flask-server:8080/api/get_topics")
+    print(f"\n🔍  Available topics: {available_topics}")        
+    if not available_topics:
+        # save the first topic if there are no topics in the database
+        requests.post("http://flask-server:8080/api/save_topic", json={"topic_name": new_topic})
+        return new_topic
     
-    if topic != "":
-        # get available topics from the database
-        available_topics = fetch_topics()
-        available_topics_df = pd.DataFrame(available_topics, columns=["id", "topic"])
-        available_topics = available_topics_df["topic"].tolist()  
-        topic = [normalize_topic(topic, available_topics)][0]
-        print(f"    Available topics: {available_topics}") 
-        for i, t in enumerate(available_topics):
-            print(f"    - Topic {i+1}: {t}")     
-        print(f"    Normalized topic: {topic}")
-    else:
-        print(f"    ⚠️  No topic found.")
-        
-    return topic
+    new_vec = model.encode(new_topic, convert_to_tensor=True)
+    known_vecs = model.encode(available_topics, convert_to_tensor=True)
+    
+    for i, t in enumerate(available_topics):
+        print(f"    - Topic {i+1}: {t}")     
+
+        sims = util.cos_sim(new_vec, known_vecs)[0]
+        max_score, best_idx = sims.max(), sims.argmax()
+
+        if max_score >= threshold:
+            print(f"\n ⚖️  Normalized topic '{new_topic}' to '{available_topics[best_idx]}' with score {max_score:.2f}")
+            return available_topics[best_idx]  # Use existing normalized topic
+    
+    print(f"\n ➕  No close match found for topic '{new_topic}'. Saving as new topic.")
+    requests.post("http://flask-server:8080/api/save_topic", json={"topic_name": new_topic})
+    return new_topic  # Return the new topic if no close match was found
+
 
 def get_materials_location(selected_results, complex_tokens, simple_tokens):
     location_results = []
