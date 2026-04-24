@@ -1,5 +1,4 @@
 import logging
-
 from flask import Flask, jsonify
 from flask_cors import CORS
 import hashlib
@@ -59,6 +58,9 @@ def analisar_desempenho_aluno(quiz_data):
             qtext_div = soup.find('div', class_='qtext')
             pergunta_texto = qtext_div.get_text(strip=True) if qtext_div else "Não encontrado"
             
+            # Gerar o tema da pergunta
+            
+            
             # 2. Extrair a resposta que o aluno deu
             # O Moodle guarda a resposta selecionada em inputs 'checked' ou campos de texto
             resposta_aluno = "Sem resposta"
@@ -86,11 +88,11 @@ def analisar_desempenho_aluno(quiz_data):
             erros.append({
                 'slot': q['slot'],
                 'tipo': q['type'],
-                'pergunta': pergunta_texto,
-                'resposta_aluno': resposta_aluno,
-                'resposta_correta': resposta_correta,
-                'nota_obtida': mark,
-                'nota_maxima': max_mark
+                'question': pergunta_texto,
+                'student_answer': resposta_aluno,
+                'correct_answer': resposta_correta #,
+                #'nota_obtida': mark,
+                #'nota_maxima': max_mark
             })
             
     return erros

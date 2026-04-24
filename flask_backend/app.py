@@ -5,7 +5,6 @@ import json
 from flask_backend.utils import *
 
 
-
 @app.route('/')
 def index():
     # test here use core_course_get_courses_by_field
@@ -185,9 +184,67 @@ def tutor_toggle():
 
     # 3. Preparar Resposta para o Aluno
     if novos_erros_encontrados:
-        app.logger.info(f"Novos erros encontrados para user_id {user_id}: {novos_erros_encontrados}")
-        temas = list(set([e['pergunta'][:30] + "..." for e in novos_erros_encontrados]))
-        msg = f"Hello! I have found some issues in your answers: {', '.join(temas)}. Would you like to review these points with me?"
+        
+        url = "http://rasa:5005/webhooks/rest/webhook"
+        payload = {
+            "sender": "placeholder_for_email", #user_email,
+            "message": "create topic trigger",
+            "metadata": {"errors": novos_erros_encontrados}
+        }
+        headers = {"Content-Type": "application/json"}
+
+        try:
+            response = requests.post(url, data=json.dumps(payload), headers=headers)
+            response.raise_for_status()
+            messages = response.json() 
+            app.logger.info(f"DEBUG COMPLETO RASA: {json.dumps(messages, indent=2)}") # Vê a estrutura real aqui  
+            app.logger.info(f"⚠️  1. Rasa response for new errors: {messages}")        
+
+            # Inicializamos a lista de erros como vazia
+            lista_erros_final = []
+
+            for message in messages:
+                # Quando usas json_message no Rasa, os dados vêm na chave 'custom'
+                if "custom" in message and "errors" in message["custom"]:
+                    lista_erros_final = message["custom"]["errors"]
+                    break # Encontramos o que queríamos
+
+            app.logger.info(f"⚠️ Erros extraídos: {lista_erros_final}")
+
+            # Agora iteramos sobre a lista de objetos reais
+            for error in lista_erros_final:
+                topic_name = error.get('topic', 'Geral')
+                
+                # 1. Gestão do Tópico na DB
+                topic = Topics.query.filter_by(name=topic_name).first()
+                if not topic:
+                    topic = Topics(name=topic_name)
+                    db.session.add(topic)
+                    db.session.flush() # flush para obter o ID sem commitar tudo ainda
+
+                # 2. Guardar o progresso
+                # Nota: Verifica se os nomes das chaves (student_answer vs resposta_aluno)
+                # coincidem com o que enviaste no actions.py
+                progresso = TutorProgress(
+                    moodle_user_id=user_id,
+                    slot=error.get('slot'),
+                    tipo=error.get('tipo'),
+                    topic=topic.id,
+                    question=error.get('pergunta'),
+                    student_answer=error.get('resposta_aluno'),
+                    correct_answer=error.get('resposta_correta')
+                )
+                db.session.add(progresso)
+
+            db.session.commit() # Commit final de tudo o que foi adicionado
+
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"⚠️ Erro ao processar tutor: {e}")
+    
+        app.logger.info(f"Novos erros encontrados para user_id {user_id} nos temas de: {lista_erros_final}")
+        temas = list(set([e['topic'] for e in lista_erros_final]))
+        msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas)}. Would you like to review these points with me?"
     else:
         msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
 

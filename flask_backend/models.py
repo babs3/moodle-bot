@@ -29,3 +29,19 @@ class MoodleUserHistory(db.Model):
     # Útil para saber, ao ler o histórico, se aquela conversa foi pedagógica ou geral
     is_tutor_interaction = db.Column(db.Boolean, default=False)
     timestamp = db.Column(db.DateTime, default=datetime.now())
+    
+class TutorProgress(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    moodle_user_id = db.Column(db.Integer, db.ForeignKey('moodle_users.moodle_id', ondelete="CASCADE"), nullable=False)
+    slot = db.Column(db.Integer, nullable=False)
+    tipo = db.Column(db.String(50), nullable=False)  # Ex: "TrueFalse", "MultipleChoice", "ShortAnswer"
+    topic = db.Column(db.Integer, db.ForeignKey('topics.id', ondelete="SET NULL"), nullable=True)  # Relaciona com a tabela de tópicos
+    question = db.Column(db.Text, nullable=False)
+    student_answer = db.Column(db.Text, nullable=False)
+    correct_answer = db.Column(db.Text, nullable=False)
+    state=db.Column(db.String(20), default="pending", nullable=False)  # Ex: "pending", "reviewed", "mastered"
+    last_updated = db.Column(db.DateTime, default=datetime.now())
+    
+class Topics(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), unique=True, nullable=False)

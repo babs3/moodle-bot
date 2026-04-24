@@ -650,11 +650,11 @@ def hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_d
     return selected_results
     
     
-def get_query_topic(query, response):
-    print(f"\n\n 🌞  --------- Getting Query Topic --------- 🌞 ")
+def get_topic(question, correct_answer, course_fullname="Ciber-physical Systems and Internet of Things"):
+    print(f"\n\n 🌞  --------- Getting Question Topic --------- 🌞 ")
             
     topic = None
-    prompt = f"Given the student query: '{query}', and the response below, what is the most relevant *canonical* topic keyword for the question? \n{response} \nReply only with the topic keyword."
+    prompt = f"Given the following question and correspondent expected answer of one of the evaluations in the course of {course_fullname}, what is the most relevant *canonical* topic keyword for the question? \nQuestion: {question}\nExpected Answer: {correct_answer}\nTopic: ? \n\nReply only with the topic keyword."
     try:
         response = g_model.generate_content(prompt)
 
@@ -666,10 +666,10 @@ def get_query_topic(query, response):
             topic = topic.replace("\n", "").strip()
             
             # Normalize the topic
-            topic = get_normalized_topic(topic)
-            
+            #topic = get_normalized_topic(topic)
         else:
             print("\n  ⚠️ Gemini Response is empty.")
+    
     except Exception as e:
         print(f"\n❌  Error calling Gemini API.: {e}")
     

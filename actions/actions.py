@@ -93,9 +93,7 @@ def keywords_to_tokens(keywords, query):
     simple_tokens = list(set(simple_tokens))
     
     return complex_tokens, simple_tokens, False # Return complex tokens, simple tokens, and split_keywords flag
-    
-    
- 
+
 def action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id):
     print(f"\n🧒  User ({user_email}) said: {user_message} 📩")
     query = treat_raw_query(user_message)
@@ -184,7 +182,26 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
         SlotSet("input_time", input_time)
         ]
     
-      
+class ActionCreateTopic(Action):
+    def name(self):
+        return "action_create_topic"
+
+    def run(self, dispatcher, tracker, domain):
+        
+        print("\n📊  Generating bot 'action_create_topic' response...")
+
+        errors = tracker.latest_message.get("metadata", {}).get("errors", [])
+        print(f"\n🔍  Original errors from metadata: {errors}")
+        
+        updated_errors = []
+        for error in errors:
+            topic = get_topic(error["question"], error["correct_answer"])
+            updated_errors.append({**error, "topic": topic})
+        print(f"\n🔍  Updated errors with topics: {updated_errors}")       
+        
+        dispatcher.utter_message(json_message={"errors": updated_errors})
+        return []
+    
 # === ACTION 1: GET DEFINITION === #
 class ActionGetDefinition(Action):
     def name(self):

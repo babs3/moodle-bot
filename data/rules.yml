@@ -81,3 +81,8 @@ rules:
   steps:
     - intent: generate_menu_buttons
     - action: action_generate_initial_menu_buttons
+
+- rule: Create Topic
+  steps:
+    - intent: create_topic
+    - action: action_create_topic

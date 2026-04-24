@@ -206,3 +206,7 @@ nlu:
 - intent: generate_menu_buttons
   examples: |
     - tutor menu buttons trigger
+
+- intent: create_topic
+  examples: |
+    - create topic trigger
