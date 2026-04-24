@@ -180,7 +180,7 @@ async function toggleTutorMode() {
             const data = await response.json();
             
             // Espera 4 segundos antes de remover a mensagem de loading
-            await new Promise(resolve => setTimeout(resolve, 2500));
+            //await new Promise(resolve => setTimeout(resolve, 2500));
             document.getElementById('tutor-loading').remove();
 
             // Mostra a resposta do Tutor (se encontrou erros ou não)

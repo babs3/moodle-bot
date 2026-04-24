@@ -197,8 +197,7 @@ def tutor_toggle():
             response = requests.post(url, data=json.dumps(payload), headers=headers)
             response.raise_for_status()
             messages = response.json() 
-            app.logger.info(f"DEBUG COMPLETO RASA: {json.dumps(messages, indent=2)}") # Vê a estrutura real aqui  
-            app.logger.info(f"⚠️  1. Rasa response for new errors: {messages}")        
+            #app.logger.info(f"DEBUG COMPLETO RASA: {json.dumps(messages, indent=2)}") # Vê a estrutura real aqui  
 
             # Inicializamos a lista de erros como vazia
             lista_erros_final = []
@@ -220,7 +219,8 @@ def tutor_toggle():
                 if not topic:
                     topic = Topics(name=topic_name)
                     db.session.add(topic)
-                    db.session.flush() # flush para obter o ID sem commitar tudo ainda
+                    db.session.commit() # Commit para gerar o ID do tópico
+                    app.logger.info(f"Novo tópico criado: {topic_name} com ID {topic.id}")
 
                 # 2. Guardar o progresso
                 # Nota: Verifica se os nomes das chaves (student_answer vs resposta_aluno)
@@ -230,9 +230,9 @@ def tutor_toggle():
                     slot=error.get('slot'),
                     tipo=error.get('tipo'),
                     topic=topic.id,
-                    question=error.get('pergunta'),
-                    student_answer=error.get('resposta_aluno'),
-                    correct_answer=error.get('resposta_correta')
+                    question=error.get('question'),
+                    student_answer=error.get('student_answer'),
+                    correct_answer=error.get('correct_answer')
                 )
                 db.session.add(progresso)
 
