@@ -681,31 +681,32 @@ def normalize_topic(new_topic, threshold=0.85):
     if response.status_code == 200:
         # Só aqui é que convertes para JSON
         available_topics = response.json() 
-        # Agora 'data' pode ser serializado à vontade
-        print(f"DEBUG COMPLETO RASA: {json.dumps(available_topics, indent=2)}") # Vê a estrutura real aqui  
+        #print(f"DEBUG COMPLETO RASA: {json.dumps(available_topics, indent=2)}") # Vê a estrutura real aqui  
         
     else:
         print(f"Erro no servidor: {response.status_code}")
         available_topics = [] # Fallback
     
-    print(f"\n🔍  Available topics: {available_topics}")        
+    #print(f"\n🔍  Available topics: {available_topics}")        
     if not available_topics:
         # save the first topic if there are no topics in the database
         requests.post("http://flask-server:8080/api/save_topic", json={"topic_name": new_topic})
         return new_topic
     
-    new_vec = model.encode(new_topic, convert_to_tensor=True)
-    known_vecs = model.encode(available_topics, convert_to_tensor=True)
+    available_topics_names = [t['name'] for t in available_topics]
     
-    for i, t in enumerate(available_topics):
+    new_vec = model.encode(new_topic, convert_to_tensor=True)
+    known_vecs = model.encode(available_topics_names, convert_to_tensor=True)
+    
+    for i, t in enumerate(available_topics_names):
         print(f"    - Topic {i+1}: {t}")     
 
         sims = util.cos_sim(new_vec, known_vecs)[0]
         max_score, best_idx = sims.max(), sims.argmax()
 
         if max_score >= threshold:
-            print(f"\n ⚖️  Normalized topic '{new_topic}' to '{available_topics[best_idx]}' with score {max_score:.2f}")
-            return available_topics[best_idx]  # Use existing normalized topic
+            print(f"\n ⚖️  Normalized topic '{new_topic}' to '{available_topics_names[best_idx]}' with score {max_score:.2f}")
+            return available_topics_names[best_idx]  # Use existing normalized topic
     
     print(f"\n ➕  No close match found for topic '{new_topic}'. Saving as new topic.")
     requests.post("http://flask-server:8080/api/save_topic", json={"topic_name": new_topic})

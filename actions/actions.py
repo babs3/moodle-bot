@@ -191,13 +191,13 @@ class ActionCreateTopic(Action):
         print("\n📊  Generating bot 'action_create_topic' response...")
 
         errors = tracker.latest_message.get("metadata", {}).get("errors", [])
-        print(f"\n🔍  Original errors from metadata: {errors}")
+        #print(f"\n🔍  Original errors from metadata: {errors}")
         
         updated_errors = []
         for error in errors:
             topic = generate_topic(error["question"], error["correct_answer"])
             updated_errors.append({**error, "topic": topic})
-        print(f"\n🔍  Updated errors with topics: {updated_errors}")       
+        #print(f"\n🔍  Updated errors with topics: {updated_errors}")       
         
         dispatcher.utter_message(json_message={"errors": updated_errors})
         return []

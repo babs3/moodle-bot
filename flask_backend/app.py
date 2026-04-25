@@ -208,7 +208,7 @@ def tutor_toggle():
                     lista_erros_final = message["custom"]["errors"]
                     break # Encontramos o que queríamos
 
-            app.logger.info(f"⚠️ Erros extraídos: {lista_erros_final}")
+            #app.logger.info(f"⚠️ Erros extraídos: {lista_erros_final}")
 
             # Agora iteramos sobre a lista de objetos reais
             for error in lista_erros_final:
@@ -242,7 +242,7 @@ def tutor_toggle():
             db.session.rollback()
             app.logger.error(f"⚠️ Erro ao processar tutor: {e}")
     
-        app.logger.info(f"Novos erros encontrados para user_id {user_id} nos temas de: {lista_erros_final}")
+        #app.logger.info(f"Novos erros encontrados para user_id {user_id} nos temas de: {lista_erros_final}")
         temas = list(set([e['topic'] for e in lista_erros_final]))
         msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas)}. Would you like to review these points with me?"
     else:
