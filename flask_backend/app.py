@@ -353,15 +353,27 @@ def verificar_novos_quizzes():
             q_nome = quiz['name']
             
             # 3. Comparar com o que já temos no banco de dados
+            # Dentro da tua função verificar_novos_quizzes:
             if not quiz_ja_processado(q_id):
-                app.logger.info(f"-> NOVO QUIZ DETETADO: {q_nome} (ID: {q_id})")
+                marcar_quiz_como_processado(q_id, q_nome)
+                app.logger.info(f"A processar perguntas do novo quiz: {q_nome}")
                 
-                # --- AQUI ENTRA A TUA LÓGICA DE EXTRAÇÃO DE PERGUNTAS ---
-                # Exemplo: popular_tabela_perguntas(q_id) TODO
+                lista_perguntas = obter_perguntas_do_quiz(q_id)
                 
-                # 4. Registar que este quiz já foi tratado
-                marcar_quiz_como_processado(q_id)
-                app.logger.info(f"   Quiz {q_id} processado com sucesso.")
+                for p in lista_perguntas:
+                    # Aqui fazes o insert na tua tabela 'questoes'
+                    nova_questao = MoodleQuizData(
+                        quiz_id=q_id,
+                        question=p['texto_pergunta'],
+                        topic=None
+                    )
+                    
+                    # TODO: tratar de criar os topics
+                    # ...
+                    
+                    db.session.add(nova_questao)
+                
+                db.session.commit()
             else:
                 # Opcional: TODO ignorar ou atualizar dados se o 'timemodified' mudou
                 pass

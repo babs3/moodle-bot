@@ -378,10 +378,83 @@ def quiz_ja_processado(quiz_id):
     else:
         return False
 
-def marcar_quiz_como_processado(quiz_id):
+def marcar_quiz_como_processado(quiz_id, quiz_name=""):
     # Criar um novo registo de quiz processado
     novo_registo = MoodleQuizPolling(
-        quiz_id=quiz_id
+        quiz_id=quiz_id,
+        quiz_name=quiz_name
     )
     db.session.add(novo_registo)
     db.session.commit()
+    
+def call_moodle(function, params={}):
+    """Função genérica para chamar o Web Service do Moodle"""
+    params.update({
+        'wstoken': TOKEN,
+        'wsfunction': function,
+        'moodlewsrestformat': 'json'
+    })
+    try:
+        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params)
+        return response.json()
+    except Exception as e:
+        print(f"Erro na chamada à API: {e}")
+        return None
+    
+def obter_perguntas_do_quiz(quiz_id):
+    # 1. Iniciar uma tentativa para ler o conteúdo
+    # Nota: Se o quiz tiver password, precisarias de a passar aqui
+    tentativa = call_moodle('mod_quiz_start_attempt', {'quizid': quiz_id})
+    
+    if 'attempt' not in tentativa:
+        print(f"Erro ao iniciar tentativa no quiz {quiz_id}: {tentativa}")
+        return []
+
+    attempt_id = tentativa['attempt']['id']
+    perguntas_extraidas = []
+
+    # 2. Obter os dados da tentativa (é aqui que estão as perguntas)
+    # O Moodle pagina as perguntas. Por defeito, tentamos a página 0. 
+    # TODO: se houver mais páginas, precisas de iterar até obter todas as perguntas.
+    dados = call_moodle('mod_quiz_get_attempt_data', {
+        'attemptid': attempt_id,
+        'page': 0
+    })
+    
+    app.logger.info(f"Dados obtidos para a tentativa {attempt_id} no quiz {quiz_id}: {dados}")
+
+    if 'questions' in dados:
+        for q in dados['questions']:
+            # Extração de dados básicos
+            texto_pergunta = extrair_conteudo_pergunta(q['html'])
+            pergunta = {
+                'moodle_question_id': q['slot'], # Slot é a posição no quiz
+                #'tipo': q['type'],
+                #'html_pergunta': q['html'], # Contém o enunciado e as opções
+                'texto_pergunta': texto_pergunta
+                #'numero': q['number']
+            }
+            perguntas_extraidas.append(pergunta)
+
+    # 3. Finalizar a tentativa (para não "sujar" o Moodle)
+    call_moodle('mod_quiz_process_attempt', {
+        'attemptid': attempt_id,
+        'finishattempt': 1 # 1 para finalizar
+    })
+
+    return perguntas_extraidas
+
+def extrair_conteudo_pergunta(html_raw):
+    # 1. Carregar o HTML no BeautifulSoup
+    soup = BeautifulSoup(html_raw, 'html.parser')
+    
+    # 2. Localizar a div que contém o enunciado (sempre classe 'qtext')
+    qtext_div = soup.find('div', class_='qtext')
+    
+    if qtext_div:
+        # get_text() remove todas as tags HTML e devolve apenas o texto limpo
+        # strip=True remove espaços e quebras de linha desnecessárias no início/fim
+        texto_limpo = qtext_div.get_text(strip=True)
+        return texto_limpo
+    
+    return "Texto não encontrado"

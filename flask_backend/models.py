@@ -26,6 +26,14 @@ class MoodleQuizPolling(db.Model):
     """
     id = db.Column(db.Integer, primary_key=True)
     quiz_id = db.Column(db.Integer, unique=True, nullable=False)  # ID do Quiz no Moodle
+    quiz_name = db.Column(db.String(255), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.now())
+    
+class MoodleQuizData(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('moodle_quiz_polling.quiz_id', ondelete="CASCADE"), nullable=False)  # ID do Quiz no Moodle
+    question = db.Column(db.Text, nullable=False)
+    topic = db.Column(db.String(255), nullable=True)
     timestamp = db.Column(db.DateTime, default=datetime.now())
     
 class MoodleUserHistory(db.Model):
