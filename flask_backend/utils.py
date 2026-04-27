@@ -9,6 +9,7 @@ from flask_jwt_extended import JWTManager
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import requests
+from flask_apscheduler import APScheduler
 from bs4 import BeautifulSoup
 from flask_backend.models import *
 
@@ -19,6 +20,7 @@ COURSE_SHORTNAME = os.getenv("MOODLE_COURSE_SHORTNAME")
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
 CORS(app) # Isto permite que o Moodle aceda à API
+scheduler = APScheduler() # Para agendar tarefas periódicas, como verificar quizzes novos
 
 app.config["SQLALCHEMY_DATABASE_URI"] = f'postgresql://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@db/{os.getenv("POSTGRES_DB")}'
 app.config["JWT_SECRET_KEY"] = "super-secret-key"  # Change in production!
@@ -364,3 +366,22 @@ elif course_data.get('courses'):
     COURSE_ID = course_data['courses'][0]['id']
 else:
     COURSE_ID = "2"  # Fallback para um ID padrão, mas idealmente deves lidar com isso melhor
+    
+def quiz_ja_processado(quiz_id):
+    # Verificar se já analisámos esta tentativa
+    analise = MoodleQuizPolling.query.filter_by(
+        quiz_id=quiz_id
+    ).first()
+    
+    if analise:
+        return True
+    else:
+        return False
+
+def marcar_quiz_como_processado(quiz_id):
+    # Criar um novo registo de quiz processado
+    novo_registo = MoodleQuizPolling(
+        quiz_id=quiz_id
+    )
+    db.session.add(novo_registo)
+    db.session.commit()

@@ -2,6 +2,7 @@ from time import sleep
 from flask import request
 from datetime import datetime, timezone, timedelta
 import json
+import time
 from flask_backend.utils import *
 
 
@@ -304,8 +305,81 @@ def save_moodle_messages(): # TODO: refactor para os novos campos da BD, como o 
     return jsonify({"message": "Moodle progress saved"}), 200
 
 
-if __name__ == "__main__":
-    # wait for models.py to be imported
-    sleep(5)
-    app.run(host='0.0.0.0', port=8080, debug=True)
+# --- LÓGICA PRINCIPAL ---
+def verificar_novos_quizzes():
+    app.logger.info(f"[{time.strftime('%H:%M:%S')}] A iniciar varredura global...")
     
+    # 1. Obter todos os cursos do Moodle
+    params = {
+        'wstoken': TOKEN,
+        'wsfunction': "core_course_get_courses",
+        'moodlewsrestformat': 'json'
+    }
+    try:
+        cursos = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params).json()
+    except Exception as e:
+        app.logger.error(f"Erro na chamada à API: {e}")
+        cursos = None
+    
+    if not cursos or 'exception' in cursos:
+        app.logger.error("Erro ao obter cursos.")
+        return
+
+    app.logger.info(f"Cursos encontrados: {cursos}")
+    course_ids = [c['id'] for c in cursos]
+    
+    # 2. Obter todos os quizzes destes cursos (em blocos para evitar URLs gigantes)
+    # O Moodle espera parâmetros no formato: courseids[0]=id1, courseids[1]=id2...
+    params = {}
+    for i, cid in enumerate(course_ids):
+        params[f'courseids[{i}]'] = cid
+        
+    params.update({
+        'wstoken': TOKEN,
+        'wsfunction': "mod_quiz_get_quizzes_by_courses",
+        'moodlewsrestformat': 'json'
+    })
+    try:
+        dados_quizzes = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params).json()
+    except Exception as e:
+        app.logger.error(f"Erro na chamada à API: {e}")
+        dados_quizzes = None
+    
+    if dados_quizzes and 'quizzes' in dados_quizzes:
+        app.logger.info(f"Quizzes encontrados: {dados_quizzes['quizzes']}")
+
+        for quiz in dados_quizzes['quizzes']:
+            q_id = quiz['id']
+            q_nome = quiz['name']
+            
+            # 3. Comparar com o que já temos no banco de dados
+            if not quiz_ja_processado(q_id):
+                app.logger.info(f"-> NOVO QUIZ DETETADO: {q_nome} (ID: {q_id})")
+                
+                # --- AQUI ENTRA A TUA LÓGICA DE EXTRAÇÃO DE PERGUNTAS ---
+                # Exemplo: popular_tabela_perguntas(q_id) TODO
+                
+                # 4. Registar que este quiz já foi tratado
+                marcar_quiz_como_processado(q_id)
+                app.logger.info(f"   Quiz {q_id} processado com sucesso.")
+            else:
+                # Opcional: TODO ignorar ou atualizar dados se o 'timemodified' mudou
+                pass
+
+
+def tarefa_monitor():
+    # Esta função será chamada automaticamente pelo scheduler
+    # Criamos o contexto manualmente para que a DB funcione
+    with app.app_context():
+        try:
+            verificar_novos_quizzes()
+        except Exception as e:
+            app.logger.error(f"Erro no monitor: {e}")
+
+if __name__ == "__main__":
+    # Configuração do agendador
+    scheduler.add_job(id='moodle_monitor_job', func=tarefa_monitor, trigger='interval', minutes=0.5)
+    scheduler.init_app(app)
+    scheduler.start()
+
+    app.run(host='0.0.0.0', port=8080, debug=True, use_reloader=False)

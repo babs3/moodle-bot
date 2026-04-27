@@ -20,6 +20,14 @@ class MoodleQuizAnalysis(db.Model):
     last_attempt_id = db.Column(db.Integer, nullable=False)  # ID da última tentativa analisada
     timestamp = db.Column(db.DateTime, default=datetime.now())
 
+class MoodleQuizPolling(db.Model):
+    """
+    Regista os quizzes que já foram processados para evitar análises repetidas.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    quiz_id = db.Column(db.Integer, unique=True, nullable=False)  # ID do Quiz no Moodle
+    timestamp = db.Column(db.DateTime, default=datetime.now())
+    
 class MoodleUserHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     moodle_user_id = db.Column(db.Integer, db.ForeignKey('moodle_users.moodle_id', ondelete="CASCADE"), nullable=False)

@@ -3,12 +3,7 @@ version: "3.1"
 intents:
   - greet
   - goodbye
-  - get_insights
   - set_username
-  - most_popular_topics
-  - total_questions
-  - most_referenced_pdfs
-  - custom_teacher_query
   - bot_challenge
   - welcome
   - ask_for_definition
@@ -87,16 +82,6 @@ responses:
   utter_create_topic:
   - text: "Creating topic..."
 
-  utter_get_insights:
-  - text: "Hey! How are you?"
-    buttons:
-    - title: "Get most popular topics"
-      payload: "/most_popular_topics"
-    - title: "Get total questions"
-      payload: "/total_questions"
-    - title: "Get most referenced PDFs"
-      payload: "/most_referenced_pdfs"
-
   utter_generate_menu_buttons:
   - text: "creating menu..."
     buttons:
@@ -112,10 +97,6 @@ actions:
 - action_get_explanation
 - action_get_summary
 - action_get_class_material_location
-- action_get_most_popular_topics
-- action_get_total_questions
-- action_get_most_referenced_pdfs
-- action_teacher_custom_question
 - action_generate_initial_menu_buttons
 - action_create_topic
 

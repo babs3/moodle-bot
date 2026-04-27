@@ -195,10 +195,6 @@ nlu:
     - Can you sum up
     - Synthesise the
 
-- intent: get_insights
-  examples: |
-    - buttons for insights
-
 - intent: set_username
   examples: |
     - set username trigger
