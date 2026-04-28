@@ -33,7 +33,7 @@ class MoodleQuizData(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     quiz_id = db.Column(db.Integer, db.ForeignKey('moodle_quiz_polling.quiz_id', ondelete="CASCADE"), nullable=False)  # ID do Quiz no Moodle
     question = db.Column(db.Text, nullable=False)
-    topic = db.Column(db.String(255), nullable=True)
+    topic_id = db.Column(db.Integer, db.ForeignKey('topics.id', ondelete="SET NULL"), nullable=True)
     timestamp = db.Column(db.DateTime, default=datetime.now())
     
 class MoodleUserHistory(db.Model):
@@ -51,7 +51,7 @@ class TutorProgress(db.Model):
     moodle_user_id = db.Column(db.Integer, db.ForeignKey('moodle_users.moodle_id', ondelete="CASCADE"), nullable=False)
     slot = db.Column(db.Integer, nullable=False)
     tipo = db.Column(db.String(50), nullable=False)  # Ex: "TrueFalse", "MultipleChoice", "ShortAnswer"
-    topic = db.Column(db.Integer, db.ForeignKey('topics.id', ondelete="SET NULL"), nullable=True)  # Relaciona com a tabela de tópicos
+    topic_id = db.Column(db.Integer, db.ForeignKey('topics.id', ondelete="SET NULL"), nullable=True)  # Relaciona com a tabela de tópicos
     question = db.Column(db.Text, nullable=False)
     student_answer = db.Column(db.Text, nullable=False)
     correct_answer = db.Column(db.Text, nullable=False)

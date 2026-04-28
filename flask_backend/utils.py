@@ -492,9 +492,6 @@ def criar_topicos_para_perguntas(pergunta_id_texto):
         # 3. Validar e Logar os resultados
         if lista_perguntas_final:
             app.logger.info(f"Processadas {len(lista_perguntas_final)} perguntas.")
-            
-            # --- AQUI JÁ PODES POPULAR A DB ---
-            popular_db(lista_perguntas_final)
         else:
             app.logger.warning("Nenhuma pergunta processada encontrada na resposta do Rasa.")
 
@@ -506,11 +503,22 @@ def criar_topicos_para_perguntas(pergunta_id_texto):
               
 def popular_db(quiz_id, perguntas):
     for p in perguntas:
+        # ir buscar id do topico à tabela de tópicos, usando o nome do tópico que o Gemini nos deu
+        topic = Topics.query.filter_by(name=p.get('topic')).first()
+        # se nao exitir, criar o tópico
+        topic_id = topic.id if topic else None
+        if not topic:
+            topic = Topics(name=p.get('topic'))
+            db.session.add(topic)
+            db.session.commit() # Commit para gerar o ID do tópico
+            app.logger.info(f"Novo tópico criado: {p.get('topic')} com ID {topic.id}")
+            topic_id = topic.id
+            
         # Aqui fazes o insert na tua tabela 'questoes'
         nova_questao = MoodleQuizData(
             quiz_id=quiz_id,
             question=p.get('question'),
-            topic=p.get('topic')
+            topic_id=topic_id
         )
         db.session.add(nova_questao)
     db.session.commit()

@@ -181,7 +181,8 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
         SlotSet("user_id", user_id),  # Store the user ID
         SlotSet("input_time", input_time)
         ]
-    
+
+
 class ActionCreateTopic(Action):
     def name(self):
         return "action_create_topic"
