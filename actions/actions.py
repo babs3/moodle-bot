@@ -223,22 +223,12 @@ class ActionCreateTopic(Action):
         except Exception as e:
             print(f"\n❌  Error calling Gemini API: {e}")
             gemini_data = None
-
-        # 3. Preparar a tua outra lista
-        updated_questions = []
-        for pergunta in perguntas:
-            updated_questions.append({
-                "question": pergunta,
-                "correct_answer": "", 
-                "topic": ""
-            })
             
         # 4. ENVIAR APENAS UMA MENSAGEM com tudo agrupado
         # Assim o Flask recebe um único objeto fácil de iterar
         dispatcher.utter_message(json_message={
             "status": "success",
-            "gemini_analysis": gemini_data,
-            "moodle_data": updated_questions
+            "gemini_analysis": gemini_data
         })
         
         return []

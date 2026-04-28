@@ -544,7 +544,6 @@ def popular_db(quiz_id, perguntas):
             app.logger.info(f"Novo tópico criado: {p.get('topic')} com ID {topic.id}")
             topic_id = topic.id
             
-        # Aqui fazes o insert na tua tabela 'questoes'
         nova_questao = MoodleQuizData(
             quiz_id=quiz_id,
             question=p.get('question'),
