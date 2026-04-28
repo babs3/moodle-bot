@@ -295,6 +295,98 @@ def save_moodle_messages(): # TODO: refactor para os novos campos da BD, como o 
 
     return jsonify({"message": "Moodle progress saved"}), 200
 
+def new_quiz_polling():
+    app.logger.info(f"[{time.strftime('%H:%M:%S')}] A iniciar polling a novos quizzes...")
+    function = "core_course_get_courses"
+    # 1. Obter todos os cursos do Moodle
+    try:
+        cursos = call_moodle(function, {})
+    except Exception as e:
+        app.logger.error(f"Erro na chamada à API: {e}")
+        cursos = None
+    
+    if not cursos or 'exception' in cursos:
+        app.logger.error("Erro ao obter cursos.")
+        return
+
+    #app.logger.info(f"Cursos encontrados: {cursos}")
+    course_ids = [c['id'] for c in cursos]
+    
+    # 2. Obter todos os quizzes destes cursos (em blocos para evitar URLs gigantes)
+    # O Moodle espera parâmetros no formato: courseids[0]=id1, courseids[1]=id2...
+    params = {}
+    for i, cid in enumerate(course_ids):
+        params[f'courseids[{i}]'] = cid
+        
+    function = "mod_quiz_get_quizzes_by_courses"
+        
+    try:
+        dados_quizzes = call_moodle(function, params)
+    except Exception as e:
+        app.logger.error(f"Erro na chamada à API: {e}")
+        dados_quizzes = None
+    
+    if dados_quizzes and 'quizzes' in dados_quizzes:
+        #app.logger.info(f"Quizzes encontrados: {dados_quizzes['quizzes']}")
+
+        for quiz in dados_quizzes['quizzes']:
+            q_id = quiz['id']
+            q_nome = quiz['name']
+            q_last_edit = quiz['timemodified'] # O timestamp do Moodle
+            # Converter o inteiro do Moodle para um objeto datetime para podermos comparar
+            q_last_edit_dt = datetime.fromtimestamp(q_last_edit)
+            
+            lista_perguntas = obter_perguntas_do_quiz(q_id)
+            #app.logger.info(f"Perguntas extraídas do moodle: {lista_perguntas}")             
+            # Gerar um hash das perguntas para comparação futura
+            questions_hash = gerar_hash_perguntas(lista_perguntas)
+    
+            quiz_local = obter_quiz_local(q_id)
+            # ir buscar perguntas a BD para comparar com o que veio do Moodle
+            questions_local = [q.question for q in MoodleQuizData.query.filter_by(quiz_id=q_id).all()]
+            #app.logger.info(f"Perguntas da db: {questions_local}")
+            #if quiz_local:
+            #    app.logger.info(f"Hash antigo: {quiz_local.questions_hash} | Hash novo: {questions_hash}")
+                  
+            
+            # 3. Comparar com o que já temos no banco de dados
+            if not quiz_ja_processado(q_id):
+                app.logger.info(f"A processar perguntas do novo quiz: {q_nome}")
+                marcar_quiz_como_processado(q_id, q_nome, questions_hash)            
+                   
+                lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
+                app.logger.info(f"Perguntas processadas pelo Rasa: {lista_final_perguntas}")
+
+                popular_db(q_id, lista_final_perguntas)
+                
+            # CASO 2: Quiz existe, mas foi editado pelo professor
+            elif q_last_edit_dt > quiz_local.timestamp:
+                app.logger.info(f"🔄  Alteração detetada no quiz: {q_nome} (Moodle: {q_last_edit_dt} > Local: {quiz_local.timestamp})")
+                
+                clean_quiz_data(q_id)
+                marcar_quiz_como_processado(q_id, q_nome, questions_hash)
+
+                lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
+                app.logger.info(f"Perguntas processadas pelo Rasa (after reprocessing): {lista_final_perguntas}")
+
+                popular_db(q_id, lista_final_perguntas)
+                
+            # CASO 3: Quiz existe, mas perguntas foram editadas pelo professor
+            elif questions_hash != quiz_local.questions_hash:
+                app.logger.info(f"🔄  Alteração detetada nas perguntas do quiz: {q_nome}")
+                app.logger.info(f"Hash antigo: {quiz_local.questions_hash} | Hash novo: {questions_hash}")
+                clean_quiz_data(q_id)
+                marcar_quiz_como_processado(q_id, q_nome, questions_hash)
+
+                lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
+                app.logger.info(f"_Perguntas processadas pelo Rasa (after reprocessing): {lista_final_perguntas}")
+                
+                popular_db(q_id, lista_final_perguntas)
+
+            # CASO 4: Estão iguais
+            else:
+                app.logger.info(f"✅  Quiz '{q_nome}' já está atualizado.")
+                pass
 
 def tarefa_monitor():
     # Esta função será chamada automaticamente pelo scheduler

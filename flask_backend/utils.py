@@ -33,59 +33,49 @@ db.init_app(app)
 migrate = Migrate(app, db)  # For database migrations
 jwt = JWTManager(app)
 
-def new_quiz_polling():
-    app.logger.info(f"[{time.strftime('%H:%M:%S')}] A iniciar polling a novos quizzes...")
-    function = "core_course_get_courses"
-    # 1. Obter todos os cursos do Moodle
-    try:
-        cursos = call_moodle(function, {})
-    except Exception as e:
-        app.logger.error(f"Erro na chamada à API: {e}")
-        cursos = None
-    
-    if not cursos or 'exception' in cursos:
-        app.logger.error("Erro ao obter cursos.")
-        return
+import hashlib
+import json
 
-    app.logger.info(f"Cursos encontrados: {cursos}")
-    course_ids = [c['id'] for c in cursos]
+def gerar_hash_perguntas(lista_perguntas):
+    # 1. Garantir que a lista está sempre na mesma ordem (pelo slot/id)
+    perguntas_ordenadas = sorted(lista_perguntas, key=lambda x: x['moodle_question_id'])
     
-    # 2. Obter todos os quizzes destes cursos (em blocos para evitar URLs gigantes)
-    # O Moodle espera parâmetros no formato: courseids[0]=id1, courseids[1]=id2...
-    params = {}
-    for i, cid in enumerate(course_ids):
-        params[f'courseids[{i}]'] = cid
+    lista_para_hash = []
+    for p in perguntas_ordenadas:
+        # 2. Normalização extrema do texto
+        texto = p['texto_pergunta']
+        # Remover espaços inquebráveis (\xa0), quebras de linha e espaços duplos
+        texto_normalizado = " ".join(texto.replace('\xa0', ' ').split())
         
-    function = "mod_quiz_get_quizzes_by_courses"
-        
-    try:
-        dados_quizzes = call_moodle(function, params)
-    except Exception as e:
-        app.logger.error(f"Erro na chamada à API: {e}")
-        dados_quizzes = None
+        # Criamos uma string única para esta pergunta
+        item_string = f"ID:{p['moodle_question_id']}|TXT:{texto_normalizado}"
+        lista_para_hash.append(item_string)
     
-    if dados_quizzes and 'quizzes' in dados_quizzes:
-        app.logger.info(f"Quizzes encontrados: {dados_quizzes['quizzes']}")
+    # 3. Juntar tudo com um separador único
+    string_final = "###".join(lista_para_hash)
+    
+    # 4. Debug: Descomenta a linha abaixo para ver exatamente o que está a ser hashed
+    # print(f"DEBUG HASH INPUT: {string_final}")
+    
+    return hashlib.md5(string_final.encode('utf-8')).hexdigest()
 
-        for quiz in dados_quizzes['quizzes']:
-            q_id = quiz['id']
-            q_nome = quiz['name']
-            
-            # 3. Comparar com o que já temos no banco de dados
-            if not quiz_ja_processado(q_id):
-                marcar_quiz_como_processado(q_id, q_nome)
-                app.logger.info(f"A processar perguntas do novo quiz: {q_nome}")
-                
-                lista_perguntas = obter_perguntas_do_quiz(q_id)
-                #app.logger.info(f"Perguntas extraídas: {lista_perguntas}")             
-                   
-                lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
-                app.logger.info(f"Perguntas processadas pelo Rasa: {lista_final_perguntas}")
-                
-                popular_db(q_id, lista_final_perguntas)
-            else:
-                # Opcional: TODO ignorar ou atualizar dados se o 'timemodified' mudou
-                pass
+def clean_quiz_data(quiz_id):
+    # Eliminar perguntas antigas do quiz
+    quiz_antigo = MoodleQuizPolling.query.filter_by(quiz_id=quiz_id).first()
+    if quiz_antigo:
+        app.logger.info(f"Removendo dados antigos do quiz ID {quiz_id} para evitar duplicações.")   
+        db.session.delete(quiz_antigo)
+        db.session.commit()
+
+    db.session.commit()
+
+   
+def obter_quiz_local(quiz_id):
+    quiz_local = MoodleQuizPolling.query.filter_by(quiz_id=quiz_id).first()
+    if quiz_local:
+        return quiz_local
+    else:
+        return None
 
 def check_moodle_user_in_db(moodle_id, email):
     # Ver se o utilizador já existe na nossa BD, se não existir, criar
@@ -399,7 +389,7 @@ def fetch_course_id_from_moodle():
         return course_id
     
     except Exception as e:
-        print(f"Erro na conexão com Moodle: {e}")
+        app.logger.error(f"Erro na conexão com Moodle: {e}")
     
     return None
 
@@ -412,16 +402,19 @@ def quiz_ja_processado(quiz_id):
     if analise:
         return True
     else:
+        app.logger.info(f"Quiz ID {quiz_id} ainda não processado.")
         return False
 
-def marcar_quiz_como_processado(quiz_id, quiz_name=""):
+def marcar_quiz_como_processado(quiz_id, quiz_name, questions_hash):
     # Criar um novo registo de quiz processado
     novo_registo = MoodleQuizPolling(
         quiz_id=quiz_id,
-        quiz_name=quiz_name
+        quiz_name=quiz_name,
+        questions_hash=questions_hash
     )
     db.session.add(novo_registo)
     db.session.commit()
+    app.logger.info(f"Quiz ID {quiz_id} adicionado ao banco de dados.")
     
 def call_moodle(function, params={}, timeout=5):
     """Função genérica para chamar o Web Service do Moodle"""
