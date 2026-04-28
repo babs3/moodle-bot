@@ -190,16 +190,56 @@ class ActionCreateTopic(Action):
         
         print("\n📊  Generating bot 'action_create_topic' response...")
 
-        errors = tracker.latest_message.get("metadata", {}).get("errors", [])
-        #print(f"\n🔍  Original errors from metadata: {errors}")
+        perguntas = tracker.latest_message.get("metadata", {}).get("perguntas", [])
+        print(f"\n🔍  Original perguntas from metadata: {perguntas}")
         
-        updated_errors = []
-        for error in errors:
-            topic = generate_topic(error["question"], error["correct_answer"])
-            updated_errors.append({**error, "topic": topic})
-        #print(f"\n🔍  Updated errors with topics: {updated_errors}")       
+        prompt = "Dadas as seguintes perguntas, cria um tópico (em inglês) para cada uma delas. Sempre que possivel, tenta agrupar perguntas relacionadas no mesmo tópico. "
+        prompt += "Responde apenas com um JSON no seguinte formato: { 'id': 'id_original', 'question': 'pergunta original', 'topic': 'tópico gerado para a pergunta' }. "
+        prompt += "Se não conseguires gerar um tópico para uma pergunta, deixa o campo 'topic' vazio. Aqui estão as perguntas: "
+        for pergunta in perguntas:
+            prompt += "\n- ID: " + str(pergunta.get("moodle_question_id", "")) + ", question: " + pergunta.get("texto_pergunta", "") + ", topic: ?" # Acessa a pergunta usando .get() para evitar erros se a chave não existir
         
-        dispatcher.utter_message(json_message={"errors": updated_errors})
+        try:
+            response = g_model.generate_content(prompt)
+            
+            if hasattr(response, "text") and response.text:
+                print("\n🎯 Gemini Response Generated Successfully!")
+                raw_text = response.text.strip()
+                
+                # 1. Limpar os backticks de Markdown (```json e ```)
+                # O regex remove o que estiver antes e depois do [ ou {
+                clean_json_str = re.sub(r'^```json\s*|```$', '', raw_text, flags=re.MULTILINE).strip()
+                
+                try:
+                    # 2. Converter a string limpa num objeto real do Python (lista ou dicionário)
+                    gemini_data = json.loads(clean_json_str)
+                except json.JSONDecodeError:
+                    print("Erro ao converter string do Gemini em JSON")
+                    gemini_data = raw_text # Fallback se falhar
+            else:
+                gemini_data = None
+
+        except Exception as e:
+            print(f"\n❌  Error calling Gemini API: {e}")
+            gemini_data = None
+
+        # 3. Preparar a tua outra lista
+        updated_questions = []
+        for pergunta in perguntas:
+            updated_questions.append({
+                "question": pergunta,
+                "correct_answer": "", 
+                "topic": ""
+            })
+            
+        # 4. ENVIAR APENAS UMA MENSAGEM com tudo agrupado
+        # Assim o Flask recebe um único objeto fácil de iterar
+        dispatcher.utter_message(json_message={
+            "status": "success",
+            "gemini_analysis": gemini_data,
+            "moodle_data": updated_questions
+        })
+        
         return []
     
 # === ACTION 1: GET DEFINITION === #

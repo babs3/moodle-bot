@@ -1,3 +1,4 @@
+import json
 import logging
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -421,12 +422,12 @@ def obter_perguntas_do_quiz(quiz_id):
         'page': 0
     })
     
-    app.logger.info(f"Dados obtidos para a tentativa {attempt_id} no quiz {quiz_id}: {dados}")
-
     if 'questions' in dados:
         for q in dados['questions']:
             # Extração de dados básicos
             texto_pergunta = extrair_conteudo_pergunta(q['html'])
+            if q['type'] == 'truefalse':
+                texto_pergunta = "Verdadeiro ou Falso: " + texto_pergunta
             pergunta = {
                 'moodle_question_id': q['slot'], # Slot é a posição no quiz
                 #'tipo': q['type'],
@@ -458,3 +459,58 @@ def extrair_conteudo_pergunta(html_raw):
         return texto_limpo
     
     return "Texto não encontrado"
+
+def criar_topicos_para_perguntas(pergunta_id_texto):
+    url = "http://rasa:5005/webhooks/rest/webhook"
+    payload = {
+        "sender": "placeholder_for_email", #user_email, # TODO 
+        "message": "create topic trigger",
+        "metadata": {"perguntas": pergunta_id_texto}
+    }
+    headers = {"Content-Type": "application/json"}
+
+    try:
+        response = requests.post(url, data=json.dumps(payload), headers=headers)
+        response.raise_for_status()
+        messages = response.json() 
+        app.logger.info(f"DEBUG COMPLETO RASAA: {json.dumps(messages, indent=2)}")
+
+        lista_perguntas_final = []
+
+        for message in messages:
+            # 1. Verificamos se a mensagem tem o campo 'custom'
+            if "custom" in message:
+                custom_data = message["custom"]
+                
+                # 2. Procuramos pela chave que definimos no Rasa (gemini_analysis)
+                # Esta chave contém a lista de perguntas já com tópicos e IDs convertidos
+                if "gemini_analysis" in custom_data:
+                    lista_perguntas_final = custom_data.get("gemini_analysis", [])
+                    app.logger.info("Encontrada análise do Gemini com sucesso.")
+                    break 
+
+        # 3. Validar e Logar os resultados
+        if lista_perguntas_final:
+            app.logger.info(f"Processadas {len(lista_perguntas_final)} perguntas.")
+            
+            # --- AQUI JÁ PODES POPULAR A DB ---
+            popular_db(lista_perguntas_final)
+        else:
+            app.logger.warning("Nenhuma pergunta processada encontrada na resposta do Rasa.")
+
+    except Exception as e:
+        app.logger.error(f"Erro ao processar resposta do Rasa: {e}")
+        
+    return lista_perguntas_final
+
+              
+def popular_db(quiz_id, perguntas):
+    for p in perguntas:
+        # Aqui fazes o insert na tua tabela 'questoes'
+        nova_questao = MoodleQuizData(
+            quiz_id=quiz_id,
+            question=p.get('question'),
+            topic=p.get('topic')
+        )
+        db.session.add(nova_questao)
+    db.session.commit()

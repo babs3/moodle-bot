@@ -359,21 +359,12 @@ def verificar_novos_quizzes():
                 app.logger.info(f"A processar perguntas do novo quiz: {q_nome}")
                 
                 lista_perguntas = obter_perguntas_do_quiz(q_id)
+                app.logger.info(f"Perguntas extraídas: {lista_perguntas}")             
+                   
+                lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
+                app.logger.info(f"Perguntas processadas pelo Rasa: {lista_final_perguntas}")
                 
-                for p in lista_perguntas:
-                    # Aqui fazes o insert na tua tabela 'questoes'
-                    nova_questao = MoodleQuizData(
-                        quiz_id=q_id,
-                        question=p['texto_pergunta'],
-                        topic=None
-                    )
-                    
-                    # TODO: tratar de criar os topics
-                    # ...
-                    
-                    db.session.add(nova_questao)
-                
-                db.session.commit()
+                popular_db(q_id, lista_final_perguntas)
             else:
                 # Opcional: TODO ignorar ou atualizar dados se o 'timemodified' mudou
                 pass
