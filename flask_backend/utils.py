@@ -109,17 +109,13 @@ def get_moodle_user_data(user_id):
     app.logger.info(f"ID: {user_id} | URL: {MOODLE_URL}")
 
     params = {
-        'wstoken': TOKEN,
-        'wsfunction': function,
-        'moodlewsrestformat': 'json',
         'criteria[0][key]': 'id',
         'criteria[0][value]': user_id
     }
 
     try:
         # 2. Adiciona um timeout para o código não ficar "pendurado" para sempre
-        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=5)
-        response_data = response.json()
+        response_data = call_moodle(function, params, timeout=5)
         #app.logger.info(f"Resposta bruta do Moodle: {response_data}")
 
         if 'users' in response_data and len(response_data['users']) > 0:
@@ -142,15 +138,11 @@ def get_moodle_contents(course_id):
     function = "core_course_get_contents"
     app.logger.info(f"--- INÍCIO DA BUSCA DE CONTEÚDOS MOODLE --- | Course ID: {course_id}")
     params = {
-        'wstoken': TOKEN,
-        'wsfunction': function,
-        'moodlewsrestformat': 'json',
         'courseid': course_id
     }
     
     try:
-        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=5)
-        contents = response.json()
+        contents = call_moodle(function, params, timeout=5)
         #app.logger.info(f"Resposta bruta do Moodle para conteúdos: {contents}")
         
         # Se o Moodle retornar um erro no JSON (ex: token inválido)
@@ -196,16 +188,13 @@ def get_quiz_attempt_review(attempt_id):
     app.logger.info(f"--- INÍCIO DA REVISÃO DE TENTATIVA --- | Attempt ID: {attempt_id}")
     
     params = {
-        'wstoken': TOKEN,
-        'wsfunction': function,
-        'moodlewsrestformat': 'json',
         'attemptid': attempt_id,
         # 'page': -1  # Opcional: -1 retorna todas as páginas de perguntas de uma vez
     }
     
     try:
-        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=10)
-        review_data = response.json()
+        # timeout mais longo porque esta chamada pode demorar, especialmente para quizzes grandes
+        review_data = call_moodle(function, params, timeout=10)
         
         # Verificação de erro na resposta da API
         if isinstance(review_data, dict) and "exception" in review_data:
@@ -227,15 +216,11 @@ def get_quiz_id_by_name(course_id, quiz_name):
     app.logger.info(f"--- PROCURANDO ID DO QUIZ: '{quiz_name}' no curso {course_id} ---")
     
     params = {
-        'wstoken': TOKEN,
-        'wsfunction': function,
-        'moodlewsrestformat': 'json',
         'courseids[0]': course_id  # A API espera um array de IDs
     }
 
     try:
-        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=10)
-        data = response.json()
+        data = call_moodle(function, params, timeout=10)
 
         if isinstance(data, dict) and "exception" in data:
             app.logger.error(f"Erro na API: {data['message']}")
@@ -264,16 +249,8 @@ def get_user_quizzes_by_course(course_id, user_id):
     function = "mod_quiz_get_quizzes_by_courses"
     app.logger.info(f"--- BUSCANDO QUIZZES DO CURSO PARA O USUÁRIO --- | Course ID: {course_id} | User ID: {user_id}")
     
-    params = {
-        'wstoken': TOKEN,
-        'wsfunction': function,
-        'moodlewsrestformat': 'json',
-        'courseids[0]': course_id
-    }
-
     try:
-        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=10)
-        data = response.json()
+        data = call_moodle(function, {'courseids[0]': course_id}, timeout=10)
 
         if isinstance(data, dict) and "exception" in data:
             app.logger.error(f"Erro na API Moodle: {data['message']}")
@@ -296,17 +273,13 @@ def get_last_attempt_id(quiz_id, user_id):
     app.logger.info(f"--- BUSCANDO TENTATIVAS --- | Quiz ID: {quiz_id} | User ID: {user_id}")
     
     params = {
-        'wstoken': TOKEN,
-        'wsfunction': function,
-        'moodlewsrestformat': 'json',
         'quizid': quiz_id,
         'userid': user_id,
         'status': 'finished'  # apenas as finalizadas
     }
     
     try:
-        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=10)
-        data = response.json()
+        data = call_moodle(function, params, timeout=10)
         
         if isinstance(data, dict) and "exception" in data:
             app.logger.error(f"Erro na API Moodle: {data['message']}")
@@ -335,16 +308,12 @@ def get_moodle_courses_by_field(field, value):
     function = "core_course_get_courses_by_field"
     app.logger.info(f"--- INÍCIO DA BUSCA DE CURSOS MOODLE --- | Field: {field}, Value: {value}")
     params = {
-        'wstoken': TOKEN,
-        'wsfunction': function,
-        'moodlewsrestformat': 'json',
         'field': field,
         'value': value
     }
     
     try:
-        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=5)
-        courses = response.json()
+        courses = call_moodle(function, params, timeout=5)
         #app.logger.info(f"Resposta bruta do Moodle para cursos: {courses}")
         
         # Se o Moodle retornar um erro no JSON (ex: token inválido)
@@ -364,15 +333,11 @@ def fetch_course_id_from_moodle():
         # Substitui pela tua lógica real de chamada à API do Moodle
         function = "core_course_get_courses_by_field"
         params = {
-            'wstoken': TOKEN,
-            'wsfunction': function,
-            'moodlewsrestformat': 'json',
             'field': "shortname",
             'value': COURSE_SHORTNAME
         }
         
-        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=5)
-        course_data = response.json()    
+        course_data = call_moodle(function, params, timeout=5)  
         course_id = course_data['courses'][0]['id']
 
         return course_id
@@ -402,7 +367,7 @@ def marcar_quiz_como_processado(quiz_id, quiz_name=""):
     db.session.add(novo_registo)
     db.session.commit()
     
-def call_moodle(function, params={}):
+def call_moodle(function, params={}, timeout=5):
     """Função genérica para chamar o Web Service do Moodle"""
     params.update({
         'wstoken': TOKEN,
@@ -410,10 +375,13 @@ def call_moodle(function, params={}):
         'moodlewsrestformat': 'json'
     })
     try:
-        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params)
+        if timeout:
+            response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=timeout)
+        else:
+            response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params)
         return response.json()
     except Exception as e:
-        print(f"Erro na chamada à API: {e}")
+        app.logger.error(f"Erro na chamada à API: {e}")
         return None
     
 def obter_perguntas_do_quiz(quiz_id):
@@ -422,7 +390,7 @@ def obter_perguntas_do_quiz(quiz_id):
     tentativa = call_moodle('mod_quiz_start_attempt', {'quizid': quiz_id})
     
     if 'attempt' not in tentativa:
-        print(f"Erro ao iniciar tentativa no quiz {quiz_id}: {tentativa}")
+        app.logger.error(f"Erro ao iniciar tentativa no quiz {quiz_id}: {tentativa}")
         return []
 
     attempt_id = tentativa['attempt']['id']

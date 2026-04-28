@@ -300,16 +300,11 @@ def save_moodle_messages(): # TODO: refactor para os novos campos da BD, como o 
 
 # --- LÓGICA PRINCIPAL ---
 def verificar_novos_quizzes():
-    app.logger.info(f"[{time.strftime('%H:%M:%S')}] A iniciar varredura global...")
-    
+    app.logger.info(f"[{time.strftime('%H:%M:%S')}] A iniciar polling a novos quizzes...")
+    function = "core_course_get_courses"
     # 1. Obter todos os cursos do Moodle
-    params = {
-        'wstoken': TOKEN,
-        'wsfunction': "core_course_get_courses",
-        'moodlewsrestformat': 'json'
-    }
     try:
-        cursos = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params).json()
+        cursos = call_moodle(function, {})
     except Exception as e:
         app.logger.error(f"Erro na chamada à API: {e}")
         cursos = None
