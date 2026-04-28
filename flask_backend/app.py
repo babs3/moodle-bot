@@ -194,6 +194,8 @@ def tutor_toggle():
             # get question topic from db
             question_data = MoodleQuizData.query.filter_by(question=error_question).first()
             topic_id = question_data.topic_id if question_data else None
+            # atualizar o erro com o topic_id encontrado
+            error['topic_id'] = topic_id
 
             # 2. Guardar o progresso
             # Nota: Verifica se os nomes das chaves (student_answer vs resposta_aluno)
@@ -202,7 +204,7 @@ def tutor_toggle():
                 moodle_user_id=user_id,
                 slot=error.get('slot'),
                 tipo=error.get('tipo'),
-                topic_id=topic_id,
+                topic_id=error.get('topic_id'),
                 question=error.get('question'),
                 student_answer=error.get('student_answer'),
                 correct_answer=error.get('correct_answer')
@@ -213,7 +215,13 @@ def tutor_toggle():
 
     
         #app.logger.info(f"Novos erros encontrados para user_id {user_id} nos temas de: {lista_erros_final}")
-        temas = list(set([e['topic'] for e in novos_erros_encontrados]))
+        temas_id = list(set([e['topic_id'] for e in novos_erros_encontrados]))
+        temas = []
+        for topic_id in temas_id:
+            topic = Topics.query.filter_by(id=topic_id).first()
+            if topic:
+                temas.append(topic.name)
+        
         msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas)}. Would you like to review these points with me?"
     else:
         msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
