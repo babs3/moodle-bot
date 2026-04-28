@@ -65,7 +65,6 @@ def chat():
     if user and user.tutor_mode_active:
         app.logger.info(f"User {moodle_id} is in tutor mode.")
         
-        url = "http://rasa:5005/webhooks/rest/webhook"
         current_time = datetime.now(timezone.utc).isoformat() #datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         payload = {
             "sender": user_email,
@@ -75,7 +74,7 @@ def chat():
         headers = {"Content-Type": "application/json"}
 
         try:
-            response = requests.post(url, data=json.dumps(payload), headers=headers)
+            response = requests.post(RASA_URL, data=json.dumps(payload), headers=headers)
             response.raise_for_status()
             messages = response.json()
 
@@ -104,7 +103,6 @@ def chat():
         #app.logger.info(f"Desempenho do aluno: {erros}")
         
         # Aqui podes pôr a tua lógica ou chamar o Rasa via REST
-        url = "http://rasa:5005/webhooks/rest/webhook"
         current_time = datetime.now(timezone.utc).isoformat() #datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         payload = {
             "sender": user_email,
@@ -114,7 +112,7 @@ def chat():
         headers = {"Content-Type": "application/json"}
 
         try:
-            response = requests.post(url, data=json.dumps(payload), headers=headers)
+            response = requests.post(RASA_URL, data=json.dumps(payload), headers=headers)
             response.raise_for_status()
             messages = response.json()
 
@@ -298,72 +296,12 @@ def save_moodle_messages(): # TODO: refactor para os novos campos da BD, como o 
     return jsonify({"message": "Moodle progress saved"}), 200
 
 
-# --- LÓGICA PRINCIPAL ---
-def verificar_novos_quizzes():
-    app.logger.info(f"[{time.strftime('%H:%M:%S')}] A iniciar polling a novos quizzes...")
-    function = "core_course_get_courses"
-    # 1. Obter todos os cursos do Moodle
-    try:
-        cursos = call_moodle(function, {})
-    except Exception as e:
-        app.logger.error(f"Erro na chamada à API: {e}")
-        cursos = None
-    
-    if not cursos or 'exception' in cursos:
-        app.logger.error("Erro ao obter cursos.")
-        return
-
-    app.logger.info(f"Cursos encontrados: {cursos}")
-    course_ids = [c['id'] for c in cursos]
-    
-    # 2. Obter todos os quizzes destes cursos (em blocos para evitar URLs gigantes)
-    # O Moodle espera parâmetros no formato: courseids[0]=id1, courseids[1]=id2...
-    params = {}
-    for i, cid in enumerate(course_ids):
-        params[f'courseids[{i}]'] = cid
-        
-    params.update({
-        'wstoken': TOKEN,
-        'wsfunction': "mod_quiz_get_quizzes_by_courses",
-        'moodlewsrestformat': 'json'
-    })
-    try:
-        dados_quizzes = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params).json()
-    except Exception as e:
-        app.logger.error(f"Erro na chamada à API: {e}")
-        dados_quizzes = None
-    
-    if dados_quizzes and 'quizzes' in dados_quizzes:
-        app.logger.info(f"Quizzes encontrados: {dados_quizzes['quizzes']}")
-
-        for quiz in dados_quizzes['quizzes']:
-            q_id = quiz['id']
-            q_nome = quiz['name']
-            
-            # 3. Comparar com o que já temos no banco de dados
-            # Dentro da tua função verificar_novos_quizzes:
-            if not quiz_ja_processado(q_id):
-                marcar_quiz_como_processado(q_id, q_nome)
-                app.logger.info(f"A processar perguntas do novo quiz: {q_nome}")
-                
-                lista_perguntas = obter_perguntas_do_quiz(q_id)
-                app.logger.info(f"Perguntas extraídas: {lista_perguntas}")             
-                   
-                lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
-                app.logger.info(f"Perguntas processadas pelo Rasa: {lista_final_perguntas}")
-                
-                popular_db(q_id, lista_final_perguntas)
-            else:
-                # Opcional: TODO ignorar ou atualizar dados se o 'timemodified' mudou
-                pass
-
-
 def tarefa_monitor():
     # Esta função será chamada automaticamente pelo scheduler
     # Criamos o contexto manualmente para que a DB funcione
     with app.app_context():
         try:
-            verificar_novos_quizzes()
+            new_quiz_polling()
         except Exception as e:
             app.logger.error(f"Erro no monitor: {e}")
 

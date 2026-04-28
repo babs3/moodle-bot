@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from flask import Flask, jsonify
 from flask_cors import CORS
 import hashlib
@@ -14,6 +15,7 @@ from flask_apscheduler import APScheduler
 from bs4 import BeautifulSoup
 from flask_backend.models import *
 
+RASA_URL = "http://rasa:5005/webhooks/rest/webhook"
 MOODLE_URL = "http://host.docker.internal" # Este endereço diz ao Docker: "Sai do contentor e vai buscar o localhost da máquina real".
 TOKEN = os.getenv("MOODLE_TOKEN")
 COURSE_SHORTNAME = os.getenv("MOODLE_COURSE_SHORTNAME")
@@ -30,6 +32,60 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 migrate = Migrate(app, db)  # For database migrations
 jwt = JWTManager(app)
+
+def new_quiz_polling():
+    app.logger.info(f"[{time.strftime('%H:%M:%S')}] A iniciar polling a novos quizzes...")
+    function = "core_course_get_courses"
+    # 1. Obter todos os cursos do Moodle
+    try:
+        cursos = call_moodle(function, {})
+    except Exception as e:
+        app.logger.error(f"Erro na chamada à API: {e}")
+        cursos = None
+    
+    if not cursos or 'exception' in cursos:
+        app.logger.error("Erro ao obter cursos.")
+        return
+
+    app.logger.info(f"Cursos encontrados: {cursos}")
+    course_ids = [c['id'] for c in cursos]
+    
+    # 2. Obter todos os quizzes destes cursos (em blocos para evitar URLs gigantes)
+    # O Moodle espera parâmetros no formato: courseids[0]=id1, courseids[1]=id2...
+    params = {}
+    for i, cid in enumerate(course_ids):
+        params[f'courseids[{i}]'] = cid
+        
+    function = "mod_quiz_get_quizzes_by_courses"
+        
+    try:
+        dados_quizzes = call_moodle(function, params)
+    except Exception as e:
+        app.logger.error(f"Erro na chamada à API: {e}")
+        dados_quizzes = None
+    
+    if dados_quizzes and 'quizzes' in dados_quizzes:
+        app.logger.info(f"Quizzes encontrados: {dados_quizzes['quizzes']}")
+
+        for quiz in dados_quizzes['quizzes']:
+            q_id = quiz['id']
+            q_nome = quiz['name']
+            
+            # 3. Comparar com o que já temos no banco de dados
+            if not quiz_ja_processado(q_id):
+                marcar_quiz_como_processado(q_id, q_nome)
+                app.logger.info(f"A processar perguntas do novo quiz: {q_nome}")
+                
+                lista_perguntas = obter_perguntas_do_quiz(q_id)
+                #app.logger.info(f"Perguntas extraídas: {lista_perguntas}")             
+                   
+                lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
+                app.logger.info(f"Perguntas processadas pelo Rasa: {lista_final_perguntas}")
+                
+                popular_db(q_id, lista_final_perguntas)
+            else:
+                # Opcional: TODO ignorar ou atualizar dados se o 'timemodified' mudou
+                pass
 
 def check_moodle_user_in_db(moodle_id, email):
     # Ver se o utilizador já existe na nossa BD, se não existir, criar
@@ -443,19 +499,18 @@ def extrair_conteudo_pergunta(html_raw):
     return "Texto não encontrado"
 
 def criar_topicos_para_perguntas(pergunta_id_texto):
-    url = "http://rasa:5005/webhooks/rest/webhook"
     payload = {
-        "sender": "placeholder_for_email", #user_email, # TODO 
+        "sender": "doesnt_matter", #user_email
         "message": "create topic trigger",
         "metadata": {"perguntas": pergunta_id_texto}
     }
     headers = {"Content-Type": "application/json"}
 
     try:
-        response = requests.post(url, data=json.dumps(payload), headers=headers)
+        response = requests.post(RASA_URL, data=json.dumps(payload), headers=headers)
         response.raise_for_status()
         messages = response.json() 
-        app.logger.info(f"DEBUG COMPLETO RASAA: {json.dumps(messages, indent=2)}")
+        #app.logger.info(f"DEBUG COMPLETO RASA: {json.dumps(messages, indent=2)}")
 
         lista_perguntas_final = []
 
