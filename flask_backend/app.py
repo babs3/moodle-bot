@@ -1,9 +1,25 @@
-from time import sleep
 from flask import request
 from datetime import datetime, timezone, timedelta
 import json
 import time
 from flask_backend.utils import *
+
+COURSE_ID = None
+
+def wait_for_moodle_config():
+    global COURSE_ID
+    app.logger.info("A aguardar configuração do Moodle...")
+    
+    while COURSE_ID is None:
+        COURSE_ID = fetch_course_id_from_moodle()
+        
+        if COURSE_ID:
+            app.logger.info(f"Sucesso! COURSE_ID definido como: {COURSE_ID}")
+            # Opcional: Guardar no app.config para acesso fácil nas rotas
+            app.config['COURSE_ID'] = COURSE_ID
+        else:
+            app.logger.warning("Course ID não encontrado ou Moodle offline. A tentar novamente em 5 segundos...")
+            time.sleep(5) # Espera 5 segundos antes da próxima tentativa
 
 
 @app.route('/')
@@ -357,6 +373,9 @@ def tarefa_monitor():
             app.logger.error(f"Erro no monitor: {e}")
 
 if __name__ == "__main__":
+    # Bloqueia aqui até ter o ID (o app não arranca sem isto)
+    wait_for_moodle_config()
+    
     # Configuração do agendador
     scheduler.add_job(id='moodle_monitor_job', func=tarefa_monitor, trigger='interval', minutes=0.5)
     scheduler.init_app(app)

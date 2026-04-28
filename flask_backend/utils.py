@@ -359,15 +359,29 @@ def get_moodle_courses_by_field(field, value):
         app.logger.error(f"Erro na requisição ao Moodle: {e}")
         return None
     
-course_data = get_moodle_courses_by_field("shortname", COURSE_SHORTNAME)
-if course_data is None:
-    app.logger.error("Failed to fetch courses from Moodle. Check the logs for details.")
-elif course_data.get('courses'):
-    # Extrai o ID do primeiro curso encontrado
-    COURSE_ID = course_data['courses'][0]['id']
-else:
-    COURSE_ID = "2"  # Fallback para um ID padrão, mas idealmente deves lidar com isso melhor
+def fetch_course_id_from_moodle():
+    try:
+        # Substitui pela tua lógica real de chamada à API do Moodle
+        function = "core_course_get_courses_by_field"
+        params = {
+            'wstoken': TOKEN,
+            'wsfunction': function,
+            'moodlewsrestformat': 'json',
+            'field': "shortname",
+            'value': COURSE_SHORTNAME
+        }
+        
+        response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params, timeout=5)
+        course_data = response.json()    
+        course_id = course_data['courses'][0]['id']
+
+        return course_id
     
+    except Exception as e:
+        print(f"Erro na conexão com Moodle: {e}")
+    
+    return None
+
 def quiz_ja_processado(quiz_id):
     # Verificar se já analisámos esta tentativa
     analise = MoodleQuizPolling.query.filter_by(
