@@ -47,7 +47,7 @@ def get_first_gemini_pro_model():
     raise RuntimeError("No 'models/gemini-*-pro' model found")
 
 model_name = get_first_gemini_pro_model()
-print(f"✅ Using model: {model_name}")
+print(f"✅  Using model: {model_name}")
 
 g_model = genai.GenerativeModel(model_name)
     
@@ -88,25 +88,16 @@ def normalize_bm25_indexes(scores):
     max_score = scores.max()
     return scores / max_score if max_score > 0 else scores
 
-def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_str, user_id):
+def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_str, user_id, is_tutor_interaction):
 
     print(f"\n📍  Saving user progress for email: {user_email}, ID: {user_id}")
     
-    # Extracting the timestamp part
-    input_time_cleaned = input_time_str.split("input_time: ")[-1].strip()
-    #print(f"\n🕓  Input time cleaned: {input_time_cleaned}")
-
-    # Converting to timezone-aware datetime in UTC
-    input_time = datetime.fromisoformat(input_time_cleaned).astimezone(timezone.utc)
-    #print(f"   Input time (UTC): {input_time}")
-
-    # Getting current UTC time
-    now_utc = datetime.now(timezone.utc)
-    #print(f"   Current time (UTC): {now_utc}")
-
     # Calculating response time
+    input_time_cleaned = input_time_str.split("input_time: ")[-1].strip()
+    input_time = datetime.fromisoformat(input_time_cleaned).astimezone(timezone.utc)
+    now_utc = datetime.now(timezone.utc)
     response_timestamp = (now_utc - input_time).total_seconds()
-    print(f" 🕓  Response time: {response_timestamp}")
+    #print(f" 🕓  Response time: {response_timestamp}")
 
     # Saving
     data = {
@@ -114,7 +105,8 @@ def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_
         "question": user_message,
         "response": bot_response,
         "pdfs": pdfs,
-        "response_time": response_timestamp
+        "is_tutor_interaction": is_tutor_interaction,
+        "time_to_respond": response_timestamp        
     }
     
     requests.post("http://flask-server:8080/api/save_moodle_messages", json=data)
@@ -265,7 +257,7 @@ def fuzzy_match_complex_tokens(query_tokens, multi_word_tokens, threshold=80):
         common_words = token_words & match_words
 
         if score >= threshold and len(common_words) >= 2:
-            print(f"✅ Match accepted! Shared words: {common_words}")
+            print(f"✅  Match accepted! Shared words: {common_words}")
             matched.append((token, match, score))
         #else:
             #print("❌ Match rejected. Too little overlap.")
@@ -339,7 +331,7 @@ def format_page_range(file_name, pages):
         Input: "file1.pdf", [1, 2, 3, 5, 6, 8]
         Output: "📄 file1.pdf (Pages 1-3, 5-6, 8)"
     """
-    # 
+    
     pages.sort()
     ranges = []
     start = pages[0]
@@ -358,7 +350,7 @@ def format_page_range(file_name, pages):
     else:
         ranges.append(f"{start}-{pages[-1]}")
 
-    return f"📄 {file_name} (p. {', '.join(ranges)})"
+    return f"📄  {file_name} (p. {', '.join(ranges)})"
 
 def treat_raw_query(query):
     # === Treat user query === #

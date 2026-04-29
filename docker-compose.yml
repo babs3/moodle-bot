@@ -7,7 +7,7 @@ services:
       - 5005:5005
     networks:
       - my-project
-    command: run --enable-api --cors "*" #--connector socketio
+    command: run --enable-api --cors "*"
 
   action-server:
     build:

@@ -21,7 +21,20 @@ def wait_for_moodle_config():
             app.logger.warning("Course ID não encontrado ou Moodle offline. A tentar novamente em 5 segundos...")
             time.sleep(5) # Espera 5 segundos antes da próxima tentativa
 
-
+def wait_for_rasa():
+    app.logger.info("A aguardar que o Rasa fique disponível...")
+    while True:
+        try:
+            response = requests.get("http://rasa:5005")
+            if response.status_code == 200:
+                app.logger.info("Rasa está online!")
+                break
+        except requests.exceptions.ConnectionError:
+            pass
+        
+        app.logger.info("Rasa ainda a carregar... a tentar novamente em 5 segundos")
+        time.sleep(5)
+        
 @app.route('/')
 def index():
     # test here use core_course_get_courses_by_field
@@ -62,14 +75,15 @@ def chat():
     
     # check if user is in tutor mode
     user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
+    
     if user and user.tutor_mode_active:
         app.logger.info(f"User {moodle_id} is in tutor mode.")
         
-        current_time = datetime.now(timezone.utc).isoformat() #datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        current_time = datetime.now(timezone.utc).isoformat() 
         payload = {
             "sender": user_email,
             "message": "tutor menu buttons trigger",
-            "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": filenames}
+            "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": filenames, "tutor_mode": True}
         }
         headers = {"Content-Type": "application/json"}
 
@@ -94,20 +108,12 @@ def chat():
         
     else:
         app.logger.info(f"User {moodle_id} is in normal mode.")
-        # Busca contents do Moodle
-
-        #quiz_id = get_quiz_id_by_name(COURSE_ID, "Quiz - SCI")
-        #attempt_id = get_last_attempt_id(quiz_id, moodle_id)
-        #quiz_review = get_quiz_attempt_review(attempt_id) # Exemplo de chamada, substitui pelo ID real da tentativa do quiz
-        #erros = analisar_desempenho_aluno(quiz_review) # Analisa o desempenho do aluno e gera feedback personalizado
-        #app.logger.info(f"Desempenho do aluno: {erros}")
         
-        # Aqui podes pôr a tua lógica ou chamar o Rasa via REST
-        current_time = datetime.now(timezone.utc).isoformat() #datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        current_time = datetime.now(timezone.utc).isoformat()
         payload = {
             "sender": user_email,
             "message": user_message, #user_input,
-            "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": filenames}
+            "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": filenames, "tutor_mode": False}
         }
         headers = {"Content-Type": "application/json"}
 
@@ -156,7 +162,7 @@ def tutor_toggle():
     # 2. Lógica de Verificação de Quizzes (O Trigger)
     # Vamos buscar todos os quizzes do curso que o aluno tem acesso e verificar se há tentativas novas para analisar. Se houver, fazemos a análise e preparamos um feedback personalizado.
     quizzes = get_user_quizzes_by_course(COURSE_ID, user_id) 
-    app.logger.info(f"Quizzes encontrados para user_id {user_id}: {[quiz['name'] for quiz in quizzes]}")
+    #app.logger.info(f"Quizzes encontrados para user_id {user_id}: {[quiz['name'] for quiz in quizzes]}")
     
     novos_erros_encontrados = []
     
@@ -216,12 +222,12 @@ def tutor_toggle():
             # coincidem com o que enviaste no actions.py
             progresso = TutorProgress(
                 moodle_user_id=user_id,
-                slot=error.get('slot'),
                 tipo=error.get('tipo'),
                 topic_id=error.get('topic_id'),
                 question=error.get('question'),
                 student_answer=error.get('student_answer'),
-                correct_answer=error.get('correct_answer')
+                correct_answer=error.get('correct_answer'),
+                state="pending"
             )
             db.session.add(progresso)
 
@@ -342,12 +348,6 @@ def new_quiz_polling():
             questions_hash = gerar_hash_perguntas(lista_perguntas)
     
             quiz_local = obter_quiz_local(q_id)
-            # ir buscar perguntas a BD para comparar com o que veio do Moodle
-            questions_local = [q.question for q in MoodleQuizData.query.filter_by(quiz_id=q_id).all()]
-            #app.logger.info(f"Perguntas da db: {questions_local}")
-            #if quiz_local:
-            #    app.logger.info(f"Hash antigo: {quiz_local.questions_hash} | Hash novo: {questions_hash}")
-                  
             
             # 3. Comparar com o que já temos no banco de dados
             if not quiz_ja_processado(q_id):
@@ -400,6 +400,9 @@ def tarefa_monitor():
 if __name__ == "__main__":
     # Bloqueia aqui até ter o ID (o app não arranca sem isto)
     wait_for_moodle_config()
+    wait_for_rasa() # Garantir que o Rasa está online antes de arrancar o Flask, para evitar erros de conexão no arranque
+    
+    tarefa_monitor() # Executa a tarefa uma vez no arranque para garantir que já temos os quizzes processados antes de receber mensagens dos alunos
     
     # Configuração do agendador
     scheduler.add_job(id='moodle_monitor_job', func=tarefa_monitor, trigger='interval', minutes=60)

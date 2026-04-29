@@ -498,13 +498,12 @@ def criar_topicos_para_perguntas(pergunta_id_texto):
     }
     headers = {"Content-Type": "application/json"}
 
+    lista_perguntas_final = []
     try:
         response = requests.post(RASA_URL, data=json.dumps(payload), headers=headers)
         response.raise_for_status()
         messages = response.json() 
         #app.logger.info(f"DEBUG COMPLETO RASA: {json.dumps(messages, indent=2)}")
-
-        lista_perguntas_final = []
 
         for message in messages:
             # 1. Verificamos se a mensagem tem o campo 'custom'

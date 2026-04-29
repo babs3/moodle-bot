@@ -11,7 +11,7 @@ from .utils import *
 VECTOR_DB_PATH = "vector_store"
 chroma_client = chromadb.PersistentClient(path=VECTOR_DB_PATH)
 collection = chroma_client.get_collection(name="class_materials")
-print("\n✅ Collection reloaded successfully.")
+print("✅  Collection reloaded successfully.")
 
 class ActionSetUsername(Action):
     def name(self) -> str:
@@ -94,7 +94,7 @@ def keywords_to_tokens(keywords, query):
     
     return complex_tokens, simple_tokens, False # Return complex tokens, simple tokens, and split_keywords flag
 
-def action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id):
+def action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, tutor_mode):
     print(f"\n🧒  User ({user_email}) said: {user_message} 📩")
     query = treat_raw_query(user_message)
     
@@ -249,6 +249,8 @@ class ActionGetDefinition(Action):
         print(f"🕓  latest_message INPUT TIME: {input_time}")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
         print(f"📚  Authorized resources from metadata: {authorized_resources}")
+        tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
+        print(f"🎓  Tutor mode from metadata: {tutor_mode}")
         
         intent = "definition of "
         
@@ -259,7 +261,7 @@ class ActionGetDefinition(Action):
             timestamp = datetime.fromisoformat(timestamp_str)
         print(f"   Decripted timestamp: {timestamp}")        
         
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id=user_id)
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, tutor_mode)
     
 # === ACTION 2: GET EXPLANATION === #
 class ActionGetExplanation(Action):
@@ -275,9 +277,11 @@ class ActionGetExplanation(Action):
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
-        intent = "explanation of "
+        tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
         
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id=user_id)
+        intent = "explanation of "
+
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, tutor_mode)
 
 # === ACTION 3: GET EXAMPLES === #
 class ActionGetExamples(Action):
@@ -293,9 +297,10 @@ class ActionGetExamples(Action):
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
+        tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
         
         intent = "examples of "
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id=user_id)
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, tutor_mode)
 
 # === ACTION 4: SUMMARIZE === #
 class ActionGetSummary(Action):
@@ -311,9 +316,10 @@ class ActionGetSummary(Action):
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
+        tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
         
         intent = "summary of "
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id=user_id)  
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, tutor_mode)  
 
 
 # === FINAL ACTION: GET PDF NAMES & PAGE LOCATIONS === #
@@ -330,10 +336,12 @@ class ActionGetClassMaterialLocation(Action):
         user_email = tracker.get_slot("user_email")
         user_message = tracker.get_slot("user_query")
         query = treat_raw_query(user_message)
+        tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
+        print(f"tutor_mode in ActionGetClassMaterialLocation: {tutor_mode}")
         
         if bot_response == "no_response":
             response = f"I couldn't find any relevant content on this topic in the course materials. Please try again."
-            save_user_progress(user_email, user_message, response, [], input_time, user_id=user_id)
+            save_user_progress(user_email, user_message, response, [], input_time, user_id, tutor_mode)
             dispatcher.utter_message(text=response)
             return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
 
@@ -351,7 +359,7 @@ class ActionGetClassMaterialLocation(Action):
             location_results, pdfs_insights = get_materials_location(selected_results, complex_tokens, simple_tokens)
 
             if location_results:
-                response = save_user_progress(user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id=user_id)
+                response = save_user_progress(user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)
                 print_results(location_results)              
                 dispatcher.utter_message(
                     text="</br></br><span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>" 
@@ -362,7 +370,7 @@ class ActionGetClassMaterialLocation(Action):
                 # no exact references found, so return related PDFs found in previous function
                 if selected_results:
                     location_results, pdfs_insights = update_materials_location(selected_results)
-                    response = save_user_progress(user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id=user_id)
+                    response = save_user_progress(user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)
                     #dispatcher.utter_message(text="</br></br>You can find related information in:</br>" + "</br>".join(location_results))
                     dispatcher.utter_message(
                         text="</br></br><span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>" 
@@ -371,7 +379,7 @@ class ActionGetClassMaterialLocation(Action):
                 )
                 else:                
                     print("\n ⚠️  No exact references found, but you might check related PDFs.")
-                    response = save_user_progress(user_email, user_message, bot_response, [], input_time, user_id=user_id)
+                    response = save_user_progress(user_email, user_message, bot_response, [], input_time, user_id, tutor_mode)
                     dispatcher.utter_message(text="I couldn't find specific page references for your question.")
 
         #clear the slots
