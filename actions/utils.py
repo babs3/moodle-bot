@@ -97,7 +97,7 @@ def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_
     input_time = datetime.fromisoformat(input_time_cleaned).astimezone(timezone.utc)
     now_utc = datetime.now(timezone.utc)
     response_timestamp = (now_utc - input_time).total_seconds()
-    #print(f" 🕓  Response time: {response_timestamp}")
+    print(f" 🕓  Response time: {response_timestamp}")
 
     # Saving
     data = {
@@ -106,7 +106,7 @@ def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_
         "response": bot_response,
         "pdfs": pdfs,
         "is_tutor_interaction": is_tutor_interaction,
-        "time_to_respond": response_timestamp        
+        "time_to_respond": str(response_timestamp)
     }
     
     requests.post("http://flask-server:8080/api/save_moodle_messages", json=data)
