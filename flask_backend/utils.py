@@ -445,33 +445,32 @@ def obter_perguntas_do_quiz(quiz_id):
     attempt_id = tentativa['attempt']['id']
     perguntas_extraidas = []
 
-    # 2. Obter os dados da tentativa (é aqui que estão as perguntas)
-    # O Moodle pagina as perguntas. Por defeito, tentamos a página 0. 
-    # TODO: se houver mais páginas, precisas de iterar até obter todas as perguntas.
-    dados = call_moodle('mod_quiz_get_attempt_data', {
-        'attemptid': attempt_id,
-        'page': 0
-    })
-    
-    if 'questions' in dados:
+    # --- 4. Ler as perguntas (incluindo múltiplas páginas) ---
+    perguntas_extraidas = []
+    pagina = 0
+    while True:
+        dados = call_moodle('mod_quiz_get_attempt_data', {'attemptid': attempt_id, 'page': pagina})
+        if 'questions' not in dados or not dados['questions']:
+            break
+            
         for q in dados['questions']:
-            # Extração de dados básicos
-            texto_pergunta = extrair_conteudo_pergunta(q['html'])
-            if q['type'] == 'truefalse':
-                texto_pergunta = "Verdadeiro ou Falso: " + texto_pergunta
-            pergunta = {
-                'moodle_question_id': q['slot'], # Slot é a posição no quiz
-                #'tipo': q['type'],
-                #'html_pergunta': q['html'], # Contém o enunciado e as opções
-                'texto_pergunta': texto_pergunta
-                #'numero': q['number']
-            }
-            perguntas_extraidas.append(pergunta)
+            texto = extrair_conteudo_pergunta(q['html'])
+            if q['type'] == 'truefalse': texto = "Verdadeiro ou Falso: " + texto
+            perguntas_extraidas.append({
+                'moodle_question_id': q['slot'],
+                'texto_pergunta': texto
+            })
+        
+        if 'nextpage' in dados and dados['nextpage'] != -1:
+            pagina = dados['nextpage']
+        else:
+            break
 
-    # 3. Finalizar a tentativa (para não "sujar" o Moodle)
+    # --- 5. FECHAR A TENTATIVA (Obrigatório para a próxima execução funcionar) ---
+    app.logger.info(f"Finalizando tentativa {attempt_id}...")
     call_moodle('mod_quiz_process_attempt', {
         'attemptid': attempt_id,
-        'finishattempt': 1 # 1 para finalizar
+        'finishattempt': 1
     })
 
     return perguntas_extraidas
