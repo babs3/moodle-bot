@@ -106,7 +106,7 @@ def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_
         "response": bot_response,
         "pdfs": pdfs,
         "is_tutor_interaction": is_tutor_interaction,
-        "time_to_respond": str(response_timestamp)
+        "time_to_respond": response_timestamp
     }
     
     requests.post("http://flask-server:8080/api/save_moodle_messages", json=data)

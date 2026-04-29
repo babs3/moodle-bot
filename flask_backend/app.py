@@ -290,7 +290,8 @@ def save_moodle_messages(): # TODO: refactor para os novos campos da BD, como o 
         question=data["question"],
         response=data["response"],
         pdfs=data["pdfs"],
-        timestamp=datetime.now(timezone.utc) + timedelta(hours=1),
+        is_tutor_interaction=data["is_tutor_interaction"],
+        time_to_respond=data["time_to_respond"]
     )
 
     db.session.add(progress)
