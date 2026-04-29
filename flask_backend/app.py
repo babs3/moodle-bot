@@ -402,7 +402,7 @@ if __name__ == "__main__":
     wait_for_moodle_config()
     
     # Configuração do agendador
-    scheduler.add_job(id='moodle_monitor_job', func=tarefa_monitor, trigger='interval', minutes=0.5)
+    scheduler.add_job(id='moodle_monitor_job', func=tarefa_monitor, trigger='interval', minutes=60)
     scheduler.init_app(app)
     scheduler.start()
 
