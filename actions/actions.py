@@ -391,7 +391,22 @@ class ActionGenerateInitialMenuButtons(Action):
         return "action_generate_initial_menu_buttons"
 
     def run(self, dispatcher, tracker, domain):
-        print("\n📊 Generating initial menu buttons...")
+        print("\n📊  Generating initial menu buttons...")
+        
+        #user_email = tracker.sender_id
+        user_id = tracker.latest_message.get("metadata", {}).get("user_id")
+        user_message = tracker.latest_message.get("metadata", {}).get("user_message", None)
+        print(f"🎓  User {user_id} sent message: {user_message}")
+        
+        # get user progress
+        progress = requests.get(f"http://flask-server:8080/api/get_user_progress/{user_id}")
+        if progress.status_code == 200:
+            progress_data = progress.json()
+            print(f"📊  User progress data retrieved: {progress_data}")
+        else:
+            print(f"❌  Failed to retrieve user progress. Status code: {progress.status_code}")
+            progress_data = []
+        
         dispatcher.utter_message(
             text="Please select an option:",
             buttons=[

@@ -83,7 +83,7 @@ def chat():
         payload = {
             "sender": user_email,
             "message": "tutor menu buttons trigger",
-            "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": filenames, "tutor_mode": True}
+            "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": filenames, "tutor_mode": True, "user_message": user_message}
         }
         headers = {"Content-Type": "application/json"}
 
@@ -258,6 +258,11 @@ def tutor_toggle():
         msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
 
     return jsonify({"text": f"{msg}"})
+
+@app.route('/api/get_user_progress/<int:user_id>', methods=['GET'])
+def get_user_progress(user_id):
+    progress = TutorProgress.query.filter_by(moodle_user_id=user_id).all()
+    return jsonify([{"state": p.state, "question": p.question, "topic_id": p.topic_id, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
 
 @app.route("/api/get_topics", methods=["GET"])
 def get_topics():
