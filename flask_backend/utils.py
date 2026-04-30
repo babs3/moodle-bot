@@ -455,9 +455,9 @@ def obter_perguntas_do_quiz(quiz_id):
             
         for q in dados['questions']:
             texto = extrair_conteudo_pergunta(q['html'])
-            if q['type'] == 'truefalse': texto = "Verdadeiro ou Falso: " + texto
             perguntas_extraidas.append({
                 'moodle_question_id': q['slot'],
+                'type': q['type'],
                 'texto_pergunta': texto
             })
         
@@ -491,6 +491,11 @@ def extrair_conteudo_pergunta(html_raw):
     return "Texto não encontrado"
 
 def criar_topicos_para_perguntas(pergunta_id_texto):
+    app.logger.info(f"Enviando perguntas para o Rasa para criação de tópicos...")
+    for p in pergunta_id_texto:
+        if p['type'] == 'truefalse':
+            p['texto_pergunta'] = "True or False: " + p['texto_pergunta']
+            
     payload = {
         "sender": "doesnt_matter", #user_email
         "message": "create topic trigger",
@@ -509,17 +514,19 @@ def criar_topicos_para_perguntas(pergunta_id_texto):
             # 1. Verificamos se a mensagem tem o campo 'custom'
             if "custom" in message:
                 custom_data = message["custom"]
-                
                 # 2. Procuramos pela chave que definimos no Rasa (gemini_analysis)
                 # Esta chave contém a lista de perguntas já com tópicos e IDs convertidos
                 if "gemini_analysis" in custom_data:
                     lista_perguntas_final = custom_data.get("gemini_analysis", [])
-                    app.logger.info("Encontrada análise do Gemini com sucesso.")
                     break 
-
+        
         # 3. Validar e Logar os resultados
         if lista_perguntas_final:
-            app.logger.info(f"Processadas {len(lista_perguntas_final)} perguntas.")
+            # clean "True or False: " do início das perguntas de True/False para guardar na BD
+            for p in lista_perguntas_final:
+                if p['question'].startswith("True or False: "):
+                    p['question'] = p['question'].replace("True or False: ", "")
+            #app.logger.info(f"Perguntas finais após processamento: {lista_perguntas_final}")
         else:
             app.logger.warning("Nenhuma pergunta processada encontrada na resposta do Rasa.")
 

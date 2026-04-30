@@ -218,8 +218,20 @@ def tutor_toggle():
             error['topic_id'] = topic_id
 
             # 2. Guardar o progresso
-            # Nota: Verifica se os nomes das chaves (student_answer vs resposta_aluno)
-            # coincidem com o que enviaste no actions.py
+            # verificar se já existe um registo para este erro específico (mesmo quiz, mesma questão, mesma resposta do aluno)
+            progresso_existente = TutorProgress.query.filter_by(
+                moodle_user_id=user_id,
+                tipo=error.get('tipo'),
+                topic_id=error.get('topic_id'),
+                question=error.get('question'),
+                student_answer=error.get('student_answer'),
+                correct_answer=error.get('correct_answer')
+            ).first()
+            
+            if progresso_existente:
+                app.logger.info(f"Progresso já existe para este erro específico, não criando duplicado. Detalhes: {progresso_existente}")
+                continue
+            
             progresso = TutorProgress(
                 moodle_user_id=user_id,
                 tipo=error.get('tipo'),
@@ -234,15 +246,14 @@ def tutor_toggle():
         db.session.commit() # Commit final de tudo o que foi adicionado
 
     
-        #app.logger.info(f"Novos erros encontrados para user_id {user_id} nos temas de: {lista_erros_final}")
         temas_id = list(set([e['topic_id'] for e in novos_erros_encontrados]))
         temas = []
         for topic_id in temas_id:
             topic = Topics.query.filter_by(id=topic_id).first()
             if topic:
-                temas.append(topic.name)
+                temas.append("<strong>" + topic.name + "</strong>")
         
-        msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas)}. Would you like to review these points with me?"
+        msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}. Would you like to review these points with me?"
     else:
         msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
 
@@ -344,7 +355,7 @@ def new_quiz_polling():
             q_last_edit_dt = datetime.fromtimestamp(q_last_edit)
             
             lista_perguntas = obter_perguntas_do_quiz(q_id)
-            #app.logger.info(f"Perguntas extraídas do moodle: {lista_perguntas}")             
+            app.logger.info(f"Perguntas extraídas do moodle: {lista_perguntas}")             
             # Gerar um hash das perguntas para comparação futura
             questions_hash = gerar_hash_perguntas(lista_perguntas)
     
