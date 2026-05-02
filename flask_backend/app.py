@@ -54,6 +54,7 @@ def index():
 @app.route('/chat', methods=['POST'])
 def chat():    
     data = request.json
+    app.logger.info(f"---------> Received chat request with data: {data}")
     moodle_id = data.get('user_id')
     app.logger.info(f"Received message from user_id: {moodle_id}")
     user_message = data.get('message')
@@ -133,6 +134,28 @@ def chat():
         except requests.RequestException as e:
             print(f"⚠️ Error connecting to Rasa: {e}")
             return None
+
+@app.route('/process_knowledge', methods=['POST'])
+def process_knowledge():
+    app.logger.info("Received knowledge processing request (...)")
+    file = request.files['file']
+    course_id = request.form.get('course_id')
+    api_key = request.form.get('api_key')
+    app.logger.info(f"Received knowledge processing request for course_id: {course_id} with file: {file.filename} and api_key: {api_key}")
+
+    # 1. Validar a API Key (segurança)
+    # 2. Guardar o ficheiro temporariamente
+    #file_path = f"temp_{course_id}.pdf"
+    #file.save(file_path)
+
+    # 3. Chamar a sua pipeline existente
+    # Aqui corre o código que já tem para ChromaDB e BM25 Pickle
+    # Importante: Adicione o course_id nos metadados do ChromaDB!
+    #sucesso = minha_pipeline_processar(file_path, course_id)
+
+    #if sucesso:
+    #    return jsonify({"status": "success"}), 200
+    #return jsonify({"status": "error"}), 500
 
 @app.route('/tutor_toggle', methods=['POST'])
 def tutor_toggle():
