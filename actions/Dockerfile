@@ -2,34 +2,42 @@ FROM rasa/rasa-sdk:3.6.2
 
 WORKDIR /app
 
-COPY ./actions/requirements.txt /app/requirements.txt
-COPY ./vector_store /app/vector_store
-COPY ./actions /app/actions
-
+# 1. Mudar para root logo no início para preparar o terreno
 USER root
 
-RUN pip install -r /app/requirements.txt
-RUN python -m spacy download en_core_web_sm
-RUN python -m nltk.downloader -d /app/nltk_data wordnet omw-1.4
+# 2. Instalar dependências de sistema (se necessário) e atualizar pip
+RUN pip install --no-cache-dir --upgrade pip
+
+# 3. Cache das dependências (requirements)
+# Copiamos APENAS o requirements primeiro. 
+# Se o requirements não mudar, o Docker salta a instalação no próximo build.
+COPY ./actions/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# 4. Cache de Modelos Pesados
+# Modelos de spaCy, NLTK e o teu modelo local mudam raramente.
+# Mantê-los aqui garante que não perdes tempo a baixá-los novamente.
+RUN python -m spacy download en_core_web_sm && \
+    python -m nltk.downloader -d /app/nltk_data wordnet omw-1.4
+
+# Copiar o modelo local (se ele for grande, deve estar antes do código)
 COPY ./models/all-MiniLM-L6-v2 /app/models/all-MiniLM-L6-v2
 
-# Pre-download NLTK wordnet data
-RUN mkdir -p /app/nltk_data && python -m nltk.downloader -d /app/nltk_data wordnet
-
-# Ensure NLTK uses the downloaded data
+# 5. Configurações de Ambiente e Pastas
 ENV NLTK_DATA=/app/nltk_data
-
-# Set environment variable for cache directory
 ENV TRANSFORMERS_CACHE=/app/cache
+RUN mkdir -p /app/cache /app/db && chown -R 1000:1000 /app/cache /app/db /app/nltk_data
 
-# Create cache directory with appropriate permissions
-RUN mkdir -p /app/cache && chown -R 1000:1000 /app/cache
+# 6. O ERRO FATAL: REMOVER A CÓPIA DO VECTOR_STORE
+# Não faças COPY ./vector_store. Porquê?
+# - O volume no docker-compose já faz esse trabalho.
+# - Se o fizeres aqui, o build vai demorar imenso a copiar gigas de dados que vão ser 
+#   substituídos pelo volume assim que o container ligar.
 
-# Ensure database folder exists
-RUN mkdir -p /app/db
+# 7. Código das Actions (Muda frequentemente, por isso fica no fim)
+COPY ./actions /app/actions
 
+# Voltar para o utilizador da Rasa
 USER 1000
 
-# Start Rasa Actions and Flask API
 CMD ["start", "--actions", "actions"]
-

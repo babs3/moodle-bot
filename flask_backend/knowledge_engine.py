@@ -18,11 +18,10 @@ import uuid
 # Load Spacy model for NLP tasks
 nlp = spacy.load("en_core_web_sm")
 
-#model = SentenceTransformer('all-MiniLM-L6-v2')
-model = SentenceTransformer("/app/models/all-MiniLM-L6-v2")
+embedding_model = SentenceTransformer("/app/models/all-MiniLM-L6-v2")
 
 def get_text_embedding(text):
-    return model.encode(text, convert_to_numpy=True)
+    return embedding_model.encode(text, convert_to_numpy=True)
 
 def is_page_number(text):
     """Checks if the text is a page number."""
@@ -421,16 +420,13 @@ def tokenize_and_clean_text(text):
     ]
     return tokens
 
-def process_pdfs(pdf_folder, course_id, vector_db_path="vector_store"):
+def process_pdfs(pdf_folder, course_id, vector_db_path="/app/vector_store/"):
     """Processa PDFs de um curso específico e atualiza a base de conhecimento."""
     
     # 1. Conectar ao ChromaDB
     chroma_client = chromadb.PersistentClient(path=vector_db_path)
     # Mantemos uma única coleção, mas filtraremos por course_id no metadata
     collection = chroma_client.get_or_create_collection(name="class_materials")
-    
-    # 2. Carregar modelo de Embeddings
-    embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
     
     documents = []
     metadata = []
@@ -490,10 +486,10 @@ def process_pdfs(pdf_folder, course_id, vector_db_path="vector_store"):
     bm25_2gram = BM25Okapi(ngram_docs_2)
     bm25_3gram = BM25Okapi(ngram_docs_3)
     
-    course_path = os.path.join(vector_db_path, f"course_{course_id}")
-    os.makedirs(course_path, exist_ok=True)
+    #course_path = os.path.join(vector_db_path, f"course_{course_id}")
+    #os.makedirs(vector_db_path, exist_ok=True)
     
-    with open(os.path.join(course_path, "bm25_index.pkl"), "wb") as f:
+    with open(os.path.join(vector_db_path, "bm25_index.pkl"), "wb") as f:
         pickle.dump((bm25_simple, bm25_2gram, bm25_3gram, metadata, documents), f)
     
     return True

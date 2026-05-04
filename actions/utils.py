@@ -56,7 +56,8 @@ nlp = spacy.load("en_core_web_sm")
 
 # Load sentence transformer model
 #model = SentenceTransformer("all-MiniLM-L6-v2")
-model = SentenceTransformer("/app/models/all-MiniLM-L6-v2")
+model_path = "/app/models/all-MiniLM-L6-v2"
+embedding_model = SentenceTransformer(model_path)
 
 # Load BM25 index
 with open(f"vector_store/bm25_index.pkl", "rb") as f:
@@ -437,7 +438,7 @@ def dense_vector_search(keywords, query, split_keywords, collection, authorized_
     # === DENSE (Vector) SEARCH === #
     print(f"\n🔛  Getting query embeddings for query: '{query}'\n...")
     
-    query_embedding = model.encode(query, convert_to_numpy=True).tolist()
+    query_embedding = embedding_model.encode(query, convert_to_numpy=True).tolist()
     vector_results = collection.query(query_embeddings=[query_embedding], n_results=20, where={
         "file": {
             "$in": authorized_resources  # O Chroma só procura nestes ficheiros
@@ -687,8 +688,8 @@ def normalize_topic(new_topic, threshold=0.85):
     
     available_topics_names = [t['name'] for t in available_topics]
     
-    new_vec = model.encode(new_topic, convert_to_tensor=True)
-    known_vecs = model.encode(available_topics_names, convert_to_tensor=True)
+    new_vec = embedding_model.encode(new_topic, convert_to_tensor=True)
+    known_vecs = embedding_model.encode(available_topics_names, convert_to_tensor=True)
     
     for i, t in enumerate(available_topics_names):
         print(f"    - Topic {i+1}: {t}")     

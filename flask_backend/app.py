@@ -157,7 +157,7 @@ def process_knowledge():
             file.save(file_path)
 
         # 3. Correr a pipeline
-        success = process_pdfs(pdf_folder=temp_dir, course_id=course_id, vector_db_path=f"vector_db_{course_id}")
+        success = process_pdfs(pdf_folder=temp_dir, course_id=course_id, vector_db_path=f"/app/vector_store") #TODO: add COURSE_ID
 
         # 4. Limpar ficheiros temporários após processar
         shutil.rmtree(temp_dir)

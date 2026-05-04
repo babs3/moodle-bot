@@ -8,7 +8,7 @@ from rasa_sdk.events import SlotSet
 from .utils import *
 
 # Connect to ChromaDB    
-VECTOR_DB_PATH = "vector_store"
+VECTOR_DB_PATH = "/app/vector_store"
 chroma_client = chromadb.PersistentClient(path=VECTOR_DB_PATH)
 collection = chroma_client.get_collection(name="class_materials")
 print("✅  Collection reloaded successfully.")

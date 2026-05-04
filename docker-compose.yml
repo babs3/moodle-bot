@@ -15,14 +15,21 @@ services:
       dockerfile: actions/Dockerfile
     volumes:
       - ./actions:/app/actions
-      - ./vector_store:/app/vector_store
-      - ./shared:/app/shared
+      # PARTILHA DA KNOWLEDGE BASE
+      - ./vector_store:/app/vector_store 
+      - ./models:/app/models # <--- Adicionado: Pasta local : Pasta no container
     ports:
       - 5055:5055
     networks:
       - my-project
+    depends_on:
+      - db
     environment:
-      GOOGLE_API_KEY: "${GOOGLE_API_KEY}"  # Load API key from .env
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY}"
+      DB_HOST: db # Gafe: Adicionado para o código saber onde está a BD
+      POSTGRES_USER: ${APP_DATABASE_USER}
+      POSTGRES_PASSWORD: ${APP_DATABASE_PASS}
+      POSTGRES_DB: ${APP_DATABASE_NAME}
 
   db:
     image: postgres:13
@@ -40,7 +47,7 @@ services:
     image: adminer
     restart: always
     ports:
-      - "8081:8080"  # Map container's 8080 to host's 8081
+      - "8081:8080"
     networks:
       - my-project
 
@@ -52,11 +59,17 @@ services:
       - db
     volumes:
       - ./flask_backend:/app/flask_backend
+      # PARTILHA DA KNOWLEDGE BASE (Faltava isto!)
+      - ./vector_store:/app/vector_store 
+      # Mount para os uploads temporários (opcional mas recomendado)
+      - ./temp_uploads:/app/temp_processing
+      - ./models:/app/models
     ports:
       - 8080:8080
     networks:
       - my-project
     environment:
+      DB_HOST: db # Gafe: Importante para a ligação SQLAlchemy/Psycopg2
       POSTGRES_USER: ${APP_DATABASE_USER}
       POSTGRES_PASSWORD: ${APP_DATABASE_PASS}
       POSTGRES_DB: ${APP_DATABASE_NAME}
@@ -64,6 +77,7 @@ services:
       MOODLE_COURSE_ID: ${MOODLE_COURSE_ID}
       MOODLE_URL: ${MOODLE_URL}
       MOODLE_COURSE_SHORTNAME: ${MOODLE_COURSE_SHORTNAME}
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY}" # Gafe: O Flask pode precisar para os embeddings
 
 networks:
   my-project:
