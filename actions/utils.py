@@ -444,6 +444,11 @@ def dense_vector_search(keywords, query, split_keywords, collection, authorized_
             "$in": authorized_resources  # O Chroma só procura nestes ficheiros
         }
     })
+    # checking if vector_results is empty
+    if not vector_results["documents"]:
+        print("⚠️  Warning: No vector search results found.")
+        return [], [], []
+    
 
     vector_docs = vector_results["documents"][0]
     vector_metadata = vector_results["metadatas"][0]

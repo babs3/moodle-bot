@@ -13,6 +13,9 @@ services:
     build:
       context: .
       dockerfile: actions/Dockerfile
+    user: "0:0"  # Força o utilizador Root (UID 0)
+    entrypoint: [] # Limpa o script padrão da Rasa
+    command: ["/opt/venv/bin/python", "-m", "rasa_sdk", "--actions", "actions", "--port", "5055"]
     volumes:
       - ./actions:/app/actions
       # PARTILHA DA KNOWLEDGE BASE
@@ -24,6 +27,7 @@ services:
       - my-project
     depends_on:
       - db
+      - chroma
     environment:
       PYTHONUNBUFFERED: "1" # Para ver os logs em tempo real
       GOOGLE_API_KEY: "${GOOGLE_API_KEY}"
@@ -56,8 +60,10 @@ services:
     build:
       context: .
       dockerfile: flask_backend/Dockerfile
+    user: "0:0"
     depends_on:
       - db
+      - chroma
     volumes:
       # MAPEAMENTO CORRETO: A pasta local vai para dentro da pasta /app inteira
       - ./flask_backend:/app
@@ -81,6 +87,19 @@ services:
       MOODLE_URL: ${MOODLE_URL}
       MOODLE_COURSE_SHORTNAME: ${MOODLE_COURSE_SHORTNAME}
       GOOGLE_API_KEY: "${GOOGLE_API_KEY}"
+
+  chroma:
+    image: chromadb/chroma:latest
+    volumes:
+      - ./vector_store:/chroma/data
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/data
+      - ANONYMIZED_TELEMETRY=False
+    ports:
+      - "8000:8000"
+    networks:
+      - my-project
 
 networks:
   my-project:

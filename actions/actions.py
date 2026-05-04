@@ -10,9 +10,10 @@ from .utils import *
 
 VECTOR_DB_PATH = "/app/vector_store"
 print(f"📂  A tentar ligar ao ChromaDB em: {VECTOR_DB_PATH}")
-
+# Em vez de PersistentClient, usamos HttpClient
+# Lembra-te: o host é 'chroma' (nome do serviço no docker-compose) 
 try:
-    chroma_client = chromadb.PersistentClient(path=VECTOR_DB_PATH)
+    chroma_client = chromadb.HttpClient(host='chroma', port=8000)
     print("📡  Cliente ChromaDB instanciado...")
     
     collection = chroma_client.get_collection(name="class_materials")

@@ -420,11 +420,15 @@ def tokenize_and_clean_text(text):
     ]
     return tokens
 
+def initialize_chroma():
+    # Agora ligamo-nos ao container 'chroma' via HTTP
+    # O host é o nome do serviço no docker-compose
+    client = chromadb.HttpClient(host='chroma', port=8000)
+    return client
+            
 def process_pdfs(pdf_folder, course_id, vector_db_path="/app/vector_store/"):
     """Processa PDFs de um curso específico e atualiza a base de conhecimento."""
-    
-    # 1. Conectar ao ChromaDB
-    chroma_client = chromadb.PersistentClient(path=vector_db_path)
+    chroma_client = initialize_chroma()
     # Mantemos uma única coleção, mas filtraremos por course_id no metadata
     collection = chroma_client.get_or_create_collection(name="class_materials")
     
@@ -439,7 +443,6 @@ def process_pdfs(pdf_folder, course_id, vector_db_path="/app/vector_store/"):
         if file.endswith(".pdf"):
             pdf_path = os.path.join(pdf_folder, file)
             
-            # Tua lógica de extração existente
             if file.startswith("BOOK_"):
                 page_chunks = extract_text_by_context(pdf_path, is_book=True, edited=False, min_word_threshold=50, sim_threshold=0.90)
             elif file.startswith("EDITED_"):
@@ -451,7 +454,6 @@ def process_pdfs(pdf_folder, course_id, vector_db_path="/app/vector_store/"):
                 doc_text = chunk["text"]
                 documents.append(doc_text)
                 
-                # ADICIONAMOS O course_id AO METADATA (Crucial para filtrar na pesquisa depois)
                 metadata.append({
                     "file": file, 
                     "page": chunk["page"], 
@@ -469,8 +471,7 @@ def process_pdfs(pdf_folder, course_id, vector_db_path="/app/vector_store/"):
     # 4. Gerar Embeddings Densos
     embeddings = embedding_model.encode(documents, convert_to_numpy=True)
         
-    # 5. Guardar no ChromaDB com IDs Únicos
-    # Usamos uuid para evitar que o ID '1' do curso A sobrescreva o ID '1' do curso B
+    # 5. Guardar no ChromaDB
     ids = [str(uuid.uuid4()) for _ in range(len(documents))]
     
     collection.add(
@@ -480,14 +481,10 @@ def process_pdfs(pdf_folder, course_id, vector_db_path="/app/vector_store/"):
         documents=documents
     )
     
-    # 6. Guardar Index BM25 específico para este curso
-    # Para escala, é melhor ter um pickle por curso em vez de um gigante
+    # 6. Guardar Index BM25
     bm25_simple = BM25Okapi(simple_tokens)
     bm25_2gram = BM25Okapi(ngram_docs_2)
     bm25_3gram = BM25Okapi(ngram_docs_3)
-    
-    #course_path = os.path.join(vector_db_path, f"course_{course_id}")
-    #os.makedirs(vector_db_path, exist_ok=True)
     
     with open(os.path.join(vector_db_path, "bm25_index.pkl"), "wb") as f:
         pickle.dump((bm25_simple, bm25_2gram, bm25_3gram, metadata, documents), f)
