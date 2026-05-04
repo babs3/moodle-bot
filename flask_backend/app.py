@@ -9,7 +9,7 @@ import threading
 from knowledge_engine import process_pdfs
 from utils import *
 
-COURSE_ID = None
+#COURSE_ID = None
 
 def wait_for_moodle_config():
     global COURSE_ID
@@ -61,6 +61,7 @@ def chat():
     data = request.json
     app.logger.info(f"---------> Received chat request with data: {data}")
     moodle_id = data.get('user_id')
+    course_id = data.get('course_id')
     app.logger.info(f"Received message from user_id: {moodle_id}")
     user_message = data.get('message')
 
@@ -70,7 +71,8 @@ def chat():
     username = info_utilizador.get("nome") if info_utilizador else "NOME_"
     check_moodle_user_in_db(moodle_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
     
-    moodle_contents = get_moodle_contents(COURSE_ID)
+    filenames = []
+    moodle_contents = get_moodle_contents(course_id)
     if moodle_contents is None:
         app.logger.error("Failed to fetch Moodle contents.")
     else:
@@ -458,7 +460,7 @@ def tarefa_monitor():
 
 if __name__ == "__main__":
     # 1. Configurações rápidas
-    # wait_for_moodle_config() # Só ativa se for instantâneo
+    #wait_for_moodle_config()
     
     # 2. Lançar o Polling em Background para NÃO bloquear o app.run
     import threading
