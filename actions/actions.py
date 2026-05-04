@@ -1,3 +1,4 @@
+print("🚀  A carregar o ficheiro actions.py...")
 import sys
 sys.modules["sqlite3"] = __import__("pysqlite3")
 import chromadb
@@ -7,11 +8,17 @@ from rasa_sdk import Action
 from rasa_sdk.events import SlotSet
 from .utils import *
 
-# Connect to ChromaDB    
 VECTOR_DB_PATH = "/app/vector_store"
-chroma_client = chromadb.PersistentClient(path=VECTOR_DB_PATH)
-collection = chroma_client.get_collection(name="class_materials")
-print("✅  Collection reloaded successfully.")
+print(f"📂  A tentar ligar ao ChromaDB em: {VECTOR_DB_PATH}")
+
+try:
+    chroma_client = chromadb.PersistentClient(path=VECTOR_DB_PATH)
+    print("📡  Cliente ChromaDB instanciado...")
+    
+    collection = chroma_client.get_collection(name="class_materials")
+    print("✅  Collection reloaded successfully.")
+except Exception as e:
+    print(f"❌  ERRO CRÍTICO NO CHROMA: {str(e)}")
 
 class ActionSetUsername(Action):
     def name(self) -> str:

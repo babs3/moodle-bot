@@ -1,9 +1,12 @@
 #!/bin/bash
 
-# Run database migrations
-flask db init
+# Só faz init se a pasta migrations não existir
+if [ ! -d "migrations" ]; then
+    flask db init
+fi
+
 flask db migrate
 flask db upgrade
 
-# Start Flask application
+# Corre o python a partir da raiz /app
 exec python app.py

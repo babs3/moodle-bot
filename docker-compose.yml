@@ -25,6 +25,7 @@ services:
     depends_on:
       - db
     environment:
+      PYTHONUNBUFFERED: "1" # Para ver os logs em tempo real
       GOOGLE_API_KEY: "${GOOGLE_API_KEY}"
       DB_HOST: db # Gafe: Adicionado para o código saber onde está a BD
       POSTGRES_USER: ${APP_DATABASE_USER}
@@ -58,18 +59,20 @@ services:
     depends_on:
       - db
     volumes:
-      - ./flask_backend:/app/flask_backend
-      # PARTILHA DA KNOWLEDGE BASE (Faltava isto!)
+      # MAPEAMENTO CORRETO: A pasta local vai para dentro da pasta /app inteira
+      - ./flask_backend:/app
       - ./vector_store:/app/vector_store 
-      # Mount para os uploads temporários (opcional mas recomendado)
-      - ./temp_uploads:/app/temp_processing
       - ./models:/app/models
     ports:
-      - 8080:8080
+      - 8082:8080
     networks:
       - my-project
     environment:
-      DB_HOST: db # Gafe: Importante para a ligação SQLAlchemy/Psycopg2
+      PYTHONPATH: "/app"
+      PYTHONUNBUFFERED: "1"
+      FLASK_APP: "app.py"  # Forçamos o Flask a focar-se no ficheiro certo
+      FLASK_ENV: "development"
+      DB_HOST: db 
       POSTGRES_USER: ${APP_DATABASE_USER}
       POSTGRES_PASSWORD: ${APP_DATABASE_PASS}
       POSTGRES_DB: ${APP_DATABASE_NAME}
@@ -77,7 +80,7 @@ services:
       MOODLE_COURSE_ID: ${MOODLE_COURSE_ID}
       MOODLE_URL: ${MOODLE_URL}
       MOODLE_COURSE_SHORTNAME: ${MOODLE_COURSE_SHORTNAME}
-      GOOGLE_API_KEY: "${GOOGLE_API_KEY}" # Gafe: O Flask pode precisar para os embeddings
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY}"
 
 networks:
   my-project:

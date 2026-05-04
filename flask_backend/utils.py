@@ -13,7 +13,7 @@ from googleapiclient.discovery import build
 import requests
 from flask_apscheduler import APScheduler
 from bs4 import BeautifulSoup
-from flask_backend.models import *
+from models import *
 
 RASA_URL = "http://rasa:5005/webhooks/rest/webhook"
 MOODLE_URL = "http://host.docker.internal" # Este endereço diz ao Docker: "Sai do contentor e vai buscar o localhost da máquina real".

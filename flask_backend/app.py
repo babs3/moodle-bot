@@ -1,10 +1,13 @@
+import os
+print(f"📂  Conteúdo da pasta /app: {os.listdir('/app')}")
 from flask import request
 from datetime import datetime, timezone, timedelta
 import json
 import time
 import shutil
+import threading
 from knowledge_engine import process_pdfs
-from flask_backend.utils import *
+from utils import *
 
 COURSE_ID = None
 
@@ -454,15 +457,23 @@ def tarefa_monitor():
             app.logger.error(f"Erro no monitor: {e}")
 
 if __name__ == "__main__":
-    # Bloqueia aqui até ter o ID (o app não arranca sem isto)
-    wait_for_moodle_config()
-    wait_for_rasa() # Garantir que o Rasa está online antes de arrancar o Flask, para evitar erros de conexão no arranque
+    # 1. Configurações rápidas
+    # wait_for_moodle_config() # Só ativa se for instantâneo
     
-    tarefa_monitor() # Executa a tarefa uma vez no arranque para garantir que já temos os quizzes processados antes de receber mensagens dos alunos
+    # 2. Lançar o Polling em Background para NÃO bloquear o app.run
+    import threading
+    def background_tasks():
+        wait_for_rasa()
+        tarefa_monitor()
+        print("✅  Polling inicial concluído em background.")
+
+    threading.Thread(target=background_tasks, daemon=True).start()
     
-    # Configuração do agendador
+    # 3. Configuração do agendador
     scheduler.add_job(id='moodle_monitor_job', func=tarefa_monitor, trigger='interval', minutes=60)
     scheduler.init_app(app)
     scheduler.start()
 
-    app.run(host='0.0.0.0', port=8080, debug=True, use_reloader=False)
+    # 4. ARRANCAR O SERVIDOR (Isto tem de ser rápido!)
+    # Se mudaste a porta no compose para 8082, continuas a usar 8080 aqui dentro
+    app.run(host='0.0.0.0', port=8080, threaded=True, debug=True, use_reloader=False)
