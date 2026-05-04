@@ -137,25 +137,29 @@ def chat():
 
 @app.route('/process_knowledge', methods=['POST'])
 def process_knowledge():
-    app.logger.info("Received knowledge processing request (...)")
-    file = request.files['file']
+    app.logger.info("---------> Received knowledge processing request")
+    
+    # 1. PEGAR A LISTA (Use o nome exato que está no JS: 'files[]')
+    uploaded_files = request.files.getlist('files[]')
+    
+    # 2. Pegar os outros dados do formulário
     course_id = request.form.get('course_id')
     api_key = request.form.get('api_key')
-    app.logger.info(f"Received knowledge processing request for course_id: {course_id} with file: {file.filename} and api_key: {api_key}")
 
-    # 1. Validar a API Key (segurança)
-    # 2. Guardar o ficheiro temporariamente
-    #file_path = f"temp_{course_id}.pdf"
-    #file.save(file_path)
+    # Validação de segurança básica
+    if not uploaded_files:
+        app.logger.error("Nenhum ficheiro encontrado na chave 'files[]'")
+        return {"error": "No files uploaded"}, 400
 
-    # 3. Chamar a sua pipeline existente
-    # Aqui corre o código que já tem para ChromaDB e BM25 Pickle
-    # Importante: Adicione o course_id nos metadados do ChromaDB!
-    #sucesso = minha_pipeline_processar(file_path, course_id)
+    app.logger.info(f"Processando {len(uploaded_files)} ficheiros para o curso {course_id}")
 
-    #if sucesso:
-    #    return jsonify({"status": "success"}), 200
-    #return jsonify({"status": "error"}), 500
+    for file in uploaded_files:
+        if file.filename:
+            # Aqui corre a sua pipeline para cada ficheiro
+            # file.save(os.path.join(UPLOAD_FOLDER, file.filename))
+            app.logger.info(f"Ficheiro recebido: {file.filename}")
+
+    return {"status": "success", "message": f"{len(uploaded_files)} ficheiros recebidos"}, 200
 
 @app.route('/tutor_toggle', methods=['POST'])
 def tutor_toggle():
