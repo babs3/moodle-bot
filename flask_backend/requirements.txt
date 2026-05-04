@@ -11,3 +11,14 @@ google-api-python-client
 flask-cors
 beautifulsoup4
 Flask-APScheduler
+chromadb
+PyMuPDF
+numpy
+python-dotenv
+rank_bm25
+scikit_learn
+sentence_transformers
+pytesseract 
+Pillow
+spacy
+nltk

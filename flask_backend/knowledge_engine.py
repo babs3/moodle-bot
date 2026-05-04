@@ -13,13 +13,13 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from nltk import ngrams
 import spacy
+import uuid
+
 # Load Spacy model for NLP tasks
 nlp = spacy.load("en_core_web_sm")
 
-load_dotenv()
-CURRENT_CLASS = os.getenv("CURRENT_CLASS")
-
-model = SentenceTransformer('all-MiniLM-L6-v2')
+#model = SentenceTransformer('all-MiniLM-L6-v2')
+model = SentenceTransformer("/app/models/all-MiniLM-L6-v2")
 
 def get_text_embedding(text):
     return model.encode(text, convert_to_numpy=True)

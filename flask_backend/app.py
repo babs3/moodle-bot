@@ -2,6 +2,8 @@ from flask import request
 from datetime import datetime, timezone, timedelta
 import json
 import time
+import shutil
+from knowledge_engine import process_pdfs
 from flask_backend.utils import *
 
 COURSE_ID = None
@@ -137,30 +139,40 @@ def chat():
 
 @app.route('/process_knowledge', methods=['POST'])
 def process_knowledge():
-    app.logger.info("---------> Received knowledge processing request")
-    
-    # 1. PEGAR A LISTA (Use o nome exato que está no JS: 'files[]')
-    uploaded_files = request.files.getlist('files[]')
-    
-    # 2. Pegar os outros dados do formulário
+    files = request.files.getlist('files[]')
     course_id = request.form.get('course_id')
     api_key = request.form.get('api_key')
 
-    # Validação de segurança básica
-    if not uploaded_files:
-        app.logger.error("Nenhum ficheiro encontrado na chave 'files[]'")
-        return {"error": "No files uploaded"}, 400
+    if not files or not course_id:
+        return jsonify({"error": "Dados insuficientes"}), 400
 
-    app.logger.info(f"Processando {len(uploaded_files)} ficheiros para o curso {course_id}")
+    # 1. Criar pasta temporária para processamento
+    temp_dir = f"temp_processing_{course_id}"
+    os.makedirs(temp_dir, exist_ok=True)
 
-    for file in uploaded_files:
-        if file.filename:
-            # Aqui corre a sua pipeline para cada ficheiro
-            # file.save(os.path.join(UPLOAD_FOLDER, file.filename))
-            app.logger.info(f"Ficheiro recebido: {file.filename}")
+    try:
+        # 2. Salvar ficheiros do request para a pasta
+        for file in files:
+            file_path = os.path.join(temp_dir, file.filename)
+            file.save(file_path)
 
-    return {"status": "success", "message": f"{len(uploaded_files)} ficheiros recebidos"}, 200
+        # 3. Correr a pipeline
+        success = process_pdfs(pdf_folder=temp_dir, course_id=course_id, vector_db_path=f"vector_db_{course_id}")
 
+        # 4. Limpar ficheiros temporários após processar
+        shutil.rmtree(temp_dir)
+
+        if success:
+            return jsonify({"status": "success", "message": "Conhecimento gerado!"}), 200
+        else:
+            return jsonify({"status": "error", "message": "Falha ao processar PDFs"}), 500
+
+    except Exception as e:
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+        app.logger.error(f"Erro na pipeline: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
 @app.route('/tutor_toggle', methods=['POST'])
 def tutor_toggle():
     data = request.json
