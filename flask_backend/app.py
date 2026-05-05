@@ -6,12 +6,13 @@ import json
 import time
 import shutil
 import threading
-from knowledge_engine import process_pdfs
+from knowledge_engine import delete_pdf_from_knowledge, process_pdfs
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from google.oauth2 import service_account
 from utils import *
+from models import *
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
@@ -162,6 +163,12 @@ def process_knowledge():
         for file in files:
             file_path = os.path.join(temp_dir, file.filename)
             file.save(file_path)
+            new_file = KnowledgeFile(
+                courseid=course_id,
+                filename=file.filename
+            )
+            db.session.add(new_file)
+            db.session.commit()
 
         # 3. Correr a pipeline
         success = process_pdfs(pdf_folder=temp_dir, course_id=course_id, vector_db_path=f"/app/vector_store") #TODO: add COURSE_ID
@@ -179,6 +186,16 @@ def process_knowledge():
             shutil.rmtree(temp_dir)
         app.logger.error(f"Erro na pipeline: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+    
+@app.route('/list_knowledge/<int:course_id>', methods=['GET'])
+def list_knowledge(course_id):
+    # Procura na base de dados do Flask/PostgreSQL
+    files = KnowledgeFile.query.filter_by(courseid=course_id).all()
+    
+    return jsonify([
+        {"filename": f.filename, "timecreated": f.timecreated} 
+        for f in files
+    ])
     
 @app.route('/tutor_toggle', methods=['POST'])
 def tutor_toggle():
@@ -364,6 +381,21 @@ def save_moodle_messages(): # TODO: refactor para os novos campos da BD, como o 
 
     return jsonify({"message": "Moodle progress saved"}), 200
 
+@app.route('/delete_knowledge', methods=['POST'])
+def remove_knowledge():
+    data = request.json
+    filename = data.get('filename')
+    course_id = data.get('course_id')
+    
+    if not filename or not course_id:
+        return jsonify({"error": "Faltam dados"}), 400
+        
+    success = delete_pdf_from_knowledge(filename, course_id)
+    
+    if success:
+        return jsonify({"message": f"Ficheiro {filename} removido com sucesso!"})
+    return jsonify({"error": "Falha ao remover"}), 500
+
 def new_quiz_polling():
     app.logger.info(f"[{time.strftime('%H:%M:%S')}] A iniciar polling a novos quizzes...")
     function = "core_course_get_courses"
@@ -462,6 +494,11 @@ def tarefa_monitor():
 
 if __name__ == "__main__":
     
+    with app.app_context():
+        print("🛠️  A verificar/criar tabelas na base de dados...")
+        db.create_all() 
+        print("✅  Verificação concluída.")
+        
     # 1. Lançar o Polling em Background para NÃO bloquear o app.run
     import threading
     def background_tasks():

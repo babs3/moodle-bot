@@ -61,3 +61,14 @@ class TutorProgress(db.Model):
 class Topics(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), unique=True, nullable=False)
+    
+class KnowledgeFile(db.Model):    
+    __tablename__ = 'knowledge_file'   
+    
+    id = db.Column(db.Integer, primary_key=True)
+    courseid = db.Column(db.Integer, nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
+
+    def __repr__(self):
+        return f'<File {self.filename}>'

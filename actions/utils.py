@@ -63,15 +63,16 @@ embedding_model = SentenceTransformer(model_path)
 VALID_SIMPLE_WORDS = set()
 
 def load_bm25_index():
-    with open(f"vector_store/bm25_index.pkl", "rb") as f:
-        # se o ficheiro nao existir, criar um novo índice BM25 vazio e guardá-lo
-        try:
+    pkl_path = os.path.join("vector_store", "bm25_index.pkl")    
+    if os.path.exists(pkl_path):
+        with open(f"vector_store/bm25_index.pkl", "rb") as f:
             _, _, _, _, bm25_documents = pickle.load(f)
-        except FileNotFoundError:
-            bm25_documents = []
-        for doc_text in bm25_documents:
-            VALID_SIMPLE_WORDS.update(extract_simple_tokens(doc_text))
-        return pickle.load(f)
+            for doc_text in bm25_documents:
+                VALID_SIMPLE_WORDS.update(extract_simple_tokens(doc_text))
+            return pickle.load(f)
+    else:
+        bm25_documents = []
+        return None
     
 def tokenize_and_clean_text(text):
     doc = nlp(text)

@@ -1,3 +1,5 @@
+import time
+
 from dotenv import load_dotenv
 import os
 import fitz  # PyMuPDF
@@ -464,6 +466,7 @@ def process_pdfs(pdf_folder, course_id, vector_db_path="/app/vector_store/"):
                 simple_tokens.append(cleaned_text)
                 ngram_docs_2.append(delete_duplicated_ngrams(get_ngrams(" ".join(cleaned_text), 2)))
                 ngram_docs_3.append(delete_duplicated_ngrams(get_ngrams(" ".join(cleaned_text), 3)))
+                
 
     if not documents:
         return False
@@ -572,6 +575,62 @@ def clean_edited_text(text):
 
     # Step 4: Optionally strip trailing spaces
     return text.strip()
+
+def delete_pdf_from_knowledge(filename, course_id, vector_db_path="/app/vector_store/"):
+    """Remove um PDF específico do ChromaDB e reconstrói o índice BM25."""
+    
+    # 1. Ligar ao ChromaDB (Client-Server)
+    chroma_client = initialize_chroma()
+    collection = chroma_client.get_collection(name="class_materials")
+    
+    # 2. Remover do ChromaDB usando metadados como filtro
+    # O Chroma permite apagar tudo o que coincida com o ficheiro e curso
+    collection.delete(
+        where={
+            "$and": [
+                {"file": filename},
+                {"course_id": str(course_id)}
+            ]
+        }
+    )
+    print(f"🗑️  Removido do ChromaDB: {filename}")
+
+    # 3. Atualizar o BM25 (O BM25 não permite 'delete', temos de reconstruir)
+    pkl_path = os.path.join(vector_db_path, "bm25_index.pkl")
+    
+    if os.path.exists(pkl_path):
+        with open(pkl_path, "rb") as f:
+            _, _, _, metadata, documents = pickle.load(f)
+        
+        # Filtrar os metadados e documentos para manter apenas o que NÃO é o ficheiro a apagar
+        indices_para_manter = [
+            i for i, meta in enumerate(metadata) 
+            if not (meta['file'] == filename and meta['course_id'] == str(course_id))
+        ]
+        
+        if not indices_para_manter:
+            # Se não sobrar nada, apagamos o ficheiro pkl
+            os.remove(pkl_path)
+            return True
+
+        new_metadata = [metadata[i] for i in indices_para_manter]
+        new_documents = [documents[i] for i in indices_para_manter]
+        
+        # Precisas de re-tokenizar para o BM25 (ou guardar os tokens no pkl anteriormente para ser mais rápido)
+        new_simple_tokens = [tokenize_and_clean_text(clean_doc_text(doc)) for doc in new_documents]
+        new_ngram_docs_2 = [delete_duplicated_ngrams(get_ngrams(" ".join(tokens), 2)) for tokens in new_simple_tokens]
+        new_ngram_docs_3 = [delete_duplicated_ngrams(get_ngrams(" ".join(tokens), 3)) for tokens in new_simple_tokens]
+
+        # Re-inicializar os objetos BM25
+        new_bm25_simple = BM25Okapi(new_simple_tokens)
+        new_bm25_2gram = BM25Okapi(new_ngram_docs_2)
+        new_bm25_3gram = BM25Okapi(new_ngram_docs_3)
+
+        # Guardar o novo snapshot
+        with open(pkl_path, "wb") as f:
+            pickle.dump((new_bm25_simple, new_bm25_2gram, new_bm25_3gram, new_metadata, new_documents), f)
+        
+    return True
 
 
 if __name__ == "__main__":
