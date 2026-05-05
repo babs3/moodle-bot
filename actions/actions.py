@@ -103,6 +103,7 @@ def keywords_to_tokens(keywords, query):
     return complex_tokens, simple_tokens, False # Return complex tokens, simple tokens, and split_keywords flag
 
 def action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, tutor_mode):
+        
     print(f"\n🧒  User ({user_email}) said: {user_message} 📩")
     query = treat_raw_query(user_message)
     
@@ -114,11 +115,19 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
     
     print(f"\n🔍  Starting search process in resources: {authorized_resources[0]}")
     # Hybrid Search Process    
-    vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(keywords, query, split_keywords, collection, authorized_resources, intent)
+    vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(keywords, query, split_keywords, collection, authorized_resources, intent)        
     bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources)
-        
+    
+    if bm25_docs == [] and bm25_meta == [] and normalized_bm25_scores == []:
+        return  [
+            SlotSet("user_query", query),  # Store the query
+            SlotSet("materials_location", ""), #gemini_results),  # Store selected materials
+            SlotSet("bot_response", "no_access"),  # Store the bot response -> trigger
+            SlotSet("user_email", user_email),  # Store the sender ID
+            SlotSet("user_id", user_id),  # Store the user ID
+            SlotSet("input_time", input_time)
+            ]
     if normalized_bm25_scores == []:
-        dispatcher.utter_message(text="Sorry, I couldn't find any relevant class materials for that subject.")
         return  [
             SlotSet("user_query", query),  # Store the query
             SlotSet("materials_location", ""), #gemini_results),  # Store selected materials
@@ -169,13 +178,12 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
                 print("\n ⚠️  Gemini Response is empty.")
                 dispatcher.utter_message(text=formatted_response)
         except Exception as e:
-            dispatcher.utter_message(text="Sorry, I couldn't process that request due to an error calling Gemini API")
             selected_results = []  # Clear selected results
             print(f"\n❌  Error calling Gemini API: {e}")
             return  [
                 SlotSet("user_query", query),  # Store the query
                 SlotSet("materials_location", ""), #gemini_results),  # Store selected materials
-                SlotSet("bot_response", "no_response"),  # Store the bot response
+                SlotSet("bot_response", "gemini_error"),  # Store the bot response -> trigger
                 SlotSet("user_email", user_email),  # Store the sender ID
                 SlotSet("user_id", user_id),  # Store the user ID
                 SlotSet("input_time", input_time)
@@ -347,12 +355,22 @@ class ActionGetClassMaterialLocation(Action):
         tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
         print(f"tutor_mode in ActionGetClassMaterialLocation: {tutor_mode}")
         
+        if bot_response == "no_access":
+            dispatcher.utter_message(text="You don't have access to any class materials yet. Please check with your instructor to gain access to the course materials and try again.")
+            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
+
         if bot_response == "no_response":
             response = f"I couldn't find any relevant content on this topic in the course materials. Please try again."
             save_user_progress(user_email, user_message, response, [], input_time, user_id, tutor_mode)
             dispatcher.utter_message(text=response)
             return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
 
+        if bot_response == "gemini_error":
+            response = f"Sorry, I couldn't process that request due to an error calling Gemini API. Please try again later."
+            save_user_progress(user_email, user_message, response, [], input_time, user_id, tutor_mode)
+            dispatcher.utter_message(text=response)
+            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
+        
         print(f"\n\n 🔖  --------- Getting class materials location --------- 🔖 ")
         
         if len(selected_results) == 0:

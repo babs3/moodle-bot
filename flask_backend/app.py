@@ -1,5 +1,5 @@
 import os
-print(f"📂  Conteúdo da pasta /app: {os.listdir('/app')}")
+#print(f"📂  Conteúdo da pasta /app: {os.listdir('/app')}")
 from flask import request
 from datetime import datetime, timezone, timedelta
 import json
@@ -75,6 +75,7 @@ def chat():
     moodle_contents = get_moodle_contents(course_id)
     if moodle_contents is None:
         app.logger.error("Failed to fetch Moodle contents.")
+        return jsonify({"text": "There is no content available for this course or an error occurred while fetching the content. Please try again later."})
     else:
         resources = extract_visible_resources(moodle_contents)
         app.logger.info(f"Recursos autorizados: {resources}")

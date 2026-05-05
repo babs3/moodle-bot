@@ -63,7 +63,7 @@ def clean_quiz_data(quiz_id):
     # Eliminar perguntas antigas do quiz
     quiz_antigo = MoodleQuizPolling.query.filter_by(quiz_id=quiz_id).first()
     if quiz_antigo:
-        app.logger.info(f"Removendo dados antigos do quiz ID {quiz_id} para evitar duplicações.")   
+        print(f"Removendo dados antigos do quiz ID {quiz_id} para evitar duplicações.")   
         db.session.delete(quiz_antigo)
         db.session.commit()
 
@@ -84,9 +84,9 @@ def check_moodle_user_in_db(moodle_id, email):
         moodle_user = MoodleUsers(moodle_id=moodle_id, email=email)
         db.session.add(moodle_user)
         db.session.commit()
-        app.logger.info(f"Created new Moodle user in DB: {email} (ID: {moodle_id})")
+        print(f"Created new Moodle user in DB: {email} (ID: {moodle_id})")
     else:
-        app.logger.info(f"Moodle user already exists in DB: {email} (ID: {moodle_id})")
+        print(f"Moodle user already exists in DB: {email} (ID: {moodle_id})")
 
 def analisar_desempenho_aluno(quiz_data):
     erros = []
@@ -151,8 +151,8 @@ def get_moodle_user_data(user_id):
     # 1. Usa o IP direto e verifica se precisas de porta (ex: :80)
     function = "core_user_get_users"
     
-    app.logger.info(f"--- INÍCIO DA BUSCA MOODLE ---")
-    app.logger.info(f"ID: {user_id} | URL: {MOODLE_URL}")
+    print(f"--- INÍCIO DA BUSCA MOODLE ---")
+    print(f"ID: {user_id} | URL: {MOODLE_URL}")
 
     params = {
         'criteria[0][key]': 'id',
@@ -162,7 +162,7 @@ def get_moodle_user_data(user_id):
     try:
         # 2. Adiciona um timeout para o código não ficar "pendurado" para sempre
         response_data = call_moodle(function, params, timeout=5)
-        #app.logger.info(f"Resposta bruta do Moodle: {response_data}")
+        #print(f"Resposta bruta do Moodle: {response_data}")
 
         if 'users' in response_data and len(response_data['users']) > 0:
             user = response_data['users'][0]
@@ -177,30 +177,30 @@ def get_moodle_user_data(user_id):
             
     except Exception as e:
         # 3. Usa o logger para o erro também, para teres a certeza que vês na consola
-        app.logger.error(f"ERRO CRÍTICO ao ligar ao Moodle: {str(e)}")
+        print(f"ERRO: ERRO CRÍTICO ao ligar ao Moodle: {str(e)}")
         return None
     
 def get_moodle_contents(course_id):
     function = "core_course_get_contents"
-    app.logger.info(f"--- INÍCIO DA BUSCA DE CONTEÚDOS MOODLE --- | Course ID: {course_id}")
+    print(f"--- INÍCIO DA BUSCA DE CONTEÚDOS MOODLE --- | Course ID: {course_id}")
     params = {
         'courseid': course_id
     }
     
     try:
         contents = call_moodle(function, params, timeout=5)
-        #app.logger.info(f"Resposta bruta do Moodle para conteúdos: {contents}")
+        #print(f"Resposta bruta do Moodle para conteúdos: {contents}")
         
         # Se o Moodle retornar um erro no JSON (ex: token inválido)
         if isinstance(contents, dict) and "exception" in contents:
-            app.logger.error(f"Erro na API Moodle: {contents['message']}")
+            print(f"ERRO: Erro na API Moodle: {contents['message']}")
             return None
 
-        app.logger.info(f"Conteúdos obtidos com sucesso para o curso {course_id}")
+        print(f"Conteúdos obtidos com sucesso para o curso {course_id}")
         return contents
 
     except requests.exceptions.RequestException as e:
-        app.logger.error(f"Erro na requisição ao Moodle: {e}")
+        print(f"ERRO: Erro na requisição ao Moodle: {e}")
         return None
     
 def extract_visible_resources(moodle_json):
@@ -231,7 +231,7 @@ def get_quiz_attempt_review(attempt_id):
     Obtém os detalhes de uma tentativa de quiz, incluindo perguntas e respostas.
     """
     function = "mod_quiz_get_attempt_review"
-    app.logger.info(f"--- INÍCIO DA REVISÃO DE TENTATIVA --- | Attempt ID: {attempt_id}")
+    print(f"--- INÍCIO DA REVISÃO DE TENTATIVA --- | Attempt ID: {attempt_id}")
     
     params = {
         'attemptid': attempt_id,
@@ -244,14 +244,14 @@ def get_quiz_attempt_review(attempt_id):
         
         # Verificação de erro na resposta da API
         if isinstance(review_data, dict) and "exception" in review_data:
-            app.logger.error(f"Erro na API Moodle (Review): {review_data['message']}")
+            print(f"ERRO: Erro na API Moodle (Review): {review_data['message']}")
             return None
 
-        app.logger.info(f"Dados da tentativa {attempt_id} obtidos com sucesso.")
+        print(f"Dados da tentativa {attempt_id} obtidos com sucesso.")
         return review_data
 
     except requests.exceptions.RequestException as e:
-        app.logger.error(f"Erro na requisição ao Moodle: {e}")
+        print(f"ERRO: Erro na requisição ao Moodle: {e}")
         return None
     
 def get_quiz_id_by_name(course_id, quiz_name):
@@ -259,7 +259,7 @@ def get_quiz_id_by_name(course_id, quiz_name):
     Procura o ID de um questionário dentro de um curso através do nome.
     """
     function = "mod_quiz_get_quizzes_by_courses"
-    app.logger.info(f"--- PROCURANDO ID DO QUIZ: '{quiz_name}' no curso {course_id} ---")
+    print(f"--- PROCURANDO ID DO QUIZ: '{quiz_name}' no curso {course_id} ---")
     
     params = {
         'courseids[0]': course_id  # A API espera um array de IDs
@@ -269,7 +269,7 @@ def get_quiz_id_by_name(course_id, quiz_name):
         data = call_moodle(function, params, timeout=10)
 
         if isinstance(data, dict) and "exception" in data:
-            app.logger.error(f"Erro na API: {data['message']}")
+            print(f"ERRO: Erro na API: {data['message']}")
             return None
 
         # A resposta contém uma chave 'quizzes' que é uma lista
@@ -278,14 +278,14 @@ def get_quiz_id_by_name(course_id, quiz_name):
         for quiz in quizzes:
             # Compara o nome (podes usar .strip().lower() para ser mais flexível)
             if quiz['name'].strip().lower() == quiz_name.strip().lower():
-                app.logger.info(f"Quiz encontrado! ID: {quiz['id']}")
+                print(f"Quiz encontrado! ID: {quiz['id']}")
                 return quiz['id']
 
         app.logger.warning(f"Nenhum questionário com o nome '{quiz_name}' foi encontrado.")
         return None
 
     except Exception as e:
-        app.logger.error(f"Erro ao procurar quiz por nome: {e}")
+        print(f"ERRO: Erro ao procurar quiz por nome: {e}")
         return None
     
 def get_user_quizzes_by_course(course_id, user_id):
@@ -293,22 +293,22 @@ def get_user_quizzes_by_course(course_id, user_id):
     Obtém a lista de quizzes de um curso e verifica quais o aluno já tentou.
     """
     function = "mod_quiz_get_quizzes_by_courses"
-    app.logger.info(f"--- BUSCANDO QUIZZES DO CURSO PARA O USUÁRIO --- | Course ID: {course_id} | User ID: {user_id}")
+    print(f"--- BUSCANDO QUIZZES DO CURSO PARA O USUÁRIO --- | Course ID: {course_id} | User ID: {user_id}")
     
     try:
         data = call_moodle(function, {'courseids[0]': course_id}, timeout=10)
 
         if isinstance(data, dict) and "exception" in data:
-            app.logger.error(f"Erro na API Moodle: {data['message']}")
+            print(f"ERRO: Erro na API Moodle: {data['message']}")
             return None
 
         quizzes = data.get('quizzes', [])
-        app.logger.info(f"Total de quizzes encontrados no curso: {len(quizzes)}")
+        print(f"Total de quizzes encontrados no curso: {len(quizzes)}")
         
         return quizzes
 
     except Exception as e:
-        app.logger.error(f"Erro ao obter quizzes do curso: {e}")
+        print(f"ERRO: Erro ao obter quizzes do curso: {e}")
         return None
     
 def get_last_attempt_id(quiz_id, user_id):
@@ -316,7 +316,7 @@ def get_last_attempt_id(quiz_id, user_id):
     Obtém o ID da última tentativa de um aluno num questionário específico.
     """
     function = "mod_quiz_get_user_quiz_attempts"
-    app.logger.info(f"--- BUSCANDO TENTATIVAS --- | Quiz ID: {quiz_id} | User ID: {user_id}")
+    print(f"--- BUSCANDO TENTATIVAS --- | Quiz ID: {quiz_id} | User ID: {user_id}")
     
     params = {
         'quizid': quiz_id,
@@ -328,7 +328,7 @@ def get_last_attempt_id(quiz_id, user_id):
         data = call_moodle(function, params, timeout=10)
         
         if isinstance(data, dict) and "exception" in data:
-            app.logger.error(f"Erro na API Moodle: {data['message']}")
+            print(f"ERRO: Erro na API Moodle: {data['message']}")
             return None
 
         attempts = data.get('attempts', [])
@@ -342,17 +342,17 @@ def get_last_attempt_id(quiz_id, user_id):
         attempts.sort(key=lambda x: x['id'], reverse=True)
         
         last_attempt = attempts[0]
-        app.logger.info(f"Tentativa encontrada! ID: {last_attempt['id']} | Estado: {last_attempt['state']}")
+        print(f"Tentativa encontrada! ID: {last_attempt['id']} | Estado: {last_attempt['state']}")
         
         return last_attempt['id']
 
     except Exception as e:
-        app.logger.error(f"Erro ao obter tentativas: {e}")
+        print(f"ERRO: Erro ao obter tentativas: {e}")
         return None
     
 def get_moodle_courses_by_field(field, value):
     function = "core_course_get_courses_by_field"
-    app.logger.info(f"--- INÍCIO DA BUSCA DE CURSOS MOODLE --- | Field: {field}, Value: {value}")
+    print(f"--- INÍCIO DA BUSCA DE CURSOS MOODLE --- | Field: {field}, Value: {value}")
     params = {
         'field': field,
         'value': value
@@ -360,18 +360,18 @@ def get_moodle_courses_by_field(field, value):
     
     try:
         courses = call_moodle(function, params, timeout=5)
-        #app.logger.info(f"Resposta bruta do Moodle para cursos: {courses}")
+        #print(f"Resposta bruta do Moodle para cursos: {courses}")
         
         # Se o Moodle retornar um erro no JSON (ex: token inválido)
         if isinstance(courses, dict) and "exception" in courses:
-            app.logger.error(f"Erro na API Moodle: {courses['message']}")
+            print(f"ERRO: Erro na API Moodle: {courses['message']}")
             return None
 
-        app.logger.info(f"Cursos obtidos com sucesso para {field}={value}")
+        print(f"Cursos obtidos com sucesso para {field}={value}")
         return courses
 
     except requests.exceptions.RequestException as e:
-        app.logger.error(f"Erro na requisição ao Moodle: {e}")
+        print(f"ERRO: Erro na requisição ao Moodle: {e}")
         return None
     
 def fetch_course_id_from_moodle():
@@ -389,7 +389,7 @@ def fetch_course_id_from_moodle():
         return course_id
     
     except Exception as e:
-        app.logger.error(f"Erro na conexão com Moodle: {e}")
+        print(f"ERRO: Erro na conexão com Moodle: {e}")
     
     return None
 
@@ -402,7 +402,7 @@ def quiz_ja_processado(quiz_id):
     if analise:
         return True
     else:
-        app.logger.info(f"Quiz ID {quiz_id} ainda não processado.")
+        print(f"Quiz ID {quiz_id} ainda não processado.")
         return False
 
 def marcar_quiz_como_processado(quiz_id, quiz_name, questions_hash):
@@ -414,7 +414,7 @@ def marcar_quiz_como_processado(quiz_id, quiz_name, questions_hash):
     )
     db.session.add(novo_registo)
     db.session.commit()
-    app.logger.info(f"Quiz ID {quiz_id} adicionado ao banco de dados.")
+    print(f"Quiz ID {quiz_id} adicionado ao banco de dados.")
     
 def call_moodle(function, params={}, timeout=5):
     """Função genérica para chamar o Web Service do Moodle"""
@@ -430,7 +430,7 @@ def call_moodle(function, params={}, timeout=5):
             response = requests.post(f"{MOODLE_URL}/webservice/rest/server.php", data=params)
         return response.json()
     except Exception as e:
-        app.logger.error(f"Erro na chamada à API: {e}")
+        print(f"ERRO: Erro na chamada à API: {e}")
         return None
     
 def obter_perguntas_do_quiz(quiz_id):
@@ -439,7 +439,7 @@ def obter_perguntas_do_quiz(quiz_id):
     tentativa = call_moodle('mod_quiz_start_attempt', {'quizid': quiz_id})
     
     if 'attempt' not in tentativa:
-        app.logger.error(f"Erro ao iniciar tentativa no quiz {quiz_id}: {tentativa}")
+        print(f"ERRO: Erro ao iniciar tentativa no quiz {quiz_id}: {tentativa}")
         return []
 
     attempt_id = tentativa['attempt']['id']
@@ -467,7 +467,7 @@ def obter_perguntas_do_quiz(quiz_id):
             break
 
     # --- 5. FECHAR A TENTATIVA (Obrigatório para a próxima execução funcionar) ---
-    app.logger.info(f"Finalizando tentativa {attempt_id}...")
+    print(f"Finalizando tentativa {attempt_id}...")
     call_moodle('mod_quiz_process_attempt', {
         'attemptid': attempt_id,
         'finishattempt': 1
@@ -491,7 +491,7 @@ def extrair_conteudo_pergunta(html_raw):
     return "Texto não encontrado"
 
 def criar_topicos_para_perguntas(pergunta_id_texto):
-    app.logger.info(f"Enviando perguntas para o Rasa para criação de tópicos...")
+    print(f"Enviando perguntas para o Rasa para criação de tópicos...")
     for p in pergunta_id_texto:
         if p['type'] == 'truefalse':
             p['texto_pergunta'] = "True or False: " + p['texto_pergunta']
@@ -508,7 +508,7 @@ def criar_topicos_para_perguntas(pergunta_id_texto):
         response = requests.post(RASA_URL, data=json.dumps(payload), headers=headers)
         response.raise_for_status()
         messages = response.json() 
-        #app.logger.info(f"DEBUG COMPLETO RASA: {json.dumps(messages, indent=2)}")
+        #print(f"DEBUG COMPLETO RASA: {json.dumps(messages, indent=2)}")
 
         for message in messages:
             # 1. Verificamos se a mensagem tem o campo 'custom'
@@ -526,12 +526,12 @@ def criar_topicos_para_perguntas(pergunta_id_texto):
             for p in lista_perguntas_final:
                 if p['question'].startswith("True or False: "):
                     p['question'] = p['question'].replace("True or False: ", "")
-            #app.logger.info(f"Perguntas finais após processamento: {lista_perguntas_final}")
+            #print(f"Perguntas finais após processamento: {lista_perguntas_final}")
         else:
             app.logger.warning("Nenhuma pergunta processada encontrada na resposta do Rasa.")
 
     except Exception as e:
-        app.logger.error(f"Erro ao processar resposta do Rasa: {e}")
+        print(f"ERRO: Erro ao processar resposta do Rasa: {e}")
         
     return lista_perguntas_final
 
@@ -546,7 +546,7 @@ def popular_db(quiz_id, perguntas):
             topic = Topics(name=p.get('topic'))
             db.session.add(topic)
             db.session.commit() # Commit para gerar o ID do tópico
-            app.logger.info(f"Novo tópico criado: {p.get('topic')} com ID {topic.id}")
+            print(f"Novo tópico criado: {p.get('topic')} com ID {topic.id}")
             topic_id = topic.id
             
         nova_questao = MoodleQuizData(

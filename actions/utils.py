@@ -59,9 +59,19 @@ nlp = spacy.load("en_core_web_sm")
 model_path = "/app/models/all-MiniLM-L6-v2"
 embedding_model = SentenceTransformer(model_path)
 
-# Load BM25 index
-with open(f"vector_store/bm25_index.pkl", "rb") as f:
-    bm25_simple, bm25_2gram, bm25_3gram, bm25_metadata, bm25_documents = pickle.load(f)
+# Collect all unique words from BM25 documents to compare for spell correction
+VALID_SIMPLE_WORDS = set()
+
+def load_bm25_index():
+    with open(f"vector_store/bm25_index.pkl", "rb") as f:
+        # se o ficheiro nao existir, criar um novo índice BM25 vazio e guardá-lo
+        try:
+            _, _, _, _, bm25_documents = pickle.load(f)
+        except FileNotFoundError:
+            bm25_documents = []
+        for doc_text in bm25_documents:
+            VALID_SIMPLE_WORDS.update(extract_simple_tokens(doc_text))
+        return pickle.load(f)
     
 def tokenize_and_clean_text(text):
     doc = nlp(text)
@@ -181,14 +191,6 @@ def format_gemini_response(text: str) -> str:
     
     return text
 
-def is_uporto_email(email):
-    # Check if the email domain is "uporto.pt"
-    if email.endswith("@g.uporto.pt") or email.endswith("@fe.up.pt"):
-        return True
-    else:
-        #st.error("❌ Invalid email domain. Please use your UPorto email.")
-        return False
-
 def lemmatize_word(word):
     """Returns the lemma of a given word (e.g., 'methods' → 'method')."""
     doc = nlp(word)
@@ -282,11 +284,6 @@ def extract_simple_tokens(query): # ['pestel', 'analysis']
     # Remove duplicates while preserving order
     keywords = list(dict.fromkeys(keywords))
     return keywords
-
-# Collect all unique words from BM25 documents to compare for spell correction
-VALID_SIMPLE_WORDS = set() # TODO
-for doc_text in bm25_documents:
-    VALID_SIMPLE_WORDS.update(extract_simple_tokens(doc_text))
 
 def group_pages_by_pdf(document_entries):
     """
@@ -443,12 +440,7 @@ def dense_vector_search(keywords, query, split_keywords, collection, authorized_
         "file": {
             "$in": authorized_resources  # O Chroma só procura nestes ficheiros
         }
-    })
-    # checking if vector_results is empty
-    if not vector_results["documents"]:
-        print("⚠️  Warning: No vector search results found.")
-        return [], [], []
-    
+    })  
 
     vector_docs = vector_results["documents"][0]
     vector_metadata = vector_results["metadatas"][0]
@@ -473,6 +465,14 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, alph
     # === Perform Hybrid BM25 search === #
     print(f"\n🔛 Getting BM25 sparse vectors for both:\n - {complex_tokens}\n - {simple_tokens}")
     
+    # grant access to the BM25 index updated with new documents (if any)
+    try:
+        bm25_simple, bm25_2gram, bm25_3gram, bm25_metadata, bm25_documents = load_bm25_index()
+    except FileNotFoundError:
+        print("👻  --> User does not have access to any documents in the authorized resources.")
+        return [], [], []
+
+
     # check length of complex_tokens and perform != .get_scores
     if complex_tokens == []:
         bm25_scores_complex = bm25_2gram.get_scores(complex_tokens)
