@@ -10,7 +10,6 @@ Copy the `.env` file and `materials` folder.
 `.env` file template:
 ```
 GOOGLE_API_KEY=MY_API_KEY_HERE
-COOKIES_SECRET_KEY=MY_COOKIES_SECRET_KEY_HERE
 MOODLE_TOKEN=MY_MOODLE_TOKEN_HERE
 MOODLE_URL=http://host.docker.internal # or other
 APP_DATABASE_USER=MY_DB_USER

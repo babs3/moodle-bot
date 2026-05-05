@@ -185,6 +185,7 @@ def tutor_toggle():
     data = request.json
     user_id = data.get('user_id')
     active = data.get('active')
+    course_id = data.get('course_id')
 
     # 1. Atualizar o estado do utilizador na BD
     user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
@@ -202,12 +203,11 @@ def tutor_toggle():
 
     if not active:
         app.logger.info(f"Modo Tutor desligado para user_id: {user_id}")
-        #return jsonify({"message": "Modo Tutor desligado."})
         return jsonify([{"text": "Modo Tutor desligado."}])
 
     # 2. Lógica de Verificação de Quizzes (O Trigger)
     # Vamos buscar todos os quizzes do curso que o aluno tem acesso e verificar se há tentativas novas para analisar. Se houver, fazemos a análise e preparamos um feedback personalizado.
-    quizzes = get_user_quizzes_by_course(COURSE_ID, user_id) 
+    quizzes = get_user_quizzes_by_course(course_id, user_id) 
     #app.logger.info(f"Quizzes encontrados para user_id {user_id}: {[quiz['name'] for quiz in quizzes]}")
     
     novos_erros_encontrados = []
