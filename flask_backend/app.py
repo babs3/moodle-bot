@@ -9,22 +9,6 @@ import threading
 from knowledge_engine import process_pdfs
 from utils import *
 
-#COURSE_ID = None
-
-def wait_for_moodle_config():
-    global COURSE_ID
-    app.logger.info("A aguardar configuração do Moodle...")
-    
-    while COURSE_ID is None:
-        COURSE_ID = fetch_course_id_from_moodle()
-        
-        if COURSE_ID:
-            app.logger.info(f"Sucesso! COURSE_ID definido como: {COURSE_ID}")
-            # Opcional: Guardar no app.config para acesso fácil nas rotas
-            app.config['COURSE_ID'] = COURSE_ID
-        else:
-            app.logger.warning("Course ID não encontrado ou Moodle offline. A tentar novamente em 5 segundos...")
-            time.sleep(5) # Espera 5 segundos antes da próxima tentativa
 
 def wait_for_rasa():
     app.logger.info("A aguardar que o Rasa fique disponível...")
@@ -72,15 +56,27 @@ def chat():
     check_moodle_user_in_db(moodle_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
     
     filenames = []
-    moodle_contents = get_moodle_contents(course_id)
-    if moodle_contents is None:
+    moodle_contents, moodle_contents_names = get_moodle_contents(course_id)
+    if moodle_contents_names == None:
         app.logger.error("Failed to fetch Moodle contents.")
-        return jsonify({"text": "There is no content available for this course or an error occurred while fetching the content. Please try again later."})
+        return jsonify([{"text": "There is no content available for this course or an error occurred while fetching the content. Please try again later."}])
+    elif moodle_contents_names == []:
+        app.logger.warning("No contents found for this course.")
+        return jsonify([{"text": "There is no content available for this course. Please check back later or contact your instructor."}])
     else:
         resources = extract_visible_resources(moodle_contents)
         app.logger.info(f"Recursos autorizados: {resources}")
         # lista com os filenames dos recursos autorizados, ex: ["slides1.pdf", "exercicio2.pdf"]
         filenames = [resource.get("filename") for resource in resources]
+        
+        authorized_resources = []
+        for filename in filenames:
+            if filename in resources:
+                authorized_resources.append(filename)
+        
+        if authorized_resources == []:
+            app.logger.warning("No authorized resources found for this course.")
+            return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
     
     # check if user is in tutor mode
     user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
@@ -92,7 +88,7 @@ def chat():
         payload = {
             "sender": user_email,
             "message": "tutor menu buttons trigger",
-            "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": filenames, "tutor_mode": True, "user_message": user_message}
+            "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message}
         }
         headers = {"Content-Type": "application/json"}
 
@@ -122,7 +118,7 @@ def chat():
         payload = {
             "sender": user_email,
             "message": user_message, #user_input,
-            "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": filenames, "tutor_mode": False}
+            "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": False}
         }
         headers = {"Content-Type": "application/json"}
 
@@ -460,10 +456,8 @@ def tarefa_monitor():
             app.logger.error(f"Erro no monitor: {e}")
 
 if __name__ == "__main__":
-    # 1. Configurações rápidas
-    #wait_for_moodle_config()
     
-    # 2. Lançar o Polling em Background para NÃO bloquear o app.run
+    # 1. Lançar o Polling em Background para NÃO bloquear o app.run
     import threading
     def background_tasks():
         wait_for_rasa()
@@ -472,11 +466,11 @@ if __name__ == "__main__":
 
     threading.Thread(target=background_tasks, daemon=True).start()
     
-    # 3. Configuração do agendador
+    # 2. Configuração do agendador
     scheduler.add_job(id='moodle_monitor_job', func=tarefa_monitor, trigger='interval', minutes=60)
     scheduler.init_app(app)
     scheduler.start()
 
-    # 4. ARRANCAR O SERVIDOR (Isto tem de ser rápido!)
+    # 2. ARRANCAR O SERVIDOR (Isto tem de ser rápido!)
     # Se mudaste a porta no compose para 8082, continuas a usar 8080 aqui dentro
     app.run(host='0.0.0.0', port=8080, threaded=True, debug=True, use_reloader=False)

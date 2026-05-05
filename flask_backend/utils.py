@@ -187,21 +187,30 @@ def get_moodle_contents(course_id):
         'courseid': course_id
     }
     
+    filenames = []  # Lista para armazenar os nomes dos ficheiros encontrados
     try:
         contents = call_moodle(function, params, timeout=5)
         #print(f"Resposta bruta do Moodle para conteúdos: {contents}")
-        
+        # print dos nomes dos ficheiros encontrados
+        if isinstance(contents, list):
+            for section in contents:
+                for module in section.get('modules', []):
+                    if 'contents' in module:
+                        for content in module['contents']:
+                            print(f"Encontrado conteúdo: {content.get('filename', 'sem nome')} (Moodle ID: {module['id']})")
+                            filenames.append(content.get('filename', 'sem nome'))
+                                                        
         # Se o Moodle retornar um erro no JSON (ex: token inválido)
         if isinstance(contents, dict) and "exception" in contents:
             print(f"ERRO: Erro na API Moodle: {contents['message']}")
-            return None
+            return None, None
 
         print(f"Conteúdos obtidos com sucesso para o curso {course_id}")
-        return contents
+        return contents, filenames
 
     except requests.exceptions.RequestException as e:
         print(f"ERRO: Erro na requisição ao Moodle: {e}")
-        return None
+        return None, None
     
 def extract_visible_resources(moodle_json):
     allowed_materials = []
@@ -373,25 +382,7 @@ def get_moodle_courses_by_field(field, value):
     except requests.exceptions.RequestException as e:
         print(f"ERRO: Erro na requisição ao Moodle: {e}")
         return None
-    
-def fetch_course_id_from_moodle():
-    try:
-        # Substitui pela tua lógica real de chamada à API do Moodle
-        function = "core_course_get_courses_by_field"
-        params = {
-            'field': "shortname",
-            'value': COURSE_SHORTNAME
-        }
-        
-        course_data = call_moodle(function, params, timeout=5)  
-        course_id = course_data['courses'][0]['id']
-
-        return course_id
-    
-    except Exception as e:
-        print(f"ERRO: Erro na conexão com Moodle: {e}")
-    
-    return None
+ 
 
 def quiz_ja_processado(quiz_id):
     # Verificar se já analisámos esta tentativa
