@@ -103,6 +103,15 @@ def keywords_to_tokens(keywords, query):
     return complex_tokens, simple_tokens, False # Return complex tokens, simple tokens, and split_keywords flag
 
 def action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, tutor_mode):
+    if authorized_resources == []:
+        return  [
+            SlotSet("user_query", user_message),  # Store the query
+            SlotSet("materials_location", []), #gemini_results),  # Store selected materials
+            SlotSet("bot_response", "no_access"),  # Store the bot response -> trigger
+            SlotSet("user_email", user_email),  # Store the sender ID
+            SlotSet("user_id", user_id),  # Store the user ID
+            SlotSet("input_time", input_time)
+            ]
         
     print(f"\n🧒  User ({user_email}) said: {user_message} 📩")
     query = treat_raw_query(user_message)

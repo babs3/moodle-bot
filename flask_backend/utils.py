@@ -2,15 +2,12 @@ import json
 import logging
 import time
 from flask import Flask, jsonify
-from flask_cors import CORS
 import hashlib
-from flask_mail import Mail, Message
 import os
-from flask_migrate import Migrate
-from flask_jwt_extended import JWTManager
-from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import requests
+import hashlib
+import json
 from flask_apscheduler import APScheduler
 from bs4 import BeautifulSoup
 from models import *
@@ -18,23 +15,6 @@ from models import *
 RASA_URL = "http://rasa:5005/webhooks/rest/webhook"
 MOODLE_URL = "http://host.docker.internal" # Este endereço diz ao Docker: "Sai do contentor e vai buscar o localhost da máquina real".
 TOKEN = os.getenv("MOODLE_TOKEN")
-COURSE_SHORTNAME = os.getenv("MOODLE_COURSE_SHORTNAME")
-
-app = Flask(__name__)
-app.logger.setLevel(logging.INFO)
-CORS(app) # Isto permite que o Moodle aceda à API
-scheduler = APScheduler() # Para agendar tarefas periódicas, como verificar quizzes novos
-
-app.config["SQLALCHEMY_DATABASE_URI"] = f'postgresql://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@db/{os.getenv("POSTGRES_DB")}'
-app.config["JWT_SECRET_KEY"] = "super-secret-key"  # Change in production!
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db.init_app(app)
-migrate = Migrate(app, db)  # For database migrations
-jwt = JWTManager(app)
-
-import hashlib
-import json
 
 def gerar_hash_perguntas(lista_perguntas):
     # 1. Garantir que a lista está sempre na mesma ordem (pelo slot/id)
@@ -172,7 +152,7 @@ def get_moodle_user_data(user_id):
                 "email": user['email'],
             }
         
-        app.logger.warning(f"Utilizador {user_id} não encontrado no Moodle.")
+        print(f"WARNING: Utilizador {user_id} não encontrado no Moodle.")
         return None
             
     except Exception as e:
@@ -290,7 +270,7 @@ def get_quiz_id_by_name(course_id, quiz_name):
                 print(f"Quiz encontrado! ID: {quiz['id']}")
                 return quiz['id']
 
-        app.logger.warning(f"Nenhum questionário com o nome '{quiz_name}' foi encontrado.")
+        print(f"WARNING: Nenhum questionário com o nome '{quiz_name}' foi encontrado.")
         return None
 
     except Exception as e:
@@ -343,7 +323,7 @@ def get_last_attempt_id(quiz_id, user_id):
         attempts = data.get('attempts', [])
         
         if not attempts:
-            app.logger.warning(f"Nenhuma tentativa encontrada para o User {user_id} no Quiz {quiz_id}")
+            print(f"WARNING: Nenhuma tentativa encontrada para o User {user_id} no Quiz {quiz_id}")
             return None
 
         # Ordenar tentativas pelo ID (a mais recente terá o ID maior)
@@ -519,7 +499,7 @@ def criar_topicos_para_perguntas(pergunta_id_texto):
                     p['question'] = p['question'].replace("True or False: ", "")
             #print(f"Perguntas finais após processamento: {lista_perguntas_final}")
         else:
-            app.logger.warning("Nenhuma pergunta processada encontrada na resposta do Rasa.")
+            print("WARNING: Nenhuma pergunta processada encontrada na resposta do Rasa.")
 
     except Exception as e:
         print(f"ERRO: Erro ao processar resposta do Rasa: {e}")

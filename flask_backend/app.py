@@ -7,7 +7,24 @@ import time
 import shutil
 import threading
 from knowledge_engine import process_pdfs
+from flask_cors import CORS
+from flask_migrate import Migrate
+from flask_jwt_extended import JWTManager
+from google.oauth2 import service_account
 from utils import *
+
+app = Flask(__name__)
+app.logger.setLevel(logging.INFO)
+CORS(app) # Isto permite que o Moodle aceda à API
+scheduler = APScheduler() # Para agendar tarefas periódicas, como verificar quizzes novos
+
+app.config["SQLALCHEMY_DATABASE_URI"] = f'postgresql://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@db/{os.getenv("POSTGRES_DB")}'
+app.config["JWT_SECRET_KEY"] = "super-secret-key"  # Change in production!
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db.init_app(app)
+migrate = Migrate(app, db)  # For database migrations
+jwt = JWTManager(app)
 
 
 def wait_for_rasa():
@@ -25,20 +42,8 @@ def wait_for_rasa():
         time.sleep(5)
         
 @app.route('/')
-def index():
-    # test here use core_course_get_courses_by_field
-    course_data = get_moodle_courses_by_field("shortname", COURSE_SHORTNAME)
-    if course_data.get('courses'):
-        # Extrai o ID do primeiro curso encontrado
-        course_id = course_data['courses'][0]['id']
-        course_fullname = course_data['courses'][0]['fullname']
-        app.logger.info(f"Curso encontrado: {course_fullname} (ID: {course_id})")
-    else:
-        app.logger.warning("Nenhum curso encontrado para este utilizador.")
-        course_id = None
-        course_fullname = None
-        
-    return f"<h1>Course ID: {course_id}</h1><p><strong>Course Name:</strong> {course_fullname}</p>" # "Flask está a correr na porta 8080!"
+def index():        
+    return "Flask está a correr na porta 8082!"
 
 @app.route('/chat', methods=['POST'])
 def chat():    
@@ -76,7 +81,7 @@ def chat():
         
         if authorized_resources == []:
             app.logger.warning("No authorized resources found for this course.")
-            return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
+            #return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
     
     # check if user is in tutor mode
     user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
