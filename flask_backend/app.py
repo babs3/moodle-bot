@@ -193,7 +193,7 @@ def list_knowledge(course_id):
     files = KnowledgeFile.query.filter_by(courseid=course_id).all()
     
     return jsonify([
-        {"filename": f.filename, "timecreated": f.timecreated} 
+        {"filename": f.filename} 
         for f in files
     ])
     
