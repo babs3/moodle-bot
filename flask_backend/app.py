@@ -163,12 +163,19 @@ def process_knowledge():
         for file in files:
             file_path = os.path.join(temp_dir, file.filename)
             file.save(file_path)
-            new_file = KnowledgeFile(
-                courseid=course_id,
-                filename=file.filename
-            )
-            db.session.add(new_file)
-            db.session.commit()
+            
+            # ver se já existe um registo deste ficheiro para este curso na base de dados, se não existir, criar um novo registo
+            existing_file = KnowledgeFile.query.filter_by(courseid=course_id, filename=file.filename).first()
+            if existing_file:
+                app.logger.info(f"Ficheiro {file.filename} já existe na base de dados para o curso {course_id}, não criando duplicado.")
+                continue
+            else: 
+                new_file = KnowledgeFile(
+                    courseid=course_id,
+                    filename=file.filename
+                )
+                db.session.add(new_file)
+                db.session.commit()
 
         # 3. Correr a pipeline
         success = process_pdfs(pdf_folder=temp_dir, course_id=course_id, vector_db_path=f"/app/vector_store") #TODO: add COURSE_ID
