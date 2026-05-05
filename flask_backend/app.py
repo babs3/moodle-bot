@@ -384,6 +384,7 @@ def save_moodle_messages(): # TODO: refactor para os novos campos da BD, como o 
 @app.route('/delete_knowledge', methods=['POST'])
 def remove_knowledge():
     data = request.json
+    #print(f"Received request to delete knowledge with data: {data}")
     filename = data.get('filename')
     course_id = data.get('course_id')
     
@@ -393,6 +394,12 @@ def remove_knowledge():
     success = delete_pdf_from_knowledge(filename, course_id)
     
     if success:
+        # remover file da base de dados
+        file_record = KnowledgeFile.query.filter_by(courseid=course_id, filename=filename).first()
+        if file_record:
+            db.session.delete(file_record)
+            db.session.commit()
+        
         return jsonify({"message": f"Ficheiro {filename} removido com sucesso!"})
     return jsonify({"error": "Falha ao remover"}), 500
 

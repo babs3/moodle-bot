@@ -579,21 +579,28 @@ def clean_edited_text(text):
 def delete_pdf_from_knowledge(filename, course_id, vector_db_path="/app/vector_store/"):
     """Remove um PDF específico do ChromaDB e reconstrói o índice BM25."""
     
-    # 1. Ligar ao ChromaDB (Client-Server)
+    # Ligar ao ChromaDB (Client-Server)
     chroma_client = initialize_chroma()
-    collection = chroma_client.get_collection(name="class_materials")
+    collection = chroma_client.get_or_create_collection(name="class_materials")
     
-    # 2. Remover do ChromaDB usando metadados como filtro
-    # O Chroma permite apagar tudo o que coincida com o ficheiro e curso
-    collection.delete(
+    # 1. Primeiro, perguntamos ao Chroma quais são os IDs que batem com os metadados
+    # Nota: Garante que o tipo de dado (str vs int) é o mesmo usado no process_pdfs
+    results = collection.get(
         where={
             "$and": [
                 {"file": filename},
-                {"course_id": str(course_id)}
+                {"course_id": str(course_id)} 
             ]
         }
     )
-    print(f"🗑️  Removido do ChromaDB: {filename}")
+    
+    # 2. Se encontrarmos IDs, apagamos por ID (que é o método mais rápido e infalível)
+    if results['ids']:
+        collection.delete(ids=results['ids'])
+        print(f"🗑️ Removidos {len(results['ids'])} chunks do ficheiro: {filename}")
+    else:
+        print(f"⚠️ Nenhum registo encontrado para {filename} no curso {course_id}")
+        return False
 
     # 3. Atualizar o BM25 (O BM25 não permite 'delete', temos de reconstruir)
     pkl_path = os.path.join(vector_db_path, "bm25_index.pkl")
@@ -629,7 +636,7 @@ def delete_pdf_from_knowledge(filename, course_id, vector_db_path="/app/vector_s
         # Guardar o novo snapshot
         with open(pkl_path, "wb") as f:
             pickle.dump((new_bm25_simple, new_bm25_2gram, new_bm25_3gram, new_metadata, new_documents), f)
-        
+    
     return True
 
 
