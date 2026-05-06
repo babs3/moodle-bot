@@ -71,16 +71,11 @@ def chat():
         return jsonify([{"text": "There is no content available for this course. Please check back later or contact your instructor."}])
     else:
         resources = extract_visible_resources(moodle_contents)
-        app.logger.info(f"Recursos autorizados: {resources}")
-        # lista com os filenames dos recursos autorizados, ex: ["slides1.pdf", "exercicio2.pdf"]
-        filenames = [resource.get("filename") for resource in resources]
-        
-        authorized_resources = []
-        for filename in filenames:
-            if filename in resources:
-                authorized_resources.append(filename)
-        
-        if authorized_resources == []:
+        app.logger.info(f"Extracted resources for course_id {course_id}: {resources}")
+        # Se resources já são os autorizados, basta extrair os nomes:
+        authorized_resources = [res.get("filename") for res in resources if res.get("filename")]
+
+        if not authorized_resources:
             app.logger.warning("No authorized resources found for this course.")
             #return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
     

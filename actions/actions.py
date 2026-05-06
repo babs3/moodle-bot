@@ -104,6 +104,7 @@ def keywords_to_tokens(keywords, query):
 
 def action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, tutor_mode):
     if authorized_resources == []:
+        print(f"\n❌  No authorized resources found for user: {user_email}")
         return  [
             SlotSet("user_query", user_message),  # Store the query
             SlotSet("materials_location", []), #gemini_results),  # Store selected materials
@@ -128,6 +129,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
     bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources)
     
     if bm25_docs == [] and bm25_meta == [] and normalized_bm25_scores == []:
+        print(f"\n⚠️  BM25 search returned no results for user query: '{query}'")
         return  [
             SlotSet("user_query", query),  # Store the query
             SlotSet("materials_location", ""), #gemini_results),  # Store selected materials
@@ -137,6 +139,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             SlotSet("input_time", input_time)
             ]
     if normalized_bm25_scores == []:
+        print(f"\n⚠️  Normalized BM25 scores is empty for user query: '{query}'")
         return  [
             SlotSet("user_query", query),  # Store the query
             SlotSet("materials_location", ""), #gemini_results),  # Store selected materials

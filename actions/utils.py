@@ -65,14 +65,21 @@ VALID_SIMPLE_WORDS = set()
 def load_bm25_index():
     pkl_path = os.path.join("vector_store", "bm25_index.pkl")    
     if os.path.exists(pkl_path):
-        with open(f"vector_store/bm25_index.pkl", "rb") as f:
-            _, _, _, _, bm25_documents = pickle.load(f)
+        with open(pkl_path, "rb") as f:
+            # 1. Carrega os dados uma única vez
+            data = pickle.load(f)
+            
+            # 2. Desempacota para processar (assumindo que o pkl é um tuplo de 5 elementos)
+            _, _, _, _, bm25_documents = data
+            
+            # 3. Atualiza as palavras válidas
             for doc_text in bm25_documents:
                 VALID_SIMPLE_WORDS.update(extract_simple_tokens(doc_text))
-            return pickle.load(f)
+            
+            # 4. Retorna os dados que já tens em memória
+            return data 
     else:
-        bm25_documents = []
-        return None
+        return [], [], [], [], []
     
 def tokenize_and_clean_text(text):
     doc = nlp(text)
@@ -469,6 +476,9 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, alph
     # grant access to the BM25 index updated with new documents (if any)
     try:
         bm25_simple, bm25_2gram, bm25_3gram, bm25_metadata, bm25_documents = load_bm25_index()
+        if bm25_simple == []:
+            print("👻  --> BM25 index is empty. No documents available for search.")
+            return [], [], []
     except FileNotFoundError:
         print("👻  --> User does not have access to any documents in the authorized resources.")
         return [], [], []
