@@ -428,8 +428,12 @@ def initialize_chroma():
     client = chromadb.HttpClient(host='chroma', port=8000)
     return client
             
-def process_pdfs(pdf_folder, course_id, vector_db_path="/app/vector_store/"):
+def process_pdfs(pdf_folder, course_id):
     """Processa PDFs de um curso específico e atualiza a base de conhecimento."""
+    
+    # 1. Definir o caminho da subpasta do curso
+    vector_db_path = "/app/vector_store"
+    
     chroma_client = initialize_chroma()
     # Mantemos uma única coleção, mas filtraremos por course_id no metadata
     collection = chroma_client.get_or_create_collection(name="class_materials")
@@ -489,7 +493,7 @@ def process_pdfs(pdf_folder, course_id, vector_db_path="/app/vector_store/"):
     bm25_2gram = BM25Okapi(ngram_docs_2)
     bm25_3gram = BM25Okapi(ngram_docs_3)
     
-    with open(os.path.join(vector_db_path, "bm25_index.pkl"), "wb") as f:
+    with open(os.path.join(vector_db_path, f"bm25_index_{course_id}.pkl"), "wb") as f:
         pickle.dump((bm25_simple, bm25_2gram, bm25_3gram, metadata, documents), f)
     
     return True
@@ -576,7 +580,8 @@ def clean_edited_text(text):
     # Step 4: Optionally strip trailing spaces
     return text.strip()
 
-def delete_pdf_from_knowledge(filename, course_id, vector_db_path="/app/vector_store/"):
+def delete_pdf_from_knowledge(filename, course_id):
+    vector_db_path = os.path.join("/app/vector_store/", f"course_{course_id}")
     """Remove um PDF específico do ChromaDB e reconstrói o índice BM25."""
     
     # Ligar ao ChromaDB (Client-Server)

@@ -8,8 +8,7 @@ from rasa_sdk import Action
 from rasa_sdk.events import SlotSet
 from .utils import *
 
-VECTOR_DB_PATH = "/app/vector_store"
-print(f"📂  A tentar ligar ao ChromaDB em: {VECTOR_DB_PATH}")
+print(f"📂  A tentar ligar ao ChromaDB em: /app/vector_store")
 # Em vez de PersistentClient, usamos HttpClient
 # Lembra-te: o host é 'chroma' (nome do serviço no docker-compose) 
 try:
@@ -102,7 +101,7 @@ def keywords_to_tokens(keywords, query):
     
     return complex_tokens, simple_tokens, False # Return complex tokens, simple tokens, and split_keywords flag
 
-def action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, tutor_mode):
+def action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id):
     if authorized_resources == []:
         print(f"\n❌  No authorized resources found for user: {user_email}")
         return  [
@@ -126,7 +125,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
     print(f"\n🔍  Starting search process in resources: {authorized_resources[0]}")
     # Hybrid Search Process    
     vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(keywords, query, split_keywords, collection, authorized_resources, intent)        
-    bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources)
+    bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id)
     
     if bm25_docs == [] and bm25_meta == [] and normalized_bm25_scores == []:
         print(f"\n⚠️  BM25 search returned no results for user query: '{query}'")
@@ -273,23 +272,17 @@ class ActionGetDefinition(Action):
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
+        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         print(f"🕓  latest_message INPUT TIME: {input_time}")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
         print(f"📚  Authorized resources from metadata: {authorized_resources}")
-        tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
-        print(f"🎓  Tutor mode from metadata: {tutor_mode}")
+        #tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
+        #print(f"🎓  Tutor mode from metadata: {tutor_mode}")
         
-        intent = "definition of "
+        intent = "definition of "      
         
-        # Convert ISO 8601 timestamp string back to a datetime object
-        timestamp_str = input_time
-        timestamp = None
-        if timestamp_str:
-            timestamp = datetime.fromisoformat(timestamp_str)
-        print(f"   Decripted timestamp: {timestamp}")        
-        
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, tutor_mode)
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
     
 # === ACTION 2: GET EXPLANATION === #
 class ActionGetExplanation(Action):
@@ -305,11 +298,11 @@ class ActionGetExplanation(Action):
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
-        tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
-        
+        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+
         intent = "explanation of "
 
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, tutor_mode)
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
 
 # === ACTION 3: GET EXAMPLES === #
 class ActionGetExamples(Action):
@@ -324,11 +317,11 @@ class ActionGetExamples(Action):
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
+        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
-        tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
-        
+
         intent = "examples of "
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, tutor_mode)
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
 
 # === ACTION 4: SUMMARIZE === #
 class ActionGetSummary(Action):
@@ -344,10 +337,10 @@ class ActionGetSummary(Action):
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
-        tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
-        
+        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+
         intent = "summary of "
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, tutor_mode)  
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
 
 
 # === FINAL ACTION: GET PDF NAMES & PAGE LOCATIONS === #
@@ -361,11 +354,12 @@ class ActionGetClassMaterialLocation(Action):
         input_time = tracker.get_slot("input_time")
         selected_results = tracker.get_slot("materials_location")
         user_id = tracker.get_slot("user_id")
+        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         user_email = tracker.get_slot("user_email")
         user_message = tracker.get_slot("user_query")
         query = treat_raw_query(user_message)
         tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
-        print(f"tutor_mode in ActionGetClassMaterialLocation: {tutor_mode}")
+        #print(f"tutor_mode in ActionGetClassMaterialLocation: {tutor_mode}")
         
         if bot_response == "no_access":
             dispatcher.utter_message(text="You don't have access to any class materials yet. Please check with your instructor to gain access to the course materials and try again.")
@@ -394,7 +388,7 @@ class ActionGetClassMaterialLocation(Action):
             # get relevant keywords from the query
             keywords = extract_query_keywords(no_punct_query)
             complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, query)       
-            location_results, pdfs_insights = get_materials_location(selected_results, complex_tokens, simple_tokens)
+            location_results, pdfs_insights = get_materials_location(selected_results, complex_tokens, simple_tokens, course_id)
 
             if location_results:
                 response = save_user_progress(user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)

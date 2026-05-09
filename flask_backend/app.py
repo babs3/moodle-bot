@@ -6,13 +6,13 @@ import json
 import time
 import shutil
 import threading
-from knowledge_engine import delete_pdf_from_knowledge, process_pdfs
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from google.oauth2 import service_account
 from utils import *
 from models import *
+from knowledge_engine import *
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
@@ -81,15 +81,21 @@ def chat():
     
     # check if user is in tutor mode
     user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
+
+    tutor = TutorModeState.query.filter_by(user_moodle_id=moodle_id, course_id=course_id).first()
+    if not tutor:
+        tutor = TutorModeState(user_moodle_id=moodle_id, course_id=course_id, is_active=False)
+        db.session.add(tutor)
+        db.session.commit()
     
-    if user and user.tutor_mode_active:
+    if user and tutor.is_active:
         app.logger.info(f"User {moodle_id} is in tutor mode.")
         
         current_time = datetime.now(timezone.utc).isoformat() 
         payload = {
             "sender": user_email,
             "message": "tutor menu buttons trigger",
-            "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message}
+            "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id}
         }
         headers = {"Content-Type": "application/json"}
 
@@ -119,7 +125,7 @@ def chat():
         payload = {
             "sender": user_email,
             "message": user_message, #user_input,
-            "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": False}
+            "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": False, "course_id": course_id}
         }
         headers = {"Content-Type": "application/json"}
 
@@ -160,12 +166,12 @@ def process_knowledge():
             file.save(file_path)
             
             # ver se já existe um registo deste ficheiro para este curso na base de dados, se não existir, criar um novo registo
-            existing_file = KnowledgeFile.query.filter_by(courseid=course_id, filename=file.filename).first()
+            existing_file = KnowledgeFiles.query.filter_by(courseid=course_id, filename=file.filename).first()
             if existing_file:
                 app.logger.info(f"Ficheiro {file.filename} já existe na base de dados para o curso {course_id}, não criando duplicado.")
                 continue
             else: 
-                new_file = KnowledgeFile(
+                new_file = KnowledgeFiles(
                     courseid=course_id,
                     filename=file.filename
                 )
@@ -173,7 +179,7 @@ def process_knowledge():
                 db.session.commit()
 
         # 3. Correr a pipeline
-        success = process_pdfs(pdf_folder=temp_dir, course_id=course_id, vector_db_path=f"/app/vector_store") #TODO: add COURSE_ID
+        success = process_pdfs(pdf_folder=temp_dir, course_id=course_id)
 
         # 4. Limpar ficheiros temporários após processar
         shutil.rmtree(temp_dir)
@@ -192,7 +198,7 @@ def process_knowledge():
 @app.route('/list_knowledge/<int:course_id>', methods=['GET'])
 def list_knowledge(course_id):
     # Procura na base de dados do Flask/PostgreSQL
-    files = KnowledgeFile.query.filter_by(courseid=course_id).all()
+    files = KnowledgeFiles.query.filter_by(courseid=course_id).all()
     
     return jsonify([
         {"filename": f.filename} 
@@ -203,12 +209,12 @@ def list_knowledge(course_id):
 def tutor_toggle():
     data = request.json
     user_id = data.get('user_id')
-    active = data.get('active')
+    is_active = data.get('active')
     course_id = data.get('course_id')
 
     # 1. Atualizar o estado do utilizador na BD
     user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
-    app.logger.info(f"Received tutor toggle for user_id: {user_id} with active: {active}")
+    app.logger.info(f"Received tutor toggle for user_id: {user_id} with is_active: {is_active}")
     app.logger.info(f"Current user in DB before toggle: {user}")
     if not user:
         # Se o user não existir na nossa BD, criamos
@@ -217,10 +223,15 @@ def tutor_toggle():
         check_moodle_user_in_db(user_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
         user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
 
-    user.tutor_mode_active = active
+    tutor = TutorModeState.query.filter_by(user_moodle_id=user_id, course_id=course_id).first()
+    if not tutor:
+        tutor = TutorModeState(user_moodle_id=user_id, course_id=course_id, is_active=is_active)
+        db.session.add(tutor)
+    else:
+        tutor.is_active = is_active
     db.session.commit()
 
-    if not active:
+    if not is_active:
         app.logger.info(f"Modo Tutor desligado para user_id: {user_id}")
         return jsonify([{"text": "Modo Tutor desligado."}])
 
@@ -242,7 +253,7 @@ def tutor_toggle():
         
         # Verificar se já analisámos esta tentativa
         analise = MoodleQuizAnalysis.query.filter_by(
-            moodle_user_id=user_id, 
+            user_moodle_id=user_id, 
             quiz_id=quiz_id
         ).first()
 
@@ -258,7 +269,7 @@ def tutor_toggle():
             # Atualizar ou criar o registo de análise
             if not analise:
                 analise = MoodleQuizAnalysis(
-                    moodle_user_id=user_id, 
+                    user_moodle_id=user_id, 
                     quiz_id=quiz_id, 
                     last_attempt_id=attempt_id
                 )
@@ -285,7 +296,7 @@ def tutor_toggle():
             # 2. Guardar o progresso
             # verificar se já existe um registo para este erro específico (mesmo quiz, mesma questão, mesma resposta do aluno)
             progresso_existente = TutorProgress.query.filter_by(
-                moodle_user_id=user_id,
+                user_moodle_id=user_id,
                 tipo=error.get('tipo'),
                 topic_id=error.get('topic_id'),
                 question=error.get('question'),
@@ -298,7 +309,7 @@ def tutor_toggle():
                 continue
             
             progresso = TutorProgress(
-                moodle_user_id=user_id,
+                user_moodle_id=user_id,
                 tipo=error.get('tipo'),
                 topic_id=error.get('topic_id'),
                 question=error.get('question'),
@@ -326,7 +337,7 @@ def tutor_toggle():
 
 @app.route('/api/get_user_progress/<int:user_id>', methods=['GET'])
 def get_user_progress(user_id):
-    progress = TutorProgress.query.filter_by(moodle_user_id=user_id).all()
+    progress = TutorProgress.query.filter_by(user_moodle_id=user_id).all()
     return jsonify([{"state": p.state, "question": p.question, "topic_id": p.topic_id, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
 
 @app.route("/api/get_topics", methods=["GET"])
@@ -367,7 +378,7 @@ def save_moodle_messages(): # TODO: refactor para os novos campos da BD, como o 
     app.logger.info(f"Saving Moodle progress for user_id: {user_id} with data: {data}")
     
     progress = MoodleUserHistory(
-        moodle_user_id=int(user_id),
+        user_moodle_id=int(user_id),
         question=data["question"],
         response=data["response"],
         pdfs=data["pdfs"],
@@ -397,7 +408,7 @@ def remove_knowledge():
     
     if success:
         # remover file da base de dados
-        file_record = KnowledgeFile.query.filter_by(courseid=course_id, filename=filename).first()
+        file_record = KnowledgeFiles.query.filter_by(courseid=course_id, filename=filename).first()
         if file_record:
             db.session.delete(file_record)
             db.session.commit()

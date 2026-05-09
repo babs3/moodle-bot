@@ -62,8 +62,8 @@ embedding_model = SentenceTransformer(model_path)
 # Collect all unique words from BM25 documents to compare for spell correction
 VALID_SIMPLE_WORDS = set()
 
-def load_bm25_index():
-    pkl_path = os.path.join("vector_store", "bm25_index.pkl")    
+def load_bm25_index(course_id):
+    pkl_path = os.path.join("vector_store", f"bm25_index_{course_id}.pkl")
     if os.path.exists(pkl_path):
         with open(pkl_path, "rb") as f:
             # 1. Carrega os dados uma única vez
@@ -469,13 +469,13 @@ def dense_vector_search(keywords, query, split_keywords, collection, authorized_
     return vector_docs, vector_metadata, normalized_vector_scores
 
 
-def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, alpha=0.8):
+def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id, alpha=0.8):
     # === Perform Hybrid BM25 search === #
     print(f"\n🔛 Getting BM25 sparse vectors for both:\n - {complex_tokens}\n - {simple_tokens}")
     
     # grant access to the BM25 index updated with new documents (if any)
     try:
-        bm25_simple, bm25_2gram, bm25_3gram, bm25_metadata, bm25_documents = load_bm25_index()
+        bm25_simple, bm25_2gram, bm25_3gram, bm25_metadata, bm25_documents = load_bm25_index(course_id)
         if bm25_simple == []:
             print("👻  --> BM25 index is empty. No documents available for search.")
             return [], [], []
@@ -722,13 +722,13 @@ def normalize_topic(new_topic, threshold=0.85):
     return new_topic  # Return the new topic if no close match was found
 
 
-def get_materials_location(selected_results, complex_tokens, simple_tokens):
+def get_materials_location(selected_results, complex_tokens, simple_tokens, course_id):
     location_results = []
     document_entries = []  # Store documents before sorting
     pdfs_insights = []
     bm25_results = []
     
-    bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, [], 1.0)  # Get BM25 results with alpha=1.0 for complex keyword search only
+    bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, [], course_id, 1.0)  # Get BM25 results with alpha=1.0 for complex keyword search only
     for doc, meta, score in zip(bm25_docs, bm25_meta, normalized_bm25_scores):
         bm25_results.append((doc, meta, score))
     

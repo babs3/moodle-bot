@@ -58,16 +58,6 @@ source rasa-env/bin/activate
 ```
 
 ## Bot Pipeline
-Generate embeddings and download model
-```
-cd ./rasa-engi-bot
-pip install -r requirements.txt
-python -m spacy download en_core_web_sm
-sudo apt install tesseract-ocr # to use ocr
-python process_pdfs.py
-python load_model.py # just if it's not already loaded
-deactivate
-```
 
 Start Containers
 ```

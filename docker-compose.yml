@@ -88,6 +88,7 @@ services:
 
   chroma:
     image: chromadb/chroma:latest
+    command: ["run", "--path", "/chroma/data", "--port", "8000", "--host", "0.0.0.0"]
     volumes:
       - ./vector_store:/chroma/data
     environment:
