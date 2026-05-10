@@ -75,3 +75,9 @@ class KnowledgeFiles(db.Model):
 
     def __repr__(self):
         return f'<File {self.filename}>'
+    
+class ClientConfig(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    #moodle_url = db.Column(db.String(255), nullable=False)
+    moodle_token = db.Column(db.String(255), nullable=False)
+    course_id = db.Column(db.Integer, unique=True, nullable=False)

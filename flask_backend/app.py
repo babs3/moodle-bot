@@ -56,15 +56,16 @@ def chat():
     course_id = data.get('course_id')
     app.logger.info(f"Received message from user_id: {moodle_id}")
     user_message = data.get('message')
+    moodle_token = data.get('token')
 
     # Busca os dados reais no Moodle
-    info_utilizador = get_moodle_user_data(moodle_id)
+    info_utilizador = get_moodle_user_data(moodle_id, moodle_token)
     user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
     username = info_utilizador.get("nome") if info_utilizador else "NOME_"
     check_moodle_user_in_db(moodle_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
     
     filenames = []
-    moodle_contents, moodle_contents_names = get_moodle_contents(course_id)
+    moodle_contents, moodle_contents_names = get_moodle_contents(course_id, moodle_token)
     if moodle_contents_names == None:
         app.logger.error("Failed to fetch Moodle contents.")
         return jsonify([{"text": "There is no content available for this course or an error occurred while fetching the content. Please try again later."}])
@@ -198,7 +199,7 @@ def process_knowledge():
         return jsonify({"status": "error", "message": str(e)}), 500
     
 
-def background_sync(app, course_id, pdf_folder):
+def background_sync(app, course_id, pdf_folder, moodle_token):
     """Função que corre em paralelo para não travar o Moodle."""
     print(f"--- Iniciando sincronização para o curso {course_id} ---")
     success = False
@@ -208,7 +209,7 @@ def background_sync(app, course_id, pdf_folder):
             # 1. Obter a estrutura do curso via Web Service
             ws_url = f"{MOODLE_URL}/webservice/rest/server.php"
             params = {
-                'wstoken': TOKEN,
+                'wstoken': moodle_token,
                 'wsfunction': 'core_course_get_contents',
                 'moodlewsrestformat': 'json',
                 'courseid': course_id
@@ -235,7 +236,7 @@ def background_sync(app, course_id, pdf_folder):
                                 
                                 # CORREÇÃO DO URL: Verifica se já existe um '?' no URL
                                 separator = '&' if '?' in file_url else '?'
-                                download_url = f"{file_url}{separator}token={TOKEN}"
+                                download_url = f"{file_url}{separator}token={moodle_token}"
                                 
                                 # Download com validação
                                 file_path = os.path.join(pdf_folder, file_name)
@@ -285,16 +286,39 @@ def background_sync(app, course_id, pdf_folder):
             print(f"Erro crítico durante a sincronização: {str(e)}")
         
         finally:
-            # IMPORTANTE: Remover o curso dos ativos quando terminar (com sucesso ou erro)
+            # 1. Libertar o lock do curso
             if course_id in active_syncs:
                 active_syncs.remove(course_id)
             
-            # Limpeza da pasta com verificação extra
+            # 2. Limpeza à prova de erro
             if os.path.exists(pdf_folder):
-                shutil.rmtree(pdf_folder)
+                try:
+                    # ignore_errors=True faz com que o shutil ignore ficheiros 
+                    # que já desapareceram ou que estão bloqueados
+                    shutil.rmtree(pdf_folder, ignore_errors=True)
+                    print(f"Pasta temporária {pdf_folder} limpa com sucesso.")
+                except Exception as e:
+                    print(f"Não foi possível apagar a pasta {pdf_folder}, mas ignoramos: {e}")
                 
 @app.route('/populate_with_moodle_contents/<int:course_id>', methods=['POST'])
 def populate_with_moodle_contents(course_id):
+    auth_header = request.headers.get('Authorization')
+    moodle_token = auth_header.split(" ")[1] if auth_header else None
+    print(f"Token recebido para sincronização do curso {course_id}: {moodle_token}")
+    
+    # IMPORTANTE: Guardar ou atualizar o token deste curso na DB para o polling saber usá-lo depois
+    client = ClientConfig.query.filter_by(course_id=course_id).first()
+    print(f"Cliente encontrado na DB para course_id {course_id}: {client}")
+    if not client:
+        client = ClientConfig(
+            course_id=course_id, 
+            moodle_token=moodle_token
+        )
+        db.session.add(client)
+    else:
+        client.moodle_token = moodle_token # Atualiza se o cliente mudou o token
+    db.session.commit()
+    
     # 1. Verificamos se este curso já está a ser sincronizado neste momento
     if course_id in active_syncs:
         return jsonify({"message": "Sincronização já em curso para este curso."}), 200
@@ -315,7 +339,7 @@ def populate_with_moodle_contents(course_id):
     # Passamos a app_instance para a thread
     thread = threading.Thread(
         target=background_sync, 
-        args=(app, course_id, pdf_folder) # <--- Adicionado app_instance
+        args=(app, course_id, pdf_folder, moodle_token) # <--- Adicionado app_instance
     )
     thread.start()
 
@@ -337,6 +361,7 @@ def tutor_toggle():
     user_id = data.get('user_id')
     is_active = data.get('active')
     course_id = data.get('course_id')
+    moodle_token = data.get('token')
 
     # 1. Atualizar o estado do utilizador na BD
     user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
@@ -344,7 +369,7 @@ def tutor_toggle():
     app.logger.info(f"Current user in DB before toggle: {user}")
     if not user:
         # Se o user não existir na nossa BD, criamos
-        info_utilizador = get_moodle_user_data(user_id)
+        info_utilizador = get_moodle_user_data(user_id, moodle_token)
         user_email = info_utilizador.get("email") if info_utilizador else f"user_{user_id}@example.com"
         check_moodle_user_in_db(user_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
         user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
@@ -363,14 +388,14 @@ def tutor_toggle():
 
     # 2. Lógica de Verificação de Quizzes (O Trigger)
     # Vamos buscar todos os quizzes do curso que o aluno tem acesso e verificar se há tentativas novas para analisar. Se houver, fazemos a análise e preparamos um feedback personalizado.
-    quizzes = get_user_quizzes_by_course(course_id, user_id) 
+    quizzes = get_user_quizzes_by_course(course_id, user_id, moodle_token) 
     #app.logger.info(f"Quizzes encontrados para user_id {user_id}: {[quiz['name'] for quiz in quizzes]}")
     
     novos_erros_encontrados = []
     
     for quiz in quizzes:
         quiz_id = quiz['id']
-        attempt_id = get_last_attempt_id(quiz_id, user_id)
+        attempt_id = get_last_attempt_id(quiz_id, user_id, moodle_token)
         
         if attempt_id == None:
             continue
@@ -385,7 +410,7 @@ def tutor_toggle():
 
         if not analise or analise.last_attempt_id < attempt_id:
             # Temos uma tentativa nova! Analisar...
-            review_data = get_quiz_attempt_review(attempt_id)
+            review_data = get_quiz_attempt_review(attempt_id, moodle_token)
             
             erros = analisar_desempenho_aluno(review_data) # A tua função BS4
             
@@ -545,89 +570,94 @@ def remove_knowledge():
 def new_quiz_polling():
     app.logger.info(f"[{time.strftime('%H:%M:%S')}] A iniciar polling a novos quizzes...")
     function = "core_course_get_courses"
-    # 1. Obter todos os cursos do Moodle
-    try:
-        cursos = call_moodle(function, {})
-    except Exception as e:
-        app.logger.error(f"Erro na chamada à API: {e}")
-        cursos = None
     
-    if not cursos or 'exception' in cursos:
-        app.logger.error("Erro ao obter cursos.")
+    # 1. Buscar todos os tokens ativos na tua DB
+    clientes = ClientConfig.query.all() 
+    if not clientes:
+        app.logger.warning("Nenhum cliente encontrado na base de dados para o polling de quizzes.")
         return
 
-    #app.logger.info(f"Cursos encontrados: {cursos}")
-    course_ids = [c['id'] for c in cursos]
-    
-    # 2. Obter todos os quizzes destes cursos (em blocos para evitar URLs gigantes)
-    # O Moodle espera parâmetros no formato: courseids[0]=id1, courseids[1]=id2...
-    params = {}
-    for i, cid in enumerate(course_ids):
-        params[f'courseids[{i}]'] = cid
+    for cliente in clientes:
+        token = cliente.moodle_token
         
-    function = "mod_quiz_get_quizzes_by_courses"
+        # 2. Fazer o polling para ESTE cliente específico
+        cursos = call_moodle(token, function)
+        if not cursos or 'exception' in cursos:
+            app.logger.error("Erro ao obter cursos.")
+            return
         
-    try:
-        dados_quizzes = call_moodle(function, params)
-    except Exception as e:
-        app.logger.error(f"Erro na chamada à API: {e}")
-        dados_quizzes = None
-    
-    if dados_quizzes and 'quizzes' in dados_quizzes:
-        #app.logger.info(f"Quizzes encontrados: {dados_quizzes['quizzes']}")
-
-        for quiz in dados_quizzes['quizzes']:
-            q_id = quiz['id']
-            q_nome = quiz['name']
-            q_last_edit = quiz['timemodified'] # O timestamp do Moodle
-            # Converter o inteiro do Moodle para um objeto datetime para podermos comparar
-            q_last_edit_dt = datetime.fromtimestamp(q_last_edit)
+        #app.logger.info(f"Cursos encontrados: {cursos}")
+        course_ids = [c['id'] for c in cursos]
+        
+        # 2. Obter todos os quizzes destes cursos (em blocos para evitar URLs gigantes)
+        # O Moodle espera parâmetros no formato: courseids[0]=id1, courseids[1]=id2...
+        params = {}
+        for i, cid in enumerate(course_ids):
+            params[f'courseids[{i}]'] = cid
             
-            lista_perguntas = obter_perguntas_do_quiz(q_id)
-            app.logger.info(f"Perguntas extraídas do moodle: {lista_perguntas}")             
-            # Gerar um hash das perguntas para comparação futura
-            questions_hash = gerar_hash_perguntas(lista_perguntas)
-    
-            quiz_local = obter_quiz_local(q_id)
+        function = "mod_quiz_get_quizzes_by_courses"
             
-            # 3. Comparar com o que já temos no banco de dados
-            if not quiz_ja_processado(q_id):
-                app.logger.info(f"A processar perguntas do novo quiz: {q_nome}")
-                marcar_quiz_como_processado(q_id, q_nome, questions_hash)            
-                   
-                lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
-                app.logger.info(f"Perguntas processadas pelo Rasa: {lista_final_perguntas}")
+        try:
+            dados_quizzes = call_moodle(function, params)
+        except Exception as e:
+            app.logger.error(f"Erro na chamada à API: {e}")
+            dados_quizzes = None
+    
+        if dados_quizzes and 'quizzes' in dados_quizzes:
+            #app.logger.info(f"Quizzes encontrados: {dados_quizzes['quizzes']}")
 
-                popular_db(q_id, lista_final_perguntas)
+            for quiz in dados_quizzes['quizzes']:
+                q_id = quiz['id']
+                q_nome = quiz['name']
+                q_last_edit = quiz['timemodified'] # O timestamp do Moodle
+                # Converter o inteiro do Moodle para um objeto datetime para podermos comparar
+                q_last_edit_dt = datetime.fromtimestamp(q_last_edit)
                 
-            # CASO 2: Quiz existe, mas foi editado pelo professor
-            elif q_last_edit_dt > quiz_local.last_updated:
-                app.logger.info(f"🔄  Alteração detetada no quiz: {q_nome} (Moodle: {q_last_edit_dt} > Local: {quiz_local.last_updated})")
+                lista_perguntas = obter_perguntas_do_quiz(q_id, moodle_token)
+                app.logger.info(f"Perguntas extraídas do moodle: {lista_perguntas}")             
+                # Gerar um hash das perguntas para comparação futura
+                questions_hash = gerar_hash_perguntas(lista_perguntas)
+        
+                quiz_local = obter_quiz_local(q_id)
                 
-                clean_quiz_data(q_id)
-                marcar_quiz_como_processado(q_id, q_nome, questions_hash)
+                # 3. Comparar com o que já temos no banco de dados
+                if not quiz_ja_processado(q_id):
+                    app.logger.info(f"A processar perguntas do novo quiz: {q_nome}")
+                    marcar_quiz_como_processado(q_id, q_nome, questions_hash)            
+                    
+                    lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
+                    app.logger.info(f"Perguntas processadas pelo Rasa: {lista_final_perguntas}")
 
-                lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
-                app.logger.info(f"Perguntas processadas pelo Rasa (after reprocessing): {lista_final_perguntas}")
+                    popular_db(q_id, lista_final_perguntas)
+                    
+                # CASO 2: Quiz existe, mas foi editado pelo professor
+                elif q_last_edit_dt > quiz_local.last_updated:
+                    app.logger.info(f"🔄  Alteração detetada no quiz: {q_nome} (Moodle: {q_last_edit_dt} > Local: {quiz_local.last_updated})")
+                    
+                    clean_quiz_data(q_id)
+                    marcar_quiz_como_processado(q_id, q_nome, questions_hash)
 
-                popular_db(q_id, lista_final_perguntas)
-                
-            # CASO 3: Quiz existe, mas perguntas foram editadas pelo professor
-            elif questions_hash != quiz_local.questions_hash:
-                app.logger.info(f"🔄  Alteração detetada nas perguntas do quiz: {q_nome}")
-                app.logger.info(f"Hash antigo: {quiz_local.questions_hash} | Hash novo: {questions_hash}")
-                clean_quiz_data(q_id)
-                marcar_quiz_como_processado(q_id, q_nome, questions_hash)
+                    lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
+                    app.logger.info(f"Perguntas processadas pelo Rasa (after reprocessing): {lista_final_perguntas}")
 
-                lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
-                app.logger.info(f"_Perguntas processadas pelo Rasa (after reprocessing): {lista_final_perguntas}")
-                
-                popular_db(q_id, lista_final_perguntas)
+                    popular_db(q_id, lista_final_perguntas)
+                    
+                # CASO 3: Quiz existe, mas perguntas foram editadas pelo professor
+                elif questions_hash != quiz_local.questions_hash:
+                    app.logger.info(f"🔄  Alteração detetada nas perguntas do quiz: {q_nome}")
+                    app.logger.info(f"Hash antigo: {quiz_local.questions_hash} | Hash novo: {questions_hash}")
+                    clean_quiz_data(q_id)
+                    marcar_quiz_como_processado(q_id, q_nome, questions_hash)
 
-            # CASO 4: Estão iguais
-            else:
-                app.logger.info(f"✅  Quiz '{q_nome}' já está atualizado.")
-                pass
+                    lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
+                    app.logger.info(f"_Perguntas processadas pelo Rasa (after reprocessing): {lista_final_perguntas}")
+                    
+                    popular_db(q_id, lista_final_perguntas)
+
+                # CASO 4: Estão iguais
+                else:
+                    app.logger.info(f"✅  Quiz '{q_nome}' já está atualizado.")
+                    pass
 
 def tarefa_monitor():
     # Esta função será chamada automaticamente pelo scheduler

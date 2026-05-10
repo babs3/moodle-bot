@@ -14,7 +14,6 @@ from models import *
 
 RASA_URL = "http://rasa:5005/webhooks/rest/webhook"
 MOODLE_URL = "http://host.docker.internal" # Este endereço diz ao Docker: "Sai do contentor e vai buscar o localhost da máquina real".
-TOKEN = os.getenv("MOODLE_TOKEN")
 
 def gerar_hash_perguntas(lista_perguntas):
     # 1. Garantir que a lista está sempre na mesma ordem (pelo slot/id)
@@ -135,7 +134,7 @@ def analisar_desempenho_aluno(quiz_data):
     return erros
 
 
-def get_moodle_user_data(user_id):
+def get_moodle_user_data(user_id, moodle_token):
     # 1. Usa o IP direto e verifica se precisas de porta (ex: :80)
     function = "core_user_get_users"
     
@@ -149,7 +148,7 @@ def get_moodle_user_data(user_id):
 
     try:
         # 2. Adiciona um timeout para o código não ficar "pendurado" para sempre
-        response_data = call_moodle(function, params, timeout=5)
+        response_data = call_moodle(moodle_token, function, params, timeout=5)
         #print(f"Resposta bruta do Moodle: {response_data}")
 
         if 'users' in response_data and len(response_data['users']) > 0:
@@ -168,7 +167,7 @@ def get_moodle_user_data(user_id):
         print(f"ERRO: ERRO CRÍTICO ao ligar ao Moodle: {str(e)}")
         return None
     
-def get_moodle_contents(course_id):
+def get_moodle_contents(course_id, moodle_token):
     function = "core_course_get_contents"
     print(f"--- INÍCIO DA BUSCA DE CONTEÚDOS MOODLE --- | Course ID: {course_id}")
     params = {
@@ -177,7 +176,7 @@ def get_moodle_contents(course_id):
     
     filenames = []  # Lista para armazenar os nomes dos ficheiros encontrados
     try:
-        contents = call_moodle(function, params, timeout=5)
+        contents = call_moodle(moodle_token, function, params, timeout=5)
         #print(f"Resposta bruta do Moodle para conteúdos: {contents}")
         # print dos nomes dos ficheiros encontrados
         if isinstance(contents, list):
@@ -223,7 +222,7 @@ def extract_visible_resources(moodle_json):
                 
     return allowed_materials
 
-def get_quiz_attempt_review(attempt_id):
+def get_quiz_attempt_review(attempt_id, moodle_token):
     """
     Obtém os detalhes de uma tentativa de quiz, incluindo perguntas e respostas.
     """
@@ -237,7 +236,7 @@ def get_quiz_attempt_review(attempt_id):
     
     try:
         # timeout mais longo porque esta chamada pode demorar, especialmente para quizzes grandes
-        review_data = call_moodle(function, params, timeout=10)
+        review_data = call_moodle(moodle_token, function, params, timeout=10)
         
         # Verificação de erro na resposta da API
         if isinstance(review_data, dict) and "exception" in review_data:
@@ -251,41 +250,7 @@ def get_quiz_attempt_review(attempt_id):
         print(f"ERRO: Erro na requisição ao Moodle: {e}")
         return None
     
-def get_quiz_id_by_name(course_id, quiz_name):
-    """
-    Procura o ID de um questionário dentro de um curso através do nome.
-    """
-    function = "mod_quiz_get_quizzes_by_courses"
-    print(f"--- PROCURANDO ID DO QUIZ: '{quiz_name}' no curso {course_id} ---")
-    
-    params = {
-        'courseids[0]': course_id  # A API espera um array de IDs
-    }
-
-    try:
-        data = call_moodle(function, params, timeout=10)
-
-        if isinstance(data, dict) and "exception" in data:
-            print(f"ERRO: Erro na API: {data['message']}")
-            return None
-
-        # A resposta contém uma chave 'quizzes' que é uma lista
-        quizzes = data.get('quizzes', [])
-        
-        for quiz in quizzes:
-            # Compara o nome (podes usar .strip().lower() para ser mais flexível)
-            if quiz['name'].strip().lower() == quiz_name.strip().lower():
-                print(f"Quiz encontrado! ID: {quiz['id']}")
-                return quiz['id']
-
-        print(f"WARNING: Nenhum questionário com o nome '{quiz_name}' foi encontrado.")
-        return None
-
-    except Exception as e:
-        print(f"ERRO: Erro ao procurar quiz por nome: {e}")
-        return None
-    
-def get_user_quizzes_by_course(course_id, user_id):
+def get_user_quizzes_by_course(course_id, user_id, moodle_token):
     """
     Obtém a lista de quizzes de um curso e verifica quais o aluno já tentou.
     """
@@ -293,7 +258,7 @@ def get_user_quizzes_by_course(course_id, user_id):
     print(f"--- BUSCANDO QUIZZES DO CURSO PARA O USUÁRIO --- | Course ID: {course_id} | User ID: {user_id}")
     
     try:
-        data = call_moodle(function, {'courseids[0]': course_id}, timeout=10)
+        data = call_moodle(moodle_token, function, {'courseids[0]': course_id}, timeout=10)
 
         if isinstance(data, dict) and "exception" in data:
             print(f"ERRO: Erro na API Moodle: {data['message']}")
@@ -308,7 +273,7 @@ def get_user_quizzes_by_course(course_id, user_id):
         print(f"ERRO: Erro ao obter quizzes do curso: {e}")
         return None
     
-def get_last_attempt_id(quiz_id, user_id):
+def get_last_attempt_id(quiz_id, user_id, moodle_token):
     """
     Obtém o ID da última tentativa de um aluno num questionário específico.
     """
@@ -322,7 +287,7 @@ def get_last_attempt_id(quiz_id, user_id):
     }
     
     try:
-        data = call_moodle(function, params, timeout=10)
+        data = call_moodle(moodle_token, function, params, timeout=10)
         
         if isinstance(data, dict) and "exception" in data:
             print(f"ERRO: Erro na API Moodle: {data['message']}")
@@ -347,31 +312,6 @@ def get_last_attempt_id(quiz_id, user_id):
         print(f"ERRO: Erro ao obter tentativas: {e}")
         return None
     
-def get_moodle_courses_by_field(field, value):
-    function = "core_course_get_courses_by_field"
-    print(f"--- INÍCIO DA BUSCA DE CURSOS MOODLE --- | Field: {field}, Value: {value}")
-    params = {
-        'field': field,
-        'value': value
-    }
-    
-    try:
-        courses = call_moodle(function, params, timeout=5)
-        #print(f"Resposta bruta do Moodle para cursos: {courses}")
-        
-        # Se o Moodle retornar um erro no JSON (ex: token inválido)
-        if isinstance(courses, dict) and "exception" in courses:
-            print(f"ERRO: Erro na API Moodle: {courses['message']}")
-            return None
-
-        print(f"Cursos obtidos com sucesso para {field}={value}")
-        return courses
-
-    except requests.exceptions.RequestException as e:
-        print(f"ERRO: Erro na requisição ao Moodle: {e}")
-        return None
- 
-
 def quiz_ja_processado(quiz_id):
     # Verificar se já analisámos esta tentativa
     analise = MoodleQuizPolling.query.filter_by(
@@ -395,10 +335,10 @@ def marcar_quiz_como_processado(quiz_id, quiz_name, questions_hash):
     db.session.commit()
     print(f"Quiz ID {quiz_id} adicionado ao banco de dados.")
     
-def call_moodle(function, params={}, timeout=5):
+def call_moodle(moodle_token, function, params={}, timeout=5):
     """Função genérica para chamar o Web Service do Moodle"""
     params.update({
-        'wstoken': TOKEN,
+        'wstoken': moodle_token,
         'wsfunction': function,
         'moodlewsrestformat': 'json'
     })
@@ -412,10 +352,10 @@ def call_moodle(function, params={}, timeout=5):
         print(f"ERRO: Erro na chamada à API: {e}")
         return None
     
-def obter_perguntas_do_quiz(quiz_id):
+def obter_perguntas_do_quiz(quiz_id, moodle_token):
     # 1. Iniciar uma tentativa para ler o conteúdo
     # Nota: Se o quiz tiver password, precisarias de a passar aqui
-    tentativa = call_moodle('mod_quiz_start_attempt', {'quizid': quiz_id})
+    tentativa = call_moodle(moodle_token, 'mod_quiz_start_attempt', {'quizid': quiz_id})
     
     if 'attempt' not in tentativa:
         print(f"ERRO: Erro ao iniciar tentativa no quiz {quiz_id}: {tentativa}")
@@ -428,7 +368,7 @@ def obter_perguntas_do_quiz(quiz_id):
     perguntas_extraidas = []
     pagina = 0
     while True:
-        dados = call_moodle('mod_quiz_get_attempt_data', {'attemptid': attempt_id, 'page': pagina})
+        dados = call_moodle(moodle_token, 'mod_quiz_get_attempt_data', {'attemptid': attempt_id, 'page': pagina})
         if 'questions' not in dados or not dados['questions']:
             break
             
@@ -447,7 +387,7 @@ def obter_perguntas_do_quiz(quiz_id):
 
     # --- 5. FECHAR A TENTATIVA (Obrigatório para a próxima execução funcionar) ---
     print(f"Finalizando tentativa {attempt_id}...")
-    call_moodle('mod_quiz_process_attempt', {
+    call_moodle(moodle_token, 'mod_quiz_process_attempt', {
         'attemptid': attempt_id,
         'finishattempt': 1
     })
