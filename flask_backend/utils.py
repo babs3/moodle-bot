@@ -39,6 +39,14 @@ def gerar_hash_perguntas(lista_perguntas):
     
     return hashlib.md5(string_final.encode('utf-8')).hexdigest()
 
+# Função de exemplo que terás de adaptar à tua realidade
+def verificar_total_pdfs_do_curso(course_id):
+    print(f"Verificando total de PDFs processados para o curso {course_id}...")
+    files = KnowledgeFiles.query.filter_by(course_id=course_id).all()
+    total_pdfs = len(files)
+    print(f"Total de PDFs processados para o curso {course_id}: {total_pdfs}")
+    return total_pdfs
+
 def clean_quiz_data(quiz_id):
     # Eliminar perguntas antigas do quiz
     quiz_antigo = MoodleQuizPolling.query.filter_by(quiz_id=quiz_id).first()

@@ -27,6 +27,8 @@ db.init_app(app)
 migrate = Migrate(app, db)  # For database migrations
 jwt = JWTManager(app)
 
+# No topo do ficheiro, cria um set para guardar os cursos em processamento
+active_syncs = set()
 
 def wait_for_rasa():
     app.logger.info("A aguardar que o Rasa fique disponível...")
@@ -166,13 +168,13 @@ def process_knowledge():
             file.save(file_path)
             
             # ver se já existe um registo deste ficheiro para este curso na base de dados, se não existir, criar um novo registo
-            existing_file = KnowledgeFiles.query.filter_by(courseid=course_id, filename=file.filename).first()
+            existing_file = KnowledgeFiles.query.filter_by(course_id=course_id, filename=file.filename).first()
             if existing_file:
                 app.logger.info(f"Ficheiro {file.filename} já existe na base de dados para o curso {course_id}, não criando duplicado.")
                 continue
             else: 
                 new_file = KnowledgeFiles(
-                    courseid=course_id,
+                    course_id=course_id,
                     filename=file.filename
                 )
                 db.session.add(new_file)
@@ -195,10 +197,134 @@ def process_knowledge():
         app.logger.error(f"Erro na pipeline: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
     
+
+def background_sync(app, course_id, pdf_folder):
+    """Função que corre em paralelo para não travar o Moodle."""
+    print(f"--- Iniciando sincronização para o curso {course_id} ---")
+    success = False
+    
+    with app.app_context():
+        try:
+            # 1. Obter a estrutura do curso via Web Service
+            ws_url = f"{MOODLE_URL}/webservice/rest/server.php"
+            params = {
+                'wstoken': TOKEN,
+                'wsfunction': 'core_course_get_contents',
+                'moodlewsrestformat': 'json',
+                'courseid': course_id
+            }
+            
+            response = requests.get(ws_url, params=params)
+            sections = response.json()
+
+            if not isinstance(sections, list):
+                print(f"Erro ao obter conteúdos do curso {course_id}: {sections}")
+                return
+
+            # Criar pasta temporária
+            os.makedirs(pdf_folder, exist_ok=True)
+
+            found_files = 0
+            for section in sections:
+                for module in section.get('modules', []):
+                    if module.get('modname') == 'resource':
+                        for content in module.get('contents', []):
+                            if content.get('mimetype') == 'application/pdf':
+                                file_url = content.get('fileurl')
+                                file_name = content.get('filename')
+                                
+                                # CORREÇÃO DO URL: Verifica se já existe um '?' no URL
+                                separator = '&' if '?' in file_url else '?'
+                                download_url = f"{file_url}{separator}token={TOKEN}"
+                                
+                                # Download com validação
+                                file_path = os.path.join(pdf_folder, file_name)
+                                r = requests.get(download_url, stream=True)
+                                
+                                if r.status_code == 200:
+                                    # VERIFICAÇÃO CRÍTICA: O Moodle devolveu um PDF ou um erro em HTML/JSON?
+                                    content_type = r.headers.get('Content-Type', '')
+                                    if 'application/pdf' in content_type:
+                                        with open(file_path, 'wb') as f:
+                                            for chunk in r.iter_content(chunk_size=8192):
+                                                f.write(chunk)
+                                        found_files += 1
+                                        # check if file already exists in the database for this course, if not, create a new record
+                                        file_record = KnowledgeFiles.query.filter_by(course_id=course_id, filename=file_name).first()
+                                        if file_record:
+                                            print(f"Ficheiro {file_name} já existe na base de dados para o curso {course_id}, não criando duplicado.")
+                                            continue
+                                        else:
+                                            new_file = KnowledgeFiles(
+                                                course_id=course_id,
+                                                filename=file_name
+                                            )
+                                            db.session.add(new_file)
+                                            db.session.commit()
+                                            print(f"Ficheiro guardado: {file_name}")
+                                    else:
+                                        print(f"Aviso: O ficheiro {file_name} não é um PDF válido. Recebido: {content_type}")
+                                        print(f"Resposta do Moodle: {r.text[:200]}") # Log para debug
+                                else:
+                                    print(f"Erro HTTP {r.status_code} no ficheiro {file_name}")
+
+            print(f"Download concluído. PDFs válidos: {found_files}")
+
+            # 2. Chamar a tua função de processamento se houver ficheiros
+            if found_files > 0:
+                print(f"A processar {found_files} PDFs na Knowledge Base...")
+                success = process_pdfs(pdf_folder=pdf_folder, course_id=course_id)
+                if success:
+                    print(f"Sucesso: Knowledge Base do curso {course_id} populada.")
+                else:
+                    print(f"Erro: A função process_pdfs falhou para o curso {course_id}.")
+            else:
+                print("Nenhum PDF novo encontrado para processar.")
+
+        except Exception as e:
+            print(f"Erro crítico durante a sincronização: {str(e)}")
+        
+        finally:
+            # IMPORTANTE: Remover o curso dos ativos quando terminar (com sucesso ou erro)
+            if course_id in active_syncs:
+                active_syncs.remove(course_id)
+            
+            # Limpeza da pasta com verificação extra
+            if os.path.exists(pdf_folder):
+                shutil.rmtree(pdf_folder)
+                
+@app.route('/populate_with_moodle_contents/<int:course_id>', methods=['POST'])
+def populate_with_moodle_contents(course_id):
+    # 1. Verificamos se este curso já está a ser sincronizado neste momento
+    if course_id in active_syncs:
+        return jsonify({"message": "Sincronização já em curso para este curso."}), 200
+    
+    # 2. Verificamos se já existem conteúdos na DB para este curso
+    # Substitui 'Knowledge' pelo nome da tua classe/tabela real
+    conteudo_existente = KnowledgeFiles.query.filter_by(course_id=course_id).first()
+    
+    if conteudo_existente:
+        print(f"Sincronização abortada: O curso {course_id} já tem dados.")
+        return jsonify({
+            "message": "O curso já tem conteúdos na Knowledge Base. Nada a fazer.",
+            "status": "already_populated"
+        }), 200
+
+    pdf_folder = os.path.join('temp_uploads', str(course_id))
+    
+    # Passamos a app_instance para a thread
+    thread = threading.Thread(
+        target=background_sync, 
+        args=(app, course_id, pdf_folder) # <--- Adicionado app_instance
+    )
+    thread.start()
+
+    return jsonify({"message": "Sincronização iniciada."}), 202
+
 @app.route('/list_knowledge/<int:course_id>', methods=['GET'])
 def list_knowledge(course_id):
     # Procura na base de dados do Flask/PostgreSQL
-    files = KnowledgeFiles.query.filter_by(courseid=course_id).all()
+    files = KnowledgeFiles.query.filter_by(course_id=course_id).all()
     
     return jsonify([
         {"filename": f.filename} 
@@ -408,7 +534,7 @@ def remove_knowledge():
     
     if success:
         # remover file da base de dados
-        file_record = KnowledgeFiles.query.filter_by(courseid=course_id, filename=filename).first()
+        file_record = KnowledgeFiles.query.filter_by(course_id=course_id, filename=filename).first()
         if file_record:
             db.session.delete(file_record)
             db.session.commit()
@@ -475,8 +601,8 @@ def new_quiz_polling():
                 popular_db(q_id, lista_final_perguntas)
                 
             # CASO 2: Quiz existe, mas foi editado pelo professor
-            elif q_last_edit_dt > quiz_local.timestamp:
-                app.logger.info(f"🔄  Alteração detetada no quiz: {q_nome} (Moodle: {q_last_edit_dt} > Local: {quiz_local.timestamp})")
+            elif q_last_edit_dt > quiz_local.last_updated:
+                app.logger.info(f"🔄  Alteração detetada no quiz: {q_nome} (Moodle: {q_last_edit_dt} > Local: {quiz_local.last_updated})")
                 
                 clean_quiz_data(q_id)
                 marcar_quiz_como_processado(q_id, q_nome, questions_hash)

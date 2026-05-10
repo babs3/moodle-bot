@@ -69,7 +69,7 @@ class Topics(db.Model):
     
 class KnowledgeFiles(db.Model):        
     id = db.Column(db.Integer, primary_key=True)
-    courseid = db.Column(db.Integer, nullable=False)
+    course_id = db.Column(db.Integer, nullable=False)
     filename = db.Column(db.String(255), nullable=False)
     last_updated = db.Column(db.DateTime, default=datetime.now)
 
