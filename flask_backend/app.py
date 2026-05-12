@@ -57,15 +57,19 @@ def chat():
     app.logger.info(f"Received message from user_id: {moodle_id}")
     user_message = data.get('message')
     moodle_token = data.get('token')
+    moodle_url = data.get('moodle_url')
+    if moodle_url == "http://localhost":
+        moodle_url = "http://host.docker.internal"
+    print(f"Received message for course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
 
     # Busca os dados reais no Moodle
-    info_utilizador = get_moodle_user_data(moodle_id, moodle_token)
+    info_utilizador = get_moodle_user_data(moodle_id, moodle_token, moodle_url)
     user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
     username = info_utilizador.get("nome") if info_utilizador else "NOME_"
     check_moodle_user_in_db(moodle_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
     
     filenames = []
-    moodle_contents, moodle_contents_names = get_moodle_contents(course_id, moodle_token)
+    moodle_contents, moodle_contents_names = get_moodle_contents(course_id, moodle_url, moodle_token)
     if moodle_contents_names == None:
         app.logger.error("Failed to fetch Moodle contents.")
         return jsonify([{"text": "There is no content available for this course or an error occurred while fetching the content. Please try again later."}])
@@ -199,7 +203,7 @@ def process_knowledge():
         return jsonify({"status": "error", "message": str(e)}), 500
     
 
-def background_sync(app, course_id, pdf_folder, moodle_token):
+def background_sync(app, course_id, pdf_folder, moodle_token, moodle_url):
     """Função que corre em paralelo para não travar o Moodle."""
     print(f"--- Iniciando sincronização para o curso {course_id} ---")
     success = False
@@ -207,7 +211,7 @@ def background_sync(app, course_id, pdf_folder, moodle_token):
     with app.app_context():
         try:
             # 1. Obter a estrutura do curso via Web Service
-            ws_url = f"{MOODLE_URL}/webservice/rest/server.php"
+            ws_url = f"{moodle_url}/webservice/rest/server.php"
             params = {
                 'wstoken': moodle_token,
                 'wsfunction': 'core_course_get_contents',
@@ -304,7 +308,15 @@ def background_sync(app, course_id, pdf_folder, moodle_token):
 def populate_with_moodle_contents(course_id):
     auth_header = request.headers.get('Authorization')
     moodle_token = auth_header.split(" ")[1] if auth_header else None
-    print(f"Token recebido para sincronização do curso {course_id}: {moodle_token}")
+    
+    # 2. Pegamos o URL do corpo do JSON
+    data = request.get_json()
+    # Se por algum motivo o JSON falhar, usamos o teu localhost como fallback (útil para dev)
+    moodle_url = data.get('moodle_url')
+    if moodle_url == "http://localhost":
+        moodle_url = "http://host.docker.internal"
+
+    print(f"Sync solicitado: Curso {course_id} | URL: {moodle_url} | Token: {moodle_token[:10]}...")
     
     # IMPORTANTE: Guardar ou atualizar o token deste curso na DB para o polling saber usá-lo depois
     client = ClientConfig.query.filter_by(course_id=course_id).first()
@@ -312,11 +324,13 @@ def populate_with_moodle_contents(course_id):
     if not client:
         client = ClientConfig(
             course_id=course_id, 
-            moodle_token=moodle_token
+            moodle_token=moodle_token,
+            moodle_url=moodle_url
         )
         db.session.add(client)
     else:
         client.moodle_token = moodle_token # Atualiza se o cliente mudou o token
+        client.moodle_url = moodle_url # Atualiza se o cliente mudou a URL
     db.session.commit()
     
     # 1. Verificamos se este curso já está a ser sincronizado neste momento
@@ -339,7 +353,7 @@ def populate_with_moodle_contents(course_id):
     # Passamos a app_instance para a thread
     thread = threading.Thread(
         target=background_sync, 
-        args=(app, course_id, pdf_folder, moodle_token) # <--- Adicionado app_instance
+        args=(app, course_id, pdf_folder, moodle_token, moodle_url) # <--- Adicionado app_instance
     )
     thread.start()
 
@@ -362,6 +376,9 @@ def tutor_toggle():
     is_active = data.get('active')
     course_id = data.get('course_id')
     moodle_token = data.get('token')
+    moodle_url = data.get('moodle_url')
+    if moodle_url == "http://localhost":
+        moodle_url = "http://host.docker.internal"
 
     # 1. Atualizar o estado do utilizador na BD
     user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
@@ -369,7 +386,7 @@ def tutor_toggle():
     app.logger.info(f"Current user in DB before toggle: {user}")
     if not user:
         # Se o user não existir na nossa BD, criamos
-        info_utilizador = get_moodle_user_data(user_id, moodle_token)
+        info_utilizador = get_moodle_user_data(user_id, moodle_token, moodle_url)
         user_email = info_utilizador.get("email") if info_utilizador else f"user_{user_id}@example.com"
         check_moodle_user_in_db(user_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
         user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
@@ -388,14 +405,14 @@ def tutor_toggle():
 
     # 2. Lógica de Verificação de Quizzes (O Trigger)
     # Vamos buscar todos os quizzes do curso que o aluno tem acesso e verificar se há tentativas novas para analisar. Se houver, fazemos a análise e preparamos um feedback personalizado.
-    quizzes = get_user_quizzes_by_course(course_id, user_id, moodle_token) 
+    quizzes = get_user_quizzes_by_course(course_id, user_id, moodle_url, moodle_token) 
     #app.logger.info(f"Quizzes encontrados para user_id {user_id}: {[quiz['name'] for quiz in quizzes]}")
     
     novos_erros_encontrados = []
     
     for quiz in quizzes:
         quiz_id = quiz['id']
-        attempt_id = get_last_attempt_id(quiz_id, user_id, moodle_token)
+        attempt_id = get_last_attempt_id(quiz_id, user_id, moodle_url, moodle_token)
         
         if attempt_id == None:
             continue
@@ -410,7 +427,7 @@ def tutor_toggle():
 
         if not analise or analise.last_attempt_id < attempt_id:
             # Temos uma tentativa nova! Analisar...
-            review_data = get_quiz_attempt_review(attempt_id, moodle_token)
+            review_data = get_quiz_attempt_review(attempt_id, moodle_url, moodle_token)
             
             erros = analisar_desempenho_aluno(review_data) # A tua função BS4
             
@@ -575,16 +592,19 @@ def new_quiz_polling():
     clientes = ClientConfig.query.all() 
     if not clientes:
         app.logger.warning("Nenhum cliente encontrado na base de dados para o polling de quizzes.")
-        return
+        return None
 
     for cliente in clientes:
         token = cliente.moodle_token
+        moodle_url = cliente.moodle_url
+        print(f"Polling para course_id {cliente.course_id} usando token {token[:10]}...") # Log para debug, mostra só os primeiros caracteres do token por segurança
+        print(f"URL do Moodle para polling: {moodle_url}")
         
         # 2. Fazer o polling para ESTE cliente específico
-        cursos = call_moodle(token, function)
+        cursos = call_moodle(moodle_url, token, function)
         if not cursos or 'exception' in cursos:
             app.logger.error("Erro ao obter cursos.")
-            return
+            return None
         
         #app.logger.info(f"Cursos encontrados: {cursos}")
         course_ids = [c['id'] for c in cursos]
@@ -598,7 +618,7 @@ def new_quiz_polling():
         function = "mod_quiz_get_quizzes_by_courses"
             
         try:
-            dados_quizzes = call_moodle(function, params)
+            dados_quizzes = call_moodle(moodle_url, token, function, params)
         except Exception as e:
             app.logger.error(f"Erro na chamada à API: {e}")
             dados_quizzes = None
@@ -613,7 +633,7 @@ def new_quiz_polling():
                 # Converter o inteiro do Moodle para um objeto datetime para podermos comparar
                 q_last_edit_dt = datetime.fromtimestamp(q_last_edit)
                 
-                lista_perguntas = obter_perguntas_do_quiz(q_id, moodle_token)
+                lista_perguntas = obter_perguntas_do_quiz(q_id, moodle_url, token)
                 app.logger.info(f"Perguntas extraídas do moodle: {lista_perguntas}")             
                 # Gerar um hash das perguntas para comparação futura
                 questions_hash = gerar_hash_perguntas(lista_perguntas)
@@ -657,14 +677,21 @@ def new_quiz_polling():
                 # CASO 4: Estão iguais
                 else:
                     app.logger.info(f"✅  Quiz '{q_nome}' já está atualizado.")
-                    pass
+                    
+            return True
 
 def tarefa_monitor():
     # Esta função será chamada automaticamente pelo scheduler
     # Criamos o contexto manualmente para que a DB funcione
     with app.app_context():
         try:
-            new_quiz_polling()
+            while True:
+                app.logger.info("A aguardar alguns segundos antes do polling para dar tempo ao trigger do Moodle...")
+                time.sleep(20)
+                response = new_quiz_polling()
+                if response != None:
+                    app.logger.info("Polling de quizzes concluído com sucesso.")
+                    break
         except Exception as e:
             app.logger.error(f"Erro no monitor: {e}")
 
