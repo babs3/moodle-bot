@@ -206,3 +206,12 @@ nlu:
 - intent: create_topic
   examples: |
     - create topic trigger
+
+- intent: view_metrics
+  examples: |
+    - What are today's metrics?
+    - How many students accessed the course this week?
+    - Show me the access report.
+    - What are the most frequently asked questions?
+    - I want to see the class statistics.
+    - How is student attendance?

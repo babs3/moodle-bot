@@ -28,6 +28,9 @@ rules:
     - action: action_set_username
 
 - rule: Handle definition request
+  condition:
+      - slot_was_set:
+          - user_role: student
   steps:
     - intent: ask_for_definition
     - action: action_get_definition
@@ -65,3 +68,16 @@ rules:
   steps:
     - intent: custom_teacher_query
     - action: action_teacher_custom_question
+
+#- rule: Handle metrics request
+#  steps:
+#    - intent: view_metrics
+#    - action: action_get_metrics_from_db
+
+- rule: Teacher asks for metrics
+  condition:
+    - slot_was_set:
+        - user_role: teacher
+  steps:
+    - intent: view_metrics
+    - action: action_get_metrics_from_db

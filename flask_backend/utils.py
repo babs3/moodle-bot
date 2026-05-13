@@ -12,7 +12,8 @@ from flask_apscheduler import APScheduler
 from bs4 import BeautifulSoup
 from models import *
 
-RASA_URL = "http://rasa:5005/webhooks/rest/webhook"
+#RASA_URL = "http://rasa:5005/webhooks/rest/webhook"
+RASA_BASE_URL = "http://rasa:5005"
 
 def gerar_hash_perguntas(lista_perguntas):
     # 1. Garantir que a lista está sempre na mesma ordem (pelo slot/id)
@@ -431,7 +432,7 @@ def criar_topicos_para_perguntas(pergunta_id_texto):
 
     lista_perguntas_final = []
     try:
-        response = requests.post(RASA_URL, data=json.dumps(payload), headers=headers)
+        response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", data=json.dumps(payload), headers=headers)
         response.raise_for_status()
         messages = response.json() 
         #print(f"DEBUG COMPLETO RASA: {json.dumps(messages, indent=2)}")

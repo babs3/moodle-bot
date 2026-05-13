@@ -19,6 +19,27 @@ try:
     print("✅  Collection reloaded successfully.")
 except Exception as e:
     print(f"❌  ERRO CRÍTICO NO CHROMA: {str(e)}")
+    
+    
+class ActionGetMetricsFromDB(Action):
+    def name(self) -> str:
+        return "action_get_metrics_from_db"
+
+    def run(self, dispatcher, tracker, domain):
+        # 1. Verificar o slot
+        role = tracker.get_slot("user_role")
+
+        # 2. Lógica de decisão (Gatekeeper)
+        if role == "teacher":
+            # Aqui vai o teu código original para ir à DB
+            # Exemplo:
+            # dados = db.query_metrics()
+            dispatcher.utter_message(text="📊 Aqui estão as métricas: ...")
+        else:
+            # Se for aluno ou estiver vazio, dispara a mensagem de erro
+            dispatcher.utter_message(template="utter_permission_denied")
+        
+        return []
 
 class ActionSetUsername(Action):
     def name(self) -> str:
@@ -28,13 +49,16 @@ class ActionSetUsername(Action):
             tracker: Tracker,
             domain: dict):
 
+        sender_id = tracker.sender_id
         # Extract metadata
         metadata = tracker.latest_message.get("metadata", {})
-        username = metadata.get("username")
+        user_name = metadata.get("user_name")
+        user_role = metadata.get("user_role")
 
-        if username:
-            dispatcher.utter_message(text=f"Hello {username}! How can I help you today?")
-            return [SlotSet("username", username)]
+        if user_name and user_role:
+            print(f"\n👤  ({sender_id}) Setting username slot to: {user_name} and user_role slot to: {user_role}")
+            dispatcher.utter_message(text=f"Hello {user_name}! How can I help you today?")
+            return [SlotSet("username", user_name), SlotSet("user_role", user_role)]
         else:
             dispatcher.utter_message(text="Hello! I'm here to assist with your learning! How can I help you today?")
             return []
@@ -279,6 +303,13 @@ class ActionGetDefinition(Action):
         print(f"📚  Authorized resources from metadata: {authorized_resources}")
         #tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
         #print(f"🎓  Tutor mode from metadata: {tutor_mode}")
+        
+        is_teacher = tracker.latest_message.get("metadata", {}).get("is_teacher", False)
+        print(f"👩‍🏫  Is teacher ({user_email}) from metadata: {is_teacher}")
+        
+        # print slot of user_role
+        user_role = tracker.get_slot("user_role")
+        print(f"👤  User role from slot: {user_role}")
         
         intent = "definition of "      
         

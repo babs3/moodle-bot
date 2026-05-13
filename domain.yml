@@ -13,8 +13,15 @@ intents:
   - generate_menu_buttons
   - create_topic
   - custom_teacher_query
+  - view_metrics
 
 slots:
+
+  user_role:
+    type: text
+    influence_conversation: true
+    mappings:
+      - type: custom
 
   user_query:
     type: text
@@ -90,6 +97,10 @@ responses:
       payload: "/generate_initial_menu"
     - title: "Generate themes menu"
       payload: "/generate_themes_menu"
+  
+  utter_permission_denied:
+  - text: "Sorry, but you don't have permission to access this data. This feature is available only to teachers."
+  - text: "Oops! It looks like you tried to access an area restricted to teachers."
 
 actions:
 - action_set_username
@@ -101,6 +112,8 @@ actions:
 - action_generate_initial_menu_buttons
 - action_create_topic
 - action_teacher_custom_question
+- action_setup_user_role
+- action_get_metrics_from_db
 
 session_config:
   session_expiration_time: 60

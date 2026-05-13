@@ -48,11 +48,28 @@ def wait_for_rasa():
 def index():        
     return "Flask está a correr na porta 8082!"
 
+def session_init_rasa(user_email, user_name, user_role):
+    # 2. "Injetar" o papel do utilizador no Rasa via Tracker API
+    try:
+        payload = {
+            "sender": user_email, # O Rasa precisa de um email para identificar o sender, mas como isto é só para definir o slot, podemos usar um placeholder
+            "message": "set username trigger",
+            "metadata": {"user_name": user_name, "user_role": user_role}
+        }
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", data=json.dumps(payload), headers=headers)
+        print(f"Rasa session init response: {response.status_code} - {response.text}")
+            
+    except Exception as e:
+        print(f"Erro ao definir slot: {e}")
+
+
 @app.route('/chat', methods=['POST'])
 def chat():    
     data = request.json
     app.logger.info(f"---------> Received chat request with data: {data}")
     moodle_id = data.get('user_id')
+    user_name = data.get('user_name')
     course_id = data.get('course_id')
     app.logger.info(f"Received message from user_id: {moodle_id}")
     user_message = data.get('message')
@@ -61,19 +78,85 @@ def chat():
     is_teacher = data.get('is_teacher', False)
     if moodle_url == "http://localhost":
         moodle_url = "http://host.docker.internal"
-    print(f"Received message for course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
+    print(f"Received message for {user_name} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
+            
+    # Busca os dados reais no Moodle
+    info_utilizador = get_moodle_user_data(moodle_id, moodle_token, moodle_url)
+    user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
+    username = info_utilizador.get("nome") if info_utilizador else "NOME_"
+    check_moodle_user_in_db(moodle_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
+    
+    session_init_rasa(user_email, user_name, "teacher" if is_teacher else "student") # Define o papel do utilizador para personalizar as respostas do Rasa
+    
+    moodle_contents, moodle_contents_names = get_moodle_contents(course_id, moodle_url, moodle_token)
+    if moodle_contents_names == None:
+        app.logger.error("Failed to fetch Moodle contents.")
+        return jsonify([{"text": "There is no content available for this course or an error occurred while fetching the content. Please try again later."}])
+    elif moodle_contents_names == []:
+        app.logger.warning("No contents found for this course.")
+        return jsonify([{"text": "There is no content available for this course. Please check back later or contact your instructor."}])
+    else:
+        resources = extract_visible_resources(moodle_contents)
+        app.logger.info(f"Extracted resources for course_id {course_id}: {resources}")
+        # Se resources já são os autorizados, basta extrair os nomes:
+        authorized_resources = [res.get("filename") for res in resources if res.get("filename")]
 
-    if is_teacher:
-        app.logger.info(f"User {moodle_id} is a teacher, sending message to Rasa without fetching Moodle data.")
+        if not authorized_resources:
+            app.logger.warning("No authorized resources found for this course.")
+            #return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
+    
+    # check if user is in tutor mode
+    user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
+
+    tutor = TutorModeState.query.filter_by(user_moodle_id=moodle_id, course_id=course_id).first()
+    if not tutor:
+        tutor = TutorModeState(user_moodle_id=moodle_id, course_id=course_id, is_active=False)
+        db.session.add(tutor)
+        db.session.commit()
+    
+    if user and tutor.is_active:
+        app.logger.info(f"User {moodle_id} is in tutor mode.")
+        
+        current_time = datetime.now(timezone.utc).isoformat() 
         payload = {
-            "sender": f"teacher_{moodle_id}",
-            "message": "/custom_teacher_query",
-            "metadata": {"username": f"Teacher_{moodle_id}", "user_id": moodle_id, "course_id": course_id, "teacher_question": user_message}
+            "sender": user_email,
+            "message": "tutor menu buttons trigger",
+            "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id, "is_teacher": is_teacher}
         }
         headers = {"Content-Type": "application/json"}
 
         try:
-            response = requests.post(RASA_URL, data=json.dumps(payload), headers=headers)
+            response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", data=json.dumps(payload), headers=headers)
+            response.raise_for_status()
+            messages = response.json()
+
+            bot_reply = ""
+
+            for message in messages:
+                if "text" in message:
+                    bot_reply += f"\n\n {message['text']}"
+                if "buttons" in message:
+                    buttons = message["buttons"]
+                    
+            return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
+
+        except requests.RequestException as e:
+            print(f"⚠️ Error connecting to Rasa: {e}")
+            return None
+        
+    else:
+        app.logger.info(f"User {moodle_id} is in normal mode.")
+        
+        current_time = datetime.now(timezone.utc).isoformat()
+        payload = {
+            "sender": user_email,
+            "message": user_message, #user_input,
+            "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": False, "course_id": course_id, "is_teacher": is_teacher}
+        }
+        headers = {"Content-Type": "application/json"}
+
+        try:
+            response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", data=json.dumps(payload), headers=headers)
             response.raise_for_status()
             messages = response.json()
 
@@ -88,97 +171,6 @@ def chat():
         except requests.RequestException as e:
             print(f"⚠️ Error connecting to Rasa: {e}")
             return None
-    
-    else: # Se for aluno, buscamos os dados do Moodle para personalizar a resposta e verificar o modo tutor
-        # Busca os dados reais no Moodle
-        info_utilizador = get_moodle_user_data(moodle_id, moodle_token, moodle_url)
-        user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
-        username = info_utilizador.get("nome") if info_utilizador else "NOME_"
-        check_moodle_user_in_db(moodle_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
-        
-        moodle_contents, moodle_contents_names = get_moodle_contents(course_id, moodle_url, moodle_token)
-        if moodle_contents_names == None:
-            app.logger.error("Failed to fetch Moodle contents.")
-            return jsonify([{"text": "There is no content available for this course or an error occurred while fetching the content. Please try again later."}])
-        elif moodle_contents_names == []:
-            app.logger.warning("No contents found for this course.")
-            return jsonify([{"text": "There is no content available for this course. Please check back later or contact your instructor."}])
-        else:
-            resources = extract_visible_resources(moodle_contents)
-            app.logger.info(f"Extracted resources for course_id {course_id}: {resources}")
-            # Se resources já são os autorizados, basta extrair os nomes:
-            authorized_resources = [res.get("filename") for res in resources if res.get("filename")]
-
-            if not authorized_resources:
-                app.logger.warning("No authorized resources found for this course.")
-                #return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
-        
-        # check if user is in tutor mode
-        user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
-
-        tutor = TutorModeState.query.filter_by(user_moodle_id=moodle_id, course_id=course_id).first()
-        if not tutor:
-            tutor = TutorModeState(user_moodle_id=moodle_id, course_id=course_id, is_active=False)
-            db.session.add(tutor)
-            db.session.commit()
-        
-        if user and tutor.is_active:
-            app.logger.info(f"User {moodle_id} is in tutor mode.")
-            
-            current_time = datetime.now(timezone.utc).isoformat() 
-            payload = {
-                "sender": user_email,
-                "message": "tutor menu buttons trigger",
-                "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id}
-            }
-            headers = {"Content-Type": "application/json"}
-
-            try:
-                response = requests.post(RASA_URL, data=json.dumps(payload), headers=headers)
-                response.raise_for_status()
-                messages = response.json()
-
-                bot_reply = ""
-
-                for message in messages:
-                    if "text" in message:
-                        bot_reply += f"\n\n {message['text']}"
-                    if "buttons" in message:
-                        buttons = message["buttons"]
-                        
-                return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
-
-            except requests.RequestException as e:
-                print(f"⚠️ Error connecting to Rasa: {e}")
-                return None
-            
-        else:
-            app.logger.info(f"User {moodle_id} is in normal mode.")
-            
-            current_time = datetime.now(timezone.utc).isoformat()
-            payload = {
-                "sender": user_email,
-                "message": user_message, #user_input,
-                "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": False, "course_id": course_id}
-            }
-            headers = {"Content-Type": "application/json"}
-
-            try:
-                response = requests.post(RASA_URL, data=json.dumps(payload), headers=headers)
-                response.raise_for_status()
-                messages = response.json()
-
-                bot_reply = ""
-
-                for message in messages:
-                    if "text" in message:
-                        bot_reply += f"\n\n {message['text']}"
-                        
-                return jsonify([{"text": f"{bot_reply.strip()}"}])
-
-            except requests.RequestException as e:
-                print(f"⚠️ Error connecting to Rasa: {e}")
-                return None
 
 @app.route('/process_knowledge', methods=['POST'])
 def process_knowledge():
