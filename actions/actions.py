@@ -48,6 +48,9 @@ class ActionSetUsername(Action):
     def run(self, dispatcher: CollectingDispatcher,
             tracker: Tracker,
             domain: dict):
+        
+        print(f"DEBUG TRACKER SLOTS: {tracker.current_slot_values()}")
+        
 
         sender_id = tracker.sender_id
         # Extract metadata
@@ -292,6 +295,9 @@ class ActionGetDefinition(Action):
     def run(self, dispatcher, tracker, domain):
         
         print("\n📊  Generating bot 'action_get_definition' response...")
+        
+        print(f"DEBUG TRACKER SLOTS: {tracker.current_slot_values()}")
+        
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
