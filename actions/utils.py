@@ -107,7 +107,7 @@ def normalize_bm25_indexes(scores):
     max_score = scores.max()
     return scores / max_score if max_score > 0 else scores
 
-def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_str, user_id, is_tutor_interaction):
+def save_user_progress(course_id, user_email, user_message, bot_response, pdfs, input_time_str, user_id, is_tutor_interaction):
 
     print(f"\n📍  Saving user progress for email: {user_email}, ID: {user_id}")
     
@@ -120,6 +120,7 @@ def save_user_progress(user_email, user_message, bot_response, pdfs, input_time_
 
     # Saving
     data = {
+        "course_id": course_id,
         "user_id": user_id,  # Use Moodle user ID
         "question": user_message,
         "response": bot_response,
@@ -400,40 +401,16 @@ def correct_spelling(word, set=VALID_SIMPLE_WORDS):
     return closest_match[0] if closest_match else word  # Return the match or original word
 
 # Function to fetch student progress for a teacher’s classes
-def get_progress(teacher_email, class_code, class_number, class_group):
-
-    teacher_classes = fetch_teacher_classes(teacher_email)
-    if not teacher_classes:
-        print(f"\n❌  No classes found for teacher.")
-        return
-    df_classes = pd.DataFrame(teacher_classes, columns=["id", "code", "number", "group", "course"])
-
-    classes_ids = []
-    if class_code and class_number and class_group:
-        # get all classes ids by the code, number and group
-        print(f"\n 🏷️  Class group: {class_group}")
-        classes_ids = df_classes[(df_classes["code"] == class_code) & (df_classes["number"] == class_number) & (df_classes["group"] == class_group)]["id"].tolist()
-    elif class_code and class_number:
-        # get all classes ids by the code and number
-        print(f"\n 🏷️  Class number: {class_number}")
-        classes_ids = df_classes[(df_classes["code"] == class_code) & (df_classes["number"] == class_number)]["id"].tolist()
-    
-    classes_ids = [int(x) for x in classes_ids if pd.notna(x)]
-    print(f"\nClasses IDs: {classes_ids}")
-
-    progress = []
-    for class_id in classes_ids:
-        progress += fetch_class_progress(class_id)
-
-    if progress:
-        return pd.DataFrame(progress, columns=["user_id", "class_id", "question", "response", "topic", "pdfs", "timestamp"])
+def get_user_history(course_id):
+    response = requests.get(f"http://flask-server:8080/api/get_user_history/{course_id}")
+    if response.status_code == 200:
+        progress_data = response.json()
+        print(f"📊  User progress data retrieved: {progress_data}")
+        return pd.DataFrame(progress_data)
     else:
-        print(f"\n❌ No progress data found for class: {class_code}-{class_number}")
-        return pd.DataFrame()
-        # To show some data so the dashboard is not empty, we fetch all the progress from all the users:
-        #progress = fetch_progress()
-        #return pd.DataFrame(progress, columns=["user_id", "class_id", "question", "response", "topic", "pdfs", "timestamp"])
-    
+        print("⚠️  Failed to retrieve user progress data.")
+        return pd.DataFrame()    
+
 def dense_vector_search(keywords, query, split_keywords, collection, authorized_resources, intent="definition of "):
 
     if keywords != []:

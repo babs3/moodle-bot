@@ -58,81 +58,17 @@ def chat():
     user_message = data.get('message')
     moodle_token = data.get('token')
     moodle_url = data.get('moodle_url')
+    is_teacher = data.get('is_teacher', False)
     if moodle_url == "http://localhost":
         moodle_url = "http://host.docker.internal"
     print(f"Received message for course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
 
-    # Busca os dados reais no Moodle
-    info_utilizador = get_moodle_user_data(moodle_id, moodle_token, moodle_url)
-    user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
-    username = info_utilizador.get("nome") if info_utilizador else "NOME_"
-    check_moodle_user_in_db(moodle_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
-    
-    filenames = []
-    moodle_contents, moodle_contents_names = get_moodle_contents(course_id, moodle_url, moodle_token)
-    if moodle_contents_names == None:
-        app.logger.error("Failed to fetch Moodle contents.")
-        return jsonify([{"text": "There is no content available for this course or an error occurred while fetching the content. Please try again later."}])
-    elif moodle_contents_names == []:
-        app.logger.warning("No contents found for this course.")
-        return jsonify([{"text": "There is no content available for this course. Please check back later or contact your instructor."}])
-    else:
-        resources = extract_visible_resources(moodle_contents)
-        app.logger.info(f"Extracted resources for course_id {course_id}: {resources}")
-        # Se resources já são os autorizados, basta extrair os nomes:
-        authorized_resources = [res.get("filename") for res in resources if res.get("filename")]
-
-        if not authorized_resources:
-            app.logger.warning("No authorized resources found for this course.")
-            #return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
-    
-    # check if user is in tutor mode
-    user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
-
-    tutor = TutorModeState.query.filter_by(user_moodle_id=moodle_id, course_id=course_id).first()
-    if not tutor:
-        tutor = TutorModeState(user_moodle_id=moodle_id, course_id=course_id, is_active=False)
-        db.session.add(tutor)
-        db.session.commit()
-    
-    if user and tutor.is_active:
-        app.logger.info(f"User {moodle_id} is in tutor mode.")
-        
-        current_time = datetime.now(timezone.utc).isoformat() 
+    if is_teacher:
+        app.logger.info(f"User {moodle_id} is a teacher, sending message to Rasa without fetching Moodle data.")
         payload = {
-            "sender": user_email,
-            "message": "tutor menu buttons trigger",
-            "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id}
-        }
-        headers = {"Content-Type": "application/json"}
-
-        try:
-            response = requests.post(RASA_URL, data=json.dumps(payload), headers=headers)
-            response.raise_for_status()
-            messages = response.json()
-
-            bot_reply = ""
-
-            for message in messages:
-                if "text" in message:
-                    bot_reply += f"\n\n {message['text']}"
-                if "buttons" in message:
-                    buttons = message["buttons"]
-                    
-            return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
-
-        except requests.RequestException as e:
-            print(f"⚠️ Error connecting to Rasa: {e}")
-            return None
-        
-    else:
-        app.logger.info(f"User {moodle_id} is in normal mode.")
-        
-        current_time = datetime.now(timezone.utc).isoformat()
-        payload = {
-            "sender": user_email,
-            "message": user_message, #user_input,
-            "metadata": {"username": username,"input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": False, "course_id": course_id}
+            "sender": f"teacher_{moodle_id}",
+            "message": "/custom_teacher_query",
+            "metadata": {"username": f"Teacher_{moodle_id}", "user_id": moodle_id, "course_id": course_id, "teacher_question": user_message}
         }
         headers = {"Content-Type": "application/json"}
 
@@ -152,6 +88,97 @@ def chat():
         except requests.RequestException as e:
             print(f"⚠️ Error connecting to Rasa: {e}")
             return None
+    
+    else: # Se for aluno, buscamos os dados do Moodle para personalizar a resposta e verificar o modo tutor
+        # Busca os dados reais no Moodle
+        info_utilizador = get_moodle_user_data(moodle_id, moodle_token, moodle_url)
+        user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
+        username = info_utilizador.get("nome") if info_utilizador else "NOME_"
+        check_moodle_user_in_db(moodle_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
+        
+        moodle_contents, moodle_contents_names = get_moodle_contents(course_id, moodle_url, moodle_token)
+        if moodle_contents_names == None:
+            app.logger.error("Failed to fetch Moodle contents.")
+            return jsonify([{"text": "There is no content available for this course or an error occurred while fetching the content. Please try again later."}])
+        elif moodle_contents_names == []:
+            app.logger.warning("No contents found for this course.")
+            return jsonify([{"text": "There is no content available for this course. Please check back later or contact your instructor."}])
+        else:
+            resources = extract_visible_resources(moodle_contents)
+            app.logger.info(f"Extracted resources for course_id {course_id}: {resources}")
+            # Se resources já são os autorizados, basta extrair os nomes:
+            authorized_resources = [res.get("filename") for res in resources if res.get("filename")]
+
+            if not authorized_resources:
+                app.logger.warning("No authorized resources found for this course.")
+                #return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
+        
+        # check if user is in tutor mode
+        user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
+
+        tutor = TutorModeState.query.filter_by(user_moodle_id=moodle_id, course_id=course_id).first()
+        if not tutor:
+            tutor = TutorModeState(user_moodle_id=moodle_id, course_id=course_id, is_active=False)
+            db.session.add(tutor)
+            db.session.commit()
+        
+        if user and tutor.is_active:
+            app.logger.info(f"User {moodle_id} is in tutor mode.")
+            
+            current_time = datetime.now(timezone.utc).isoformat() 
+            payload = {
+                "sender": user_email,
+                "message": "tutor menu buttons trigger",
+                "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id}
+            }
+            headers = {"Content-Type": "application/json"}
+
+            try:
+                response = requests.post(RASA_URL, data=json.dumps(payload), headers=headers)
+                response.raise_for_status()
+                messages = response.json()
+
+                bot_reply = ""
+
+                for message in messages:
+                    if "text" in message:
+                        bot_reply += f"\n\n {message['text']}"
+                    if "buttons" in message:
+                        buttons = message["buttons"]
+                        
+                return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
+
+            except requests.RequestException as e:
+                print(f"⚠️ Error connecting to Rasa: {e}")
+                return None
+            
+        else:
+            app.logger.info(f"User {moodle_id} is in normal mode.")
+            
+            current_time = datetime.now(timezone.utc).isoformat()
+            payload = {
+                "sender": user_email,
+                "message": user_message, #user_input,
+                "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": False, "course_id": course_id}
+            }
+            headers = {"Content-Type": "application/json"}
+
+            try:
+                response = requests.post(RASA_URL, data=json.dumps(payload), headers=headers)
+                response.raise_for_status()
+                messages = response.json()
+
+                bot_reply = ""
+
+                for message in messages:
+                    if "text" in message:
+                        bot_reply += f"\n\n {message['text']}"
+                        
+                return jsonify([{"text": f"{bot_reply.strip()}"}])
+
+            except requests.RequestException as e:
+                print(f"⚠️ Error connecting to Rasa: {e}")
+                return None
 
 @app.route('/process_knowledge', methods=['POST'])
 def process_knowledge():
@@ -421,6 +448,7 @@ def tutor_toggle():
         
         # Verificar se já analisámos esta tentativa
         analise = MoodleQuizAnalysis.query.filter_by(
+            course_id=course_id,
             user_moodle_id=user_id, 
             quiz_id=quiz_id
         ).first()
@@ -439,7 +467,8 @@ def tutor_toggle():
                 analise = MoodleQuizAnalysis(
                     user_moodle_id=user_id, 
                     quiz_id=quiz_id, 
-                    last_attempt_id=attempt_id
+                    last_attempt_id=attempt_id,
+                    course_id=course_id
                 )
                 db.session.add(analise)
             else:
@@ -464,6 +493,7 @@ def tutor_toggle():
             # 2. Guardar o progresso
             # verificar se já existe um registo para este erro específico (mesmo quiz, mesma questão, mesma resposta do aluno)
             progresso_existente = TutorProgress.query.filter_by(
+                course_id=course_id,
                 user_moodle_id=user_id,
                 tipo=error.get('tipo'),
                 topic_id=error.get('topic_id'),
@@ -477,6 +507,7 @@ def tutor_toggle():
                 continue
             
             progresso = TutorProgress(
+                course_id=course_id,
                 user_moodle_id=user_id,
                 tipo=error.get('tipo'),
                 topic_id=error.get('topic_id'),
@@ -503,10 +534,25 @@ def tutor_toggle():
 
     return jsonify({"text": f"{msg}"})
 
-@app.route('/api/get_user_progress/<int:user_id>', methods=['GET'])
-def get_user_progress(user_id):
-    progress = TutorProgress.query.filter_by(user_moodle_id=user_id).all()
+@app.route('/api/get_user_progress', methods=['GET'])
+def get_user_progress():
+    data = request.json
+    user_id = data.get('user_id')
+    course_id = data.get('course_id')
+    
+    progress = TutorProgress.query.filter_by(
+        course_id=course_id,
+        user_moodle_id=user_id,
+    ).all()
     return jsonify([{"state": p.state, "question": p.question, "topic_id": p.topic_id, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
+
+@app.route('/api/get_user_history/<course_id>', methods=['GET'])
+def get_user_history(course_id):
+    history = MoodleUserHistory.query.filter_by(
+        course_id=course_id,
+        is_tutor_interaction=False
+    ).all()
+    return jsonify([{"question": h.question, "pdfs": h.pdfs} for h in history])
 
 @app.route("/api/get_topics", methods=["GET"])
 def get_topics():
@@ -540,12 +586,13 @@ def get_moodle_user(email):
     return jsonify({"id":str(moodle_user.id), "moodle_id": moodle_user.moodle_id, "email": moodle_user.email}) # "name": moodle_user.name
 
 @app.route("/api/save_moodle_messages", methods=["POST"])
-def save_moodle_messages(): # TODO: refactor para os novos campos da BD, como o is_tutor_interaction
+def save_moodle_messages():
     data = request.json
     user_id = data.get("user_id")
     app.logger.info(f"Saving Moodle progress for user_id: {user_id} with data: {data}")
     
     progress = MoodleUserHistory(
+        course_id=data["course_id"],
         user_moodle_id=int(user_id),
         question=data["question"],
         response=data["response"],
@@ -624,9 +671,10 @@ def new_quiz_polling():
             dados_quizzes = None
     
         if dados_quizzes and 'quizzes' in dados_quizzes:
-            #app.logger.info(f"Quizzes encontrados: {dados_quizzes['quizzes']}")
+            app.logger.info(f"Quizzes encontrados: {dados_quizzes['quizzes']}")
 
             for quiz in dados_quizzes['quizzes']:
+                course_id = quiz['course']
                 q_id = quiz['id']
                 q_nome = quiz['name']
                 q_last_edit = quiz['timemodified'] # O timestamp do Moodle
@@ -638,41 +686,41 @@ def new_quiz_polling():
                 # Gerar um hash das perguntas para comparação futura
                 questions_hash = gerar_hash_perguntas(lista_perguntas)
         
-                quiz_local = obter_quiz_local(q_id)
+                quiz_local = obter_quiz_local(course_id, q_id)
                 
                 # 3. Comparar com o que já temos no banco de dados
-                if not quiz_ja_processado(q_id):
+                if not quiz_ja_processado(course_id, q_id):
                     app.logger.info(f"A processar perguntas do novo quiz: {q_nome}")
-                    marcar_quiz_como_processado(q_id, q_nome, questions_hash)            
+                    marcar_quiz_como_processado(course_id, q_id, q_nome, questions_hash)            
                     
                     lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
                     app.logger.info(f"Perguntas processadas pelo Rasa: {lista_final_perguntas}")
 
-                    popular_db(q_id, lista_final_perguntas)
+                    popular_db(course_id, q_id, lista_final_perguntas)
                     
                 # CASO 2: Quiz existe, mas foi editado pelo professor
                 elif q_last_edit_dt > quiz_local.last_updated:
                     app.logger.info(f"🔄  Alteração detetada no quiz: {q_nome} (Moodle: {q_last_edit_dt} > Local: {quiz_local.last_updated})")
                     
-                    clean_quiz_data(q_id)
-                    marcar_quiz_como_processado(q_id, q_nome, questions_hash)
+                    clean_quiz_data(course_id, q_id)
+                    marcar_quiz_como_processado(course_id, q_id, q_nome, questions_hash)
 
                     lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
                     app.logger.info(f"Perguntas processadas pelo Rasa (after reprocessing): {lista_final_perguntas}")
 
-                    popular_db(q_id, lista_final_perguntas)
+                    popular_db(course_id, q_id, lista_final_perguntas)
                     
                 # CASO 3: Quiz existe, mas perguntas foram editadas pelo professor
                 elif questions_hash != quiz_local.questions_hash:
                     app.logger.info(f"🔄  Alteração detetada nas perguntas do quiz: {q_nome}")
                     app.logger.info(f"Hash antigo: {quiz_local.questions_hash} | Hash novo: {questions_hash}")
-                    clean_quiz_data(q_id)
-                    marcar_quiz_como_processado(q_id, q_nome, questions_hash)
+                    clean_quiz_data(course_id, q_id)
+                    marcar_quiz_como_processado(course_id, q_id, q_nome, questions_hash)
 
                     lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
                     app.logger.info(f"_Perguntas processadas pelo Rasa (after reprocessing): {lista_final_perguntas}")
                     
-                    popular_db(q_id, lista_final_perguntas)
+                    popular_db(course_id, q_id, lista_final_perguntas)
 
                 # CASO 4: Estão iguais
                 else:

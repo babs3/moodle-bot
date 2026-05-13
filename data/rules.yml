@@ -60,3 +60,8 @@ rules:
   steps:
     - intent: create_topic
     - action: action_create_topic
+
+- rule: Handle teacher's query
+  steps:
+    - intent: custom_teacher_query
+    - action: action_teacher_custom_question

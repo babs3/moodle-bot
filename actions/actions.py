@@ -367,13 +367,13 @@ class ActionGetClassMaterialLocation(Action):
 
         if bot_response == "no_response":
             response = f"I couldn't find any relevant content on this topic in the course materials. Please try again."
-            save_user_progress(user_email, user_message, response, [], input_time, user_id, tutor_mode)
+            save_user_progress(course_id, user_email, user_message, response, [], input_time, user_id, tutor_mode)
             dispatcher.utter_message(text=response)
             return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
 
         if bot_response == "gemini_error":
             response = f"Sorry, I couldn't process that request due to an error calling Gemini API. Please try again later."
-            save_user_progress(user_email, user_message, response, [], input_time, user_id, tutor_mode)
+            save_user_progress(course_id, user_email, user_message, response, [], input_time, user_id, tutor_mode)
             dispatcher.utter_message(text=response)
             return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
         
@@ -391,7 +391,7 @@ class ActionGetClassMaterialLocation(Action):
             location_results, pdfs_insights = get_materials_location(selected_results, complex_tokens, simple_tokens, course_id)
 
             if location_results:
-                response = save_user_progress(user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)
+                response = save_user_progress(course_id, user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)
                 print_results(location_results)              
                 dispatcher.utter_message(
                     text="</br></br><span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>" 
@@ -402,7 +402,7 @@ class ActionGetClassMaterialLocation(Action):
                 # no exact references found, so return related PDFs found in previous function
                 if selected_results:
                     location_results, pdfs_insights = update_materials_location(selected_results)
-                    response = save_user_progress(user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)
+                    response = save_user_progress(course_id, user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)
                     #dispatcher.utter_message(text="</br></br>You can find related information in:</br>" + "</br>".join(location_results))
                     dispatcher.utter_message(
                         text="</br></br><span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>" 
@@ -411,7 +411,7 @@ class ActionGetClassMaterialLocation(Action):
                 )
                 else:                
                     print("\n ⚠️  No exact references found, but you might check related PDFs.")
-                    response = save_user_progress(user_email, user_message, bot_response, [], input_time, user_id, tutor_mode)
+                    response = save_user_progress(course_id, user_email, user_message, bot_response, [], input_time, user_id, tutor_mode)
                     dispatcher.utter_message(text="I couldn't find specific page references for your question.")
 
         #clear the slots
@@ -426,12 +426,13 @@ class ActionGenerateInitialMenuButtons(Action):
         print("\n📊  Generating initial menu buttons...")
         
         #user_email = tracker.sender_id
+        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         user_message = tracker.latest_message.get("metadata", {}).get("user_message", None)
         print(f"🎓  User {user_id} sent message: {user_message}")
         
         # get user progress
-        progress = requests.get(f"http://flask-server:8080/api/get_user_progress/{user_id}")
+        progress = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id})
         if progress.status_code == 200:
             progress_data = progress.json()
             print(f"📊  User progress data retrieved: {progress_data}")
@@ -449,3 +450,37 @@ class ActionGenerateInitialMenuButtons(Action):
         )
         return []
     
+class ActionTeacherCustomQuestion(Action):
+    def name(self):
+        return "action_teacher_custom_question"
+    
+    def run(self, dispatcher, tracker, domain):
+        print("\n📊  Generating bot response...")
+        #teacher_email = tracker.sender_id
+        #user_id = tracker.latest_message.get("metadata", {}).get("user_id")
+        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+        teacher_question = tracker.latest_message.get("metadata", {}).get("teacher_question")
+        print(f"Teacher question: {teacher_question}")
+
+        df = get_user_history(course_id)
+        if df.empty:
+            dispatcher.utter_message(text="There are no questions asked by students yet.")
+            return []       
+
+        prompt = f"The information below summarises the questions asked by students. Given this, formulate an answer taking into account the teacher's question: '{teacher_question}'. \n{df.to_string()}"
+        formatted_response = "Sorry, I couldn't generate a response..."
+        print(f"\nTeacher Prompt: {prompt}")
+        try:
+            response = g_model.generate_content(prompt)
+
+            if hasattr(response, "text") and response.text:
+                print("\n🎯  Gemini Response Generated Successfully!")
+                formatted_response = format_gemini_response(response.text)
+                print(formatted_response)
+                dispatcher.utter_message(text=formatted_response)
+            else:
+                print("\n ⚠️  Gemini Response is empty.")
+                dispatcher.utter_message(text="Sorry, I couldn't generate a response.")
+        except Exception as e:
+            dispatcher.utter_message(text="Sorry, I couldn't process that request.")
+            print(f"\n❌  Error calling Gemini API: {e}")

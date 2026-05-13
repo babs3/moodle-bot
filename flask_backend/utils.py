@@ -45,9 +45,12 @@ def verificar_total_pdfs_do_curso(course_id):
     print(f"Total de PDFs processados para o curso {course_id}: {total_pdfs}")
     return total_pdfs
 
-def clean_quiz_data(quiz_id):
+def clean_quiz_data(course_id, quiz_id):
     # Eliminar perguntas antigas do quiz
-    quiz_antigo = MoodleQuizPolling.query.filter_by(quiz_id=quiz_id).first()
+    quiz_antigo = MoodleQuizPolling.query.filter_by(
+        quiz_id=quiz_id,
+        course_id=course_id
+    ).first()
     if quiz_antigo:
         print(f"Removendo dados antigos do quiz ID {quiz_id} para evitar duplicações.")   
         db.session.delete(quiz_antigo)
@@ -56,8 +59,11 @@ def clean_quiz_data(quiz_id):
     db.session.commit()
 
    
-def obter_quiz_local(quiz_id):
-    quiz_local = MoodleQuizPolling.query.filter_by(quiz_id=quiz_id).first()
+def obter_quiz_local(course_id, quiz_id):
+    quiz_local = MoodleQuizPolling.query.filter_by(
+        quiz_id=quiz_id,
+        course_id=course_id
+        ).first()
     if quiz_local:
         return quiz_local
     else:
@@ -311,10 +317,11 @@ def get_last_attempt_id(quiz_id, user_id, moodle_url, moodle_token):
         print(f"ERRO: Erro ao obter tentativas: {e}")
         return None
     
-def quiz_ja_processado(quiz_id):
+def quiz_ja_processado(course_id, quiz_id):
     # Verificar se já analisámos esta tentativa
     analise = MoodleQuizPolling.query.filter_by(
-        quiz_id=quiz_id
+        quiz_id=quiz_id,
+        course_id=course_id
     ).first()
     
     if analise:
@@ -323,9 +330,10 @@ def quiz_ja_processado(quiz_id):
         print(f"Quiz ID {quiz_id} ainda não processado.")
         return False
 
-def marcar_quiz_como_processado(quiz_id, quiz_name, questions_hash):
+def marcar_quiz_como_processado(course_id, quiz_id, quiz_name, questions_hash):
     # Criar um novo registo de quiz processado
     novo_registo = MoodleQuizPolling(
+        course_id=course_id,
         quiz_id=quiz_id,
         quiz_name=quiz_name,
         questions_hash=questions_hash
@@ -453,8 +461,8 @@ def criar_topicos_para_perguntas(pergunta_id_texto):
         
     return lista_perguntas_final
 
-              
-def popular_db(quiz_id, perguntas):
+
+def popular_db(course_id, quiz_id, perguntas):
     for p in perguntas:
         # ir buscar id do topico à tabela de tópicos, usando o nome do tópico que o Gemini nos deu
         topic = Topics.query.filter_by(name=p.get('topic')).first()
@@ -468,6 +476,7 @@ def popular_db(quiz_id, perguntas):
             topic_id = topic.id
             
         nova_questao = MoodleQuizData(
+            course_id=course_id,
             quiz_id=quiz_id,
             question=p.get('question'),
             topic_id=topic_id

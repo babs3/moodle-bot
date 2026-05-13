@@ -12,6 +12,7 @@ intents:
   - ask_for_summary
   - generate_menu_buttons
   - create_topic
+  - custom_teacher_query
 
 slots:
 
@@ -99,6 +100,7 @@ actions:
 - action_get_class_material_location
 - action_generate_initial_menu_buttons
 - action_create_topic
+- action_teacher_custom_question
 
 session_config:
   session_expiration_time: 60
