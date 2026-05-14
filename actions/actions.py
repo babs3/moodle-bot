@@ -38,7 +38,10 @@ class ActionGetMetricsFromDB(Action):
             df = get_user_history(course_id)
             if df.empty:
                 dispatcher.utter_message(text="There are no questions asked by students yet.")
-                return []       
+                return []      
+            
+            # limit df to the last 50 entries to avoid overloading the prompt
+            data_snippet = df.tail(50).to_string(index=False)
 
             prompt = f"""
             ### ROLE
@@ -52,7 +55,7 @@ class ActionGetMetricsFromDB(Action):
             5. **LANGUAGE:** Always respond in English (UK).
 
             ### CONTEXT
-            Data: {df.to_string()}
+            Data: {data_snippet}
             Teacher's Question: '{teacher_question}'
 
             ### INSTRUCTIONS
