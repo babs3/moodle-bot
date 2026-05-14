@@ -71,7 +71,6 @@ def chat():
     moodle_id = data.get('user_id')
     user_name = data.get('user_name')
     course_id = data.get('course_id')
-    app.logger.info(f"Received message from user_id: {moodle_id}")
     user_message = data.get('message')
     moodle_token = data.get('token')
     moodle_url = data.get('moodle_url')
@@ -221,7 +220,6 @@ def process_knowledge():
         app.logger.error(f"Erro na pipeline: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
     
-
 def background_sync(app, course_id, pdf_folder, moodle_token, moodle_url):
     """Função que corre em paralelo para não travar o Moodle."""
     print(f"--- Iniciando sincronização para o curso {course_id} ---")
@@ -544,7 +542,7 @@ def get_user_history(course_id):
         course_id=course_id,
         is_tutor_interaction=False
     ).all()
-    return jsonify([{"question": h.question, "pdfs": h.pdfs} for h in history])
+    return jsonify([{"user_id": h.user_moodle_id, "question": h.question, "pdfs": h.pdfs, "timestamp": h.timestamp} for h in history])
 
 @app.route("/api/get_topics", methods=["GET"])
 def get_topics():

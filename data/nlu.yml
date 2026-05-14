@@ -214,4 +214,18 @@ nlu:
     - Show me the access report.
     - What are the most frequently asked questions?
     - I want to see the class statistics.
-    - How is student attendance?
+    - How is student attendance on the bot?
+    - Which PDFs generate the most questions?
+    - Which materials do students have the most difficulty understanding?
+    - At what time do students study the most?
+    - Has there been a spike in questions in the last few days?
+    - Which topics do students understand the least?
+    - Is there any document that no one is consulting?
+    - How has student interest evolved over the month?
+    - Summarize the main learning roadblocks from this week.
+    - Are students asking complex questions or just seeking simple definitions?
+    - How many different students used the bot this week?
+    - Are the questions coming mainly from a few students, or is the whole class participating?
+    - Is there any student (ID) asking too many questions on the same topic?
+    - What is the average number of questions per student?
+    - Identify the IDs of the students who seem to be struggling the most.

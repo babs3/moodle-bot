@@ -64,16 +64,6 @@ rules:
     - intent: create_topic
     - action: action_create_topic
 
-- rule: Handle teacher's query
-  steps:
-    - intent: custom_teacher_query
-    - action: action_teacher_custom_question
-
-#- rule: Handle metrics request
-#  steps:
-#    - intent: view_metrics
-#    - action: action_get_metrics_from_db
-
 - rule: Teacher asks for metrics
   condition:
     - slot_was_set:

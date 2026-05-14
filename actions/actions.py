@@ -31,10 +31,54 @@ class ActionGetMetricsFromDB(Action):
 
         # 2. Lógica de decisão (Gatekeeper)
         if role == "teacher":
-            # Aqui vai o teu código original para ir à DB
-            # Exemplo:
-            # dados = db.query_metrics()
-            dispatcher.utter_message(text="📊 Aqui estão as métricas: ...")
+            course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+            teacher_question = tracker.latest_message.get("metadata", {}).get("message")
+            print(f"Teacher question: {teacher_question}")
+
+            df = get_user_history(course_id)
+            if df.empty:
+                dispatcher.utter_message(text="There are no questions asked by students yet.")
+                return []       
+
+            prompt = f"""
+            ### ROLE
+            You are a Concise Educational Data Analyst. Your output is displayed in a narrow LMS sidebar.
+
+            ### RULES
+            1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
+            2. **HTML ONLY:** Use <b>text</b> for bold, <ul><li></li></ul> for lists, and <br> for line breaks.
+            3. **NO INTROS/OTHERS:** Start directly with the analysis. Do not say "Hello" or "Here is the report".
+            4. **MAX BREVITY:** Use individual paragraphs. Maximum 3-4 paragraphs in total. Keep the total word count under 100 words.
+            5. **LANGUAGE:** Always respond in English (UK).
+
+            ### CONTEXT
+            Data: {df.to_string()}
+            Teacher's Question: '{teacher_question}'
+
+            ### INSTRUCTIONS
+            - If the question is generic, provide a "Quick Snapshot".
+            - Use 'user_id' to distinguish if a problem is global or isolated.
+            - Identify the most critical PDF/Topic and provide one brief action.
+
+            ### RESPONSE (HTML format)
+            """
+            
+            formatted_response = "Sorry, I couldn't generate a response..."
+            print(f"\nTeacher Prompt: {prompt}")
+            try:
+                response = g_model.generate_content(prompt)
+
+                if hasattr(response, "text") and response.text:
+                    print("\n🎯  Gemini Response Generated Successfully!")
+                    formatted_response = format_gemini_response(response.text)
+                    print(formatted_response)
+                    dispatcher.utter_message(text=formatted_response)
+                else:
+                    print("\n ⚠️  Gemini Response is empty.")
+                    dispatcher.utter_message(text="Sorry, I couldn't generate a response.")
+            except Exception as e:
+                dispatcher.utter_message(text="Sorry, I couldn't process that request.")
+                print(f"\n❌  Error calling Gemini API: {e}")
         else:
             # Se for aluno ou estiver vazio, dispara a mensagem de erro
             dispatcher.utter_message(template="utter_permission_denied")
@@ -487,37 +531,3 @@ class ActionGenerateInitialMenuButtons(Action):
         )
         return []
     
-class ActionTeacherCustomQuestion(Action):
-    def name(self):
-        return "action_teacher_custom_question"
-    
-    def run(self, dispatcher, tracker, domain):
-        print("\n📊  Generating bot response...")
-        #teacher_email = tracker.sender_id
-        #user_id = tracker.latest_message.get("metadata", {}).get("user_id")
-        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
-        teacher_question = tracker.latest_message.get("metadata", {}).get("teacher_question")
-        print(f"Teacher question: {teacher_question}")
-
-        df = get_user_history(course_id)
-        if df.empty:
-            dispatcher.utter_message(text="There are no questions asked by students yet.")
-            return []       
-
-        prompt = f"The information below summarises the questions asked by students. Given this, formulate an answer taking into account the teacher's question: '{teacher_question}'. \n{df.to_string()}"
-        formatted_response = "Sorry, I couldn't generate a response..."
-        print(f"\nTeacher Prompt: {prompt}")
-        try:
-            response = g_model.generate_content(prompt)
-
-            if hasattr(response, "text") and response.text:
-                print("\n🎯  Gemini Response Generated Successfully!")
-                formatted_response = format_gemini_response(response.text)
-                print(formatted_response)
-                dispatcher.utter_message(text=formatted_response)
-            else:
-                print("\n ⚠️  Gemini Response is empty.")
-                dispatcher.utter_message(text="Sorry, I couldn't generate a response.")
-        except Exception as e:
-            dispatcher.utter_message(text="Sorry, I couldn't process that request.")
-            print(f"\n❌  Error calling Gemini API: {e}")

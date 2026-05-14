@@ -54,7 +54,7 @@ class MoodleUserHistory(db.Model):
     pdfs = db.Column(db.String(255), nullable=True)
     is_tutor_interaction = db.Column(db.Boolean, default=False)
     time_to_respond = db.Column(db.String(100), nullable=False)  # Tempo que o bot levou para responder
-    last_updated = db.Column(db.DateTime, default=datetime.now)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
     # TODO: devo por o topic_id aqui também? Talvez seja útil para análises futuras, mas não é essencial no momento.
     
 class TutorProgress(db.Model):
@@ -67,7 +67,7 @@ class TutorProgress(db.Model):
     student_answer = db.Column(db.Text, nullable=False)
     correct_answer = db.Column(db.Text, nullable=False)
     state=db.Column(db.String(20), default="pending", nullable=False)  # Ex: "pending", "reviewed", "mastered"
-    last_updated = db.Column(db.DateTime, default=datetime.now)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
     
 class Topics(db.Model):
     id = db.Column(db.Integer, primary_key=True)
