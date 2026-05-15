@@ -70,6 +70,10 @@ class ActionGetMetricsFromDB(Action):
             formatted_response = "Sorry, I couldn't generate a response..."
             print(f"\nTeacher Prompt: {prompt}")
             try:
+                g_model = genai.GenerativeModel(
+                    model_name=MODEL_NAME,
+                    #system_instruction=system_instruction TODO: ver se é preciso
+                )
                 response = g_model.generate_content(prompt)
 
                 if hasattr(response, "text") and response.text:
@@ -152,17 +156,15 @@ class ActionCallLLMWithContext(Action):
         3. FORMAT OF THE RESPONSE: You must structure your response using simple HTML tags so that it is rendered correctly in the interface (use tags like <b>, <br>, <ul>, <li>). Do not use Markdown (like ** or ###).
         """
 
-        # Montar a estrutura final de mensagens combinando o Sistema atualizado + Histórico
-        messages = [
-            {"role": "model", "parts": [{"text": system_instruction}]}
-        ] + chat_history
-    
-        print(f"\n📜  Complete messages payload for LLM:\n{messages}\n")
+        print(f"\n📜  Complete messages payload for LLM:\n{chat_history}\n")
         
         formatted_response = "Sorry, I couldn't generate a response..."
-        print(f"\nTeacher Prompt: {messages}")
         try:
-            response = g_model.generate_content(messages)
+            g_model = genai.GenerativeModel(
+                model_name=MODEL_NAME,
+                system_instruction=system_instruction
+            )
+            response = g_model.generate_content(chat_history)
 
             if hasattr(response, "text") and response.text:
                 print("\n🎯  Gemini Response Generated Successfully!")
@@ -177,20 +179,6 @@ class ActionCallLLMWithContext(Action):
             print(f"\n❌  Error calling Gemini API: {e}")
         
         return []
-    
-class ActionRouteDefinition(Action):
-    def name(self) -> str:
-        return "action_route_definition"
-
-    def run(self, dispatcher, tracker, domain):
-        user_role = tracker.get_slot("user_role")
-        
-        if user_role == "teacher":
-            print("🚀 Encaminhando Professor para o LLM...")
-            return [FollowupAction("action_call_llm_with_context")]
-        
-        print("📚 Encaminhando Aluno para o fluxo normal...")
-        return [FollowupAction("action_get_definition")]
 
 class ActionSetUsername(Action):
     def name(self) -> str:
@@ -211,10 +199,8 @@ class ActionSetUsername(Action):
 
         if user_name and user_role:
             print(f"\n👤  ({sender_id}) Setting username slot to: {user_name} and user_role slot to: {user_role}")
-            dispatcher.utter_message(text=f"Hello {user_name}! How can I help you today?")
             return [SlotSet("username", user_name), SlotSet("user_role", user_role)]
         else:
-            dispatcher.utter_message(text="Hello! I'm here to assist with your learning! How can I help you today?")
             return []
 
 def keywords_to_tokens(keywords, query):
@@ -356,6 +342,10 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
         
         formatted_response = "Sorry, I couldn't generate a response..."
         try:
+            g_model = genai.GenerativeModel(
+                model_name=MODEL_NAME,
+                #system_instruction=system_instruction TODO: ver se é preciso
+            )
             response = g_model.generate_content(prompt)
 
             if hasattr(response, "text") and response.text:
@@ -404,6 +394,10 @@ class ActionCreateTopic(Action):
             prompt += "\n- ID: " + str(pergunta.get("moodle_question_id", "")) + ", question: " + pergunta.get("texto_pergunta", "") + ", topic: ?" # Acessa a pergunta usando .get() para evitar erros se a chave não existir
         
         try:
+            g_model = genai.GenerativeModel(
+                model_name=MODEL_NAME,
+                #system_instruction=system_instruction TODO: ver se é preciso
+            )
             response = g_model.generate_content(prompt)
             
             if hasattr(response, "text") and response.text:

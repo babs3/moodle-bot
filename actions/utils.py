@@ -46,10 +46,10 @@ def get_first_gemini_pro_model():
 
     raise RuntimeError("No 'models/gemini-*-pro' model found")
 
-model_name = get_first_gemini_pro_model()
-print(f"✅  Using model: {model_name}")
+MODEL_NAME = get_first_gemini_pro_model()
+print(f"✅  Using model: {MODEL_NAME}")
 
-g_model = genai.GenerativeModel(model_name)
+#g_model = genai.GenerativeModel(MODEL_NAME)
     
 # Load Spacy model for NLP tasks
 nlp = spacy.load("en_core_web_sm")
@@ -642,6 +642,10 @@ def generate_topic(question, correct_answer, course_fullname="Ciber-physical Sys
     topic = None
     prompt = f"Given the following question and correspondent expected answer of one of the evaluations in the course of {course_fullname}, what is the most relevant *canonical* topic keyword for the question? \nQuestion: {question}\nExpected Answer: {correct_answer}\nTopic: ? \n\nReply only with the topic keyword."
     try:
+        g_model = genai.GenerativeModel(
+            model_name=MODEL_NAME,
+            #system_instruction=system_instruction TODO: ver se é preciso
+        )
         response = g_model.generate_content(prompt)
 
         if hasattr(response, "text") and response.text:
