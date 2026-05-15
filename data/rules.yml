@@ -14,8 +14,8 @@ rules:
 
 - rule: Greet the user
   steps:
-    - intent: greet
-    - action: utter_greet
+  - intent: greet
+  - action: utter_greet
 
 - rule: Say goodbye anytime the user says goodbye
   steps:
@@ -24,50 +24,67 @@ rules:
 
 - rule: Set username
   steps:
-    - intent: set_username
-    - action: action_set_username
+  - intent: set_username
+  - action: action_set_username
 
 - rule: Handle definition request
   condition:
-      - slot_was_set:
-          - user_role: student
+  - slot_was_set:
+      - user_role: student
   steps:
-    - intent: ask_for_definition
-    - action: action_get_definition
-    - action: action_get_class_material_location
+  - intent: ask_for_definition
+  - action: action_get_definition
+  - action: action_get_class_material_location
 
 - rule: Handle examples request
+  condition:
+  - slot_was_set:
+      - user_role: student
   steps:
-    - intent: ask_for_examples
-    - action: action_get_examples
-    - action: action_get_class_material_location
+  - intent: ask_for_examples
+  - action: action_get_examples
+  - action: action_get_class_material_location
 
 - rule: Handle explanation request
+  condition:
+  - slot_was_set:
+      - user_role: student
   steps:
-    - intent: ask_for_explanation
-    - action: action_get_explanation
-    - action: action_get_class_material_location
+  - intent: ask_for_explanation
+  - action: action_get_explanation
+  - action: action_get_class_material_location
 
 - rule: Handle summarization request
+  condition:
+  - slot_was_set:
+      - user_role: student
   steps:
-    - intent: ask_for_summary
-    - action: action_get_summary
-    - action: action_get_class_material_location
+  - intent: ask_for_summary
+  - action: action_get_summary
+  - action: action_get_class_material_location
 
 - rule: Create initial menu buttons
   steps:
-    - intent: generate_menu_buttons
-    - action: action_generate_initial_menu_buttons
+  - intent: generate_menu_buttons
+  - action: action_generate_initial_menu_buttons
 
 - rule: Create Topic
   steps:
-    - intent: create_topic
-    - action: action_create_topic
+  - intent: create_topic
+  - action: action_create_topic
 
 - rule: Teacher asks for metrics
   condition:
-    - slot_was_set:
-        - user_role: teacher
+  - slot_was_set:
+      - user_role: teacher
   steps:
-    - intent: view_metrics
-    - action: action_get_metrics_from_db
+  - intent: view_metrics
+  - action: action_get_metrics_from_db
+
+- rule: Teacher asks question (fallback)
+  condition:
+  - slot_was_set:
+    - user_role: teacher
+  steps:
+  - intent: ask_for_definition
+  - action: action_call_llm_with_context

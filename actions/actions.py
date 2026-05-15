@@ -31,8 +31,9 @@ class ActionGetMetricsFromDB(Action):
 
         # 2. Lógica de decisão (Gatekeeper)
         if role == "teacher":
+            
             course_id = tracker.latest_message.get("metadata", {}).get("course_id")
-            teacher_question = tracker.latest_message.get("metadata", {}).get("message")
+            teacher_question = tracker.latest_message.get("text")
             print(f"Teacher question: {teacher_question}")
 
             df = get_user_history(course_id)
@@ -85,6 +86,72 @@ class ActionGetMetricsFromDB(Action):
         else:
             # Se for aluno ou estiver vazio, dispara a mensagem de erro
             dispatcher.utter_message(template="utter_permission_denied")
+        
+        return []
+
+class ActionCallLLMWithContext(Action):
+    def name(self) -> str:
+        return "action_call_llm_with_context"
+
+    def run(self, dispatcher, tracker, domain):
+        # Esta ação pode ser usada para chamadas genéricas ao LLM com contexto do histórico de conversa
+        # O prompt e a formatação da resposta podem ser adaptados conforme necessário
+        print("\n📊  Generating bot 'action_call_llm_with_context' response...")
+        
+        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+        teacher_question = tracker.latest_message.get("text")
+        print(f"Teacher question: {teacher_question}")
+
+        df = get_user_history(course_id)
+        if df.empty:
+            dispatcher.utter_message(text="There are no questions asked by students yet.")
+            return []      
+        
+        # limit df to the last 50 entries to avoid overloading the prompt
+        data_snippet = df.tail(50).to_string(index=False)
+        
+        # 1. Recuperar os eventos da conversa
+        events = tracker.events
+        
+        # 2. Filtrar e construir o histórico para o LLM
+        chat_history = []
+        max_turns = 6 # Define quantas mensagens queres que o LLM "lembre"
+        
+        # Vamos andar de trás para a frente no histórico
+        for event in reversed(events):
+            if len(chat_history) >= max_turns:
+                break
+                
+            if event.get("event") == "user":
+                # discard this type: {'role': 'user', 'content': 'set username trigger'}
+                if event.get("text") != "set username trigger":
+                    chat_history.insert(0, {"role": "user", "content": event.get("text")})
+            elif event.get("event") == "bot":
+                chat_history.insert(0, {"role": "assistant", "content": event.get("text")})
+        
+            
+        # 3. Criar a diretriz do sistema (Persona + Dados dos Alunos + Regras)
+        # Injetamos o data_snippet diretamente no papel de sistema para o LLM ter como base de conhecimento.
+        system_instruction = f"""
+        You are an advanced analytics assistant for professors and academic administrators.
+        Your goal is to help professors analyze student behavior, questions, and challenges based on the data provided.
+
+        [STUDENT DATA (Last 50 records in the system)]
+        {data_snippet}
+
+        [BEHAVIORAL INSTRUCTIONS]
+        1. HISTORY AND FOLLOW-UP: Use the conversation history to answer follow-up or ambiguous questions. If the professor asks "Who?", "Why?" or "What did he say?", analyze the previous messages to identify the student or concept they are referring to.
+        2. ACCURACY: Base your responses strictly on the provided student data. If the information is not available and it's not a contextual follow-up question, kindly indicate that you do not have those details.
+        3. FORMAT OF THE RESPONSE: You must structure your response using simple HTML tags so that it is rendered correctly in the interface (use tags like <b>, <br>, <ul>, <li>). Do not use Markdown (like ** or ###).
+        """
+
+        # Montar a estrutura final de mensagens combinando o Sistema atualizado + Histórico
+        messages = [
+            {"role": "system", "content": system_instruction}
+        ] + chat_history
+    
+        print(f"\n📜  Complete messages payload for LLM:\n{messages}\n")
+        
         
         return []
 
@@ -282,7 +349,6 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
         SlotSet("user_id", user_id),  # Store the user ID
         SlotSet("input_time", input_time)
         ]
-
 
 class ActionCreateTopic(Action):
     def name(self):

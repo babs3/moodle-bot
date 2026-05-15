@@ -17,8 +17,11 @@ intents:
 slots:
 
   user_role:
-    type: text
-    initial_value: "teacher"
+    type: categorical
+    values:
+      - student
+      - teacher
+    initial_value: teacher
     influence_conversation: true
     mappings:
       - type: custom
@@ -113,6 +116,7 @@ actions:
 - action_create_topic
 - action_setup_user_role
 - action_get_metrics_from_db
+- action_call_llm_with_context
 
 session_config:
   session_expiration_time: 60
