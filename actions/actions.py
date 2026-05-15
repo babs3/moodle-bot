@@ -123,11 +123,18 @@ class ActionCallLLMWithContext(Action):
                 break
                 
             if event.get("event") == "user":
-                # discard this type: {'role': 'user', 'content': 'set username trigger'}
                 if event.get("text") != "set username trigger":
-                    chat_history.insert(0, {"role": "user", "content": event.get("text")})
+                    # Formato Gemini: 'user' + 'parts' com 'text'
+                    chat_history.insert(0, {
+                        "role": "user", 
+                        "parts": [{"text": event.get("text")}]
+                    })
             elif event.get("event") == "bot":
-                chat_history.insert(0, {"role": "assistant", "content": event.get("text")})
+                # Formato Gemini: 'model' (e não 'assistant') + 'parts' com 'text'
+                chat_history.insert(0, {
+                    "role": "model", 
+                    "parts": [{"text": event.get("text")}]
+                })
         
             
         # 3. Criar a diretriz do sistema (Persona + Dados dos Alunos + Regras)
@@ -147,11 +154,27 @@ class ActionCallLLMWithContext(Action):
 
         # Montar a estrutura final de mensagens combinando o Sistema atualizado + Histórico
         messages = [
-            {"role": "system", "content": system_instruction}
+            {"role": "model", "parts": [{"text": system_instruction}]}
         ] + chat_history
     
         print(f"\n📜  Complete messages payload for LLM:\n{messages}\n")
         
+        formatted_response = "Sorry, I couldn't generate a response..."
+        print(f"\nTeacher Prompt: {messages}")
+        try:
+            response = g_model.generate_content(messages)
+
+            if hasattr(response, "text") and response.text:
+                print("\n🎯  Gemini Response Generated Successfully!")
+                formatted_response = format_gemini_response(response.text)
+                print(formatted_response)
+                dispatcher.utter_message(text=formatted_response)
+            else:
+                print("\n ⚠️  Gemini Response is empty.")
+                dispatcher.utter_message(text="Sorry, I couldn't generate a response.")
+        except Exception as e:
+            dispatcher.utter_message(text="Sorry, I couldn't process that request.")
+            print(f"\n❌  Error calling Gemini API: {e}")
         
         return []
     
@@ -422,7 +445,7 @@ class ActionGetDefinition(Action):
         
         print("\n📊  Generating bot 'action_get_definition' response...")
         
-        print(f"DEBUG TRACKER SLOTS: {tracker.current_slot_values()}")
+        print(f"DEBUG TRACKER SLOTSS: {tracker.current_slot_values()}")
         
         # print slot of user_role
         user_role = tracker.get_slot("user_role")

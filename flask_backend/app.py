@@ -575,8 +575,8 @@ def get_moodle_user(email):
         return jsonify({"error": "Moodle user not found"}), 404
     return jsonify({"id":str(moodle_user.id), "moodle_id": moodle_user.moodle_id, "email": moodle_user.email}) # "name": moodle_user.name
 
-@app.route("/api/save_moodle_messages", methods=["POST"])
-def save_moodle_messages():
+@app.route("/api/save_student_moodle_messages", methods=["POST"])
+def save_student_moodle_messages():
     data = request.json
     user_id = data.get("user_id")
     app.logger.info(f"Saving Moodle progress for user_id: {user_id} with data: {data}")
