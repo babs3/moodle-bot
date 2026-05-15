@@ -44,7 +44,7 @@ class ActionGetMetricsFromDB(Action):
             # limit df to the last 50 entries to avoid overloading the prompt
             data_snippet = df.tail(50).to_string(index=False)
 
-            prompt = f"""
+            system_instruction = f"""
             ### ROLE
             You are a Concise Educational Data Analyst. Your output is displayed in a narrow LMS sidebar.
 
@@ -57,7 +57,6 @@ class ActionGetMetricsFromDB(Action):
 
             ### CONTEXT
             Data: {data_snippet}
-            Teacher's Question: '{teacher_question}'
 
             ### INSTRUCTIONS
             - If the question is generic, provide a "Quick Snapshot".
@@ -67,14 +66,18 @@ class ActionGetMetricsFromDB(Action):
             ### RESPONSE (HTML format)
             """
             
+            generation_config = {
+                "temperature": 0.2,
+            }
+            
             formatted_response = "Sorry, I couldn't generate a response..."
-            print(f"\nTeacher Prompt: {prompt}")
             try:
                 g_model = genai.GenerativeModel(
                     model_name=MODEL_NAME,
-                    #system_instruction=system_instruction TODO: ver se é preciso
+                    system_instruction=system_instruction,
+                    generation_config=generation_config
                 )
-                response = g_model.generate_content(prompt)
+                response = g_model.generate_content(teacher_question)
 
                 if hasattr(response, "text") and response.text:
                     print("\n🎯  Gemini Response Generated Successfully!")
@@ -139,7 +142,6 @@ class ActionCallLLMWithContext(Action):
                     "role": "model", 
                     "parts": [{"text": event.get("text")}]
                 })
-        
             
         # 3. Criar a diretriz do sistema (Persona + Dados dos Alunos + Regras)
         # Injetamos o data_snippet diretamente no papel de sistema para o LLM ter como base de conhecimento.
@@ -158,11 +160,18 @@ class ActionCallLLMWithContext(Action):
 
         print(f"\n📜  Complete messages payload for LLM:\n{chat_history}\n")
         
+        generation_config = {
+            "temperature": 0.2,          # 🛡️ Mantém isto baixo para o bot ser factual e não inventar dados
+            #"max_output_tokens": 400,    # 💸 Mantém isto para controlar o tamanho da resposta e custos
+            # top_p e top_k omitidos -> O Gemini assume os dele (0.95 e 40)
+        }
+        
         formatted_response = "Sorry, I couldn't generate a response..."
         try:
             g_model = genai.GenerativeModel(
                 model_name=MODEL_NAME,
-                system_instruction=system_instruction
+                system_instruction=system_instruction,
+                generation_config=generation_config
             )
             response = g_model.generate_content(chat_history)
 
@@ -340,11 +349,16 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
         raw_text = "\n".join(results_text)
         prompt = f" Use the following raw educational content to answer the student query '{query}': \n{raw_text} \nDon's exceed 50 words and be concise and precise in your answer. If you don't find relevant information, say you couldn't find relevant content in the course materials."
         
+        generation_config = {
+            "temperature": 0.2,
+        }
+        
         formatted_response = "Sorry, I couldn't generate a response..."
         try:
             g_model = genai.GenerativeModel(
                 model_name=MODEL_NAME,
                 #system_instruction=system_instruction TODO: ver se é preciso
+                generation_config=generation_config
             )
             response = g_model.generate_content(prompt)
 
