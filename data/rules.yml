@@ -27,12 +27,14 @@ rules:
   - intent: set_username
   - action: action_set_username
 
-- rule: Handle definition request
-  condition:
-  - slot_was_set:
-      - user_role: student
+
+- rule: Roteador de Definições Soberano
   steps:
   - intent: ask_for_definition
+  - action: action_route_definition  # <--- O Rasa Core só agenda ESTA ação. Não há sequências automáticas.
+
+- rule: Fluxo de Execução do Estudante
+  steps:
   - action: action_get_definition
   - action: action_get_class_material_location
 
@@ -80,11 +82,3 @@ rules:
   steps:
   - intent: view_metrics
   - action: action_get_metrics_from_db
-
-- rule: Teacher asks question (fallback)
-  condition:
-  - slot_was_set:
-    - user_role: teacher
-  steps:
-  - intent: ask_for_definition
-  - action: action_call_llm_with_context

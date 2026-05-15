@@ -117,6 +117,7 @@ actions:
 - action_setup_user_role
 - action_get_metrics_from_db
 - action_call_llm_with_context
+- action_route_definition
 
 session_config:
   session_expiration_time: 60

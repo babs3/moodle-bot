@@ -5,7 +5,7 @@ import chromadb
 from rasa_sdk.executor import CollectingDispatcher
 from rasa_sdk import Action, Tracker
 from rasa_sdk import Action
-from rasa_sdk.events import SlotSet
+from rasa_sdk.events import SlotSet, FollowupAction
 from .utils import *
 
 print(f"📂  A tentar ligar ao ChromaDB em: /app/vector_store")
@@ -154,6 +154,20 @@ class ActionCallLLMWithContext(Action):
         
         
         return []
+    
+class ActionRouteDefinition(Action):
+    def name(self) -> str:
+        return "action_route_definition"
+
+    def run(self, dispatcher, tracker, domain):
+        user_role = tracker.get_slot("user_role")
+        
+        if user_role == "teacher":
+            print("🚀 Encaminhando Professor para o LLM...")
+            return [FollowupAction("action_call_llm_with_context")]
+        
+        print("📚 Encaminhando Aluno para o fluxo normal...")
+        return [FollowupAction("action_get_definition")]
 
 class ActionSetUsername(Action):
     def name(self) -> str:
@@ -179,7 +193,6 @@ class ActionSetUsername(Action):
         else:
             dispatcher.utter_message(text="Hello! I'm here to assist with your learning! How can I help you today?")
             return []
-        
 
 def keywords_to_tokens(keywords, query):
     """
@@ -411,6 +424,9 @@ class ActionGetDefinition(Action):
         
         print(f"DEBUG TRACKER SLOTS: {tracker.current_slot_values()}")
         
+        # print slot of user_role
+        user_role = tracker.get_slot("user_role")
+        print(f"👤  User role from slot: {user_role}")
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
@@ -425,10 +441,6 @@ class ActionGetDefinition(Action):
         
         is_teacher = tracker.latest_message.get("metadata", {}).get("is_teacher", False)
         print(f"👩‍🏫  Is teacher ({user_email}) from metadata: {is_teacher}")
-        
-        # print slot of user_role
-        user_role = tracker.get_slot("user_role")
-        print(f"👤  User role from slot: {user_role}")
         
         intent = "definition of "      
         
