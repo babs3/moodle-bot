@@ -294,7 +294,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
     complex_tokens, simple_tokens, split_keywords = keywords_to_tokens(keywords, no_punct_query)  
     print(f"\n🔍  Extracted keywords: \n    {complex_tokens} \n    {simple_tokens} \n    Split keywords flag: {split_keywords}")
     
-    print(f"\n🔍  Starting search process in resources: {authorized_resources[0]}")
+    print(f"\n🔍  Starting search process in resources: {authorized_resources}")
     # Hybrid Search Process    
     vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(keywords, query, split_keywords, collection, authorized_resources, intent)        
     bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id)

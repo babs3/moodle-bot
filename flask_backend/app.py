@@ -103,7 +103,9 @@ def chat():
         if not authorized_resources:
             app.logger.warning("No authorized resources found for this course.")
             #return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
-    
+        else: 
+            app.logger.info(f"Authorized resources for course_id {course_id}: {authorized_resources}")
+            
     # check if user is in tutor mode
     user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
 
