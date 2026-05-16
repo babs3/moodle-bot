@@ -419,18 +419,44 @@ class ActionCreateTopic(Action):
         perguntas = tracker.latest_message.get("metadata", {}).get("perguntas", [])
         print(f"\n🔍  Original perguntas from metadata: {perguntas}")
         
-        prompt = "Dadas as seguintes perguntas, cria um tópico (em inglês) para cada uma delas. Sempre que possivel, tenta agrupar perguntas relacionadas no mesmo tópico. "
-        prompt += "Responde apenas com um JSON no seguinte formato: { 'id': 'id_original', 'question': 'pergunta original', 'topic': 'tópico gerado para a pergunta' }. "
-        prompt += "Se não conseguires gerar um tópico para uma pergunta, deixa o campo 'topic' vazio. Aqui estão as perguntas: "
+        # 1. DEFINIÇÃO DA SYSTEM INSTRUCTION (Regras, Contexto e Schema em Inglês)
+        system_instruction = """
+        You are an expert academic data categorization assistant.
+        Your task is to analyze a provided list of student questions and generate a concise topic (in English) for each one.
+
+        CRITICAL RULES:
+        1. CONSISTENCY: Group related or similar questions under the exact same topic name to maintain categorization consistency.
+        2. FALLBACK: If you cannot determine a clear topic for a specific question, leave the "topic" field as an empty string ("").
+        3. OUTPUT FORMAT: You must respond strictly with a valid JSON array of objects matching the schema provided below. Do not include any introductory text, explanations, or markdown code block wrappers (like ```json).
+
+        EXPECTED JSON SCHEMA:
+        [
+        {
+            "id": "original_moodle_question_id",
+            "question": "original_question_text",
+            "topic": "generated_topic_in_english_or_empty_string"
+        }
+        ]
+        """
+
+        # 2. CONSTRUÇÃO DOS DADOS DO UTILIZADOR (Apenas a lista crua)
+        user_prompt = "Categorize the following questions:\n"
         for pergunta in perguntas:
-            prompt += "\n- ID: " + str(pergunta.get("moodle_question_id", "")) + ", question: " + pergunta.get("texto_pergunta", "") + ", topic: ?" # Acessa a pergunta usando .get() para evitar erros se a chave não existir
-        
+            moodle_id = str(pergunta.get("moodle_question_id", ""))
+            texto_pergunta = pergunta.get("texto_pergunta", "")
+            user_prompt += f"- ID: {moodle_id}, question: {texto_pergunta}\n"
+            
         try:
+            # 3. INICIALIZAÇÃO DO MODELO
             g_model = genai.GenerativeModel(
-                model_name=MODEL_NAME,
-                #system_instruction=system_instruction TODO: ver se é preciso
+                model_name=MODEL_NAME, # A tua variável global com o nome do modelo pro
+                system_instruction=system_instruction,
+                generation_config={
+                    "temperature": 0.2,                          # Temperatura baixa para categorizações mais exatas
+                    "response_mime_type": "application/json"     # 🌟 Força o Gemini a cuspir APENAS JSON puro
+                }
             )
-            response = g_model.generate_content(prompt)
+            response = g_model.generate_content(user_prompt)
 
             if hasattr(response, "text") and response.text:
                 print("\n🎯 Gemini Response Generated Successfully!")

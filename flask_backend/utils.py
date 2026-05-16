@@ -435,7 +435,7 @@ def criar_topicos_para_perguntas(pergunta_id_texto):
         response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", data=json.dumps(payload), headers=headers)
         response.raise_for_status()
         messages = response.json() 
-        #print(f"DEBUG COMPLETO RASA: {json.dumps(messages, indent=2)}")
+        print(f">> DEBUG COMPLETO RASA: {json.dumps(messages, indent=2)}")
 
         for message in messages:
             # 1. Verificamos se a mensagem tem o campo 'custom'

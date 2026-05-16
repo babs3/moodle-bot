@@ -635,7 +635,7 @@ def new_quiz_polling():
         token = cliente.moodle_token
         moodle_url = cliente.moodle_url
         print(f"Polling para course_id {cliente.course_id} usando token {token[:10]}...") # Log para debug, mostra só os primeiros caracteres do token por segurança
-        print(f"URL do Moodle para polling: {moodle_url}")
+        #print(f"URL do Moodle para polling: {moodle_url}")
         
         # 2. Fazer o polling para ESTE cliente específico
         cursos = call_moodle(moodle_url, token, function)
