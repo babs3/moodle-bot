@@ -345,22 +345,40 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
         for text_chunk, _, _ in selected_results:
             results_text.append(text_chunk)
 
-        # === PREPARE QUERY FOR GEMINI === #
+        # === PREPARE CONTEXT AND RULES FOR SYSTEM === #
         raw_text = "\n".join(results_text)
-        prompt = f" Use the following raw educational content to answer the student query '{query}': \n{raw_text} \nDon's exceed 50 words and be concise and precise in your answer. If you don't find relevant information, say you couldn't find relevant content in the course materials."
         
+        system_instruction = f"""
+        You are a precise academic tutor assistant. Your task is to answer the student's query based strictly on the provided educational course material.
+
+        [COURSE MATERIAL CONTEXT]
+        {raw_text}
+
+        [CRITICAL RULES]
+        1. CONCISENESS: Be extremely precise and direct. Do NOT exceed 50 words in your answer.
+        2. STRICTNESS: Base your answer ONLY on the provided course material above. Do not extrapolate or use outside knowledge.
+        3. FALLBACK: If you cannot find the relevant information to answer the query within the provided course material, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials."
+        """
+
+        # === PREPARE PARAMETERS === #
         generation_config = {
-            "temperature": 0.2,
+            "temperature": 0.1,           # Baixamos para 0.1 para máxima precisão factual
+            #"max_output_tokens": 120,     # Um teto seguro (50 palavras dão cerca de 70 tokens)
         }
         
         formatted_response = "Sorry, I couldn't generate a response..."
+        
+        # === CALL GEMINI API === #
         try:
             g_model = genai.GenerativeModel(
                 model_name=MODEL_NAME,
-                #system_instruction=system_instruction TODO: ver se é preciso
+                system_instruction=system_instruction, # Contexto e regras vão aqui
                 generation_config=generation_config
             )
-            response = g_model.generate_content(prompt)
+            
+            # O input do utilizador leva apenas a pergunta direta
+            user_prompt = f"Student Query: {query}"
+            response = g_model.generate_content(user_prompt)
 
             if hasattr(response, "text") and response.text:
                 print("\n🎯  Gemini Response Generated Successfully!")
@@ -413,7 +431,7 @@ class ActionCreateTopic(Action):
                 #system_instruction=system_instruction TODO: ver se é preciso
             )
             response = g_model.generate_content(prompt)
-            
+
             if hasattr(response, "text") and response.text:
                 print("\n🎯 Gemini Response Generated Successfully!")
                 raw_text = response.text.strip()
