@@ -502,6 +502,11 @@ class ActionGetDefinition(Action):
         # print slot of user_role
         user_role = tracker.get_slot("user_role")
         print(f"👤  User role from slot: {user_role}")
+        # Extract variables from chat memory
+        concept = tracker.get_slot("concept")        
+        print(f"🔍  Concept from slot: '{concept}'")
+
+        #concept_clean = concept.lower().strip()
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field

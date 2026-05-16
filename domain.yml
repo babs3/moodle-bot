@@ -14,13 +14,22 @@ intents:
   - create_topic
   - view_metrics
 
+entities:
+  - concept
+
 slots:
+  concept:
+    type: text
+    influence_conversation: false
+    mappings:
+      - type: from_entity
+        entity: concept
 
   sender_id:
     type: text
     mappings:
       - type: custom
-      
+
   user_role:
     type: categorical
     values:

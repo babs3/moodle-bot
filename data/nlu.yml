@@ -67,29 +67,15 @@ nlu:
 
 - intent: ask_for_definition
   examples: |
-    - What is
-    - What are
-    - What are business 
-    - What does
-    - What is the definition of
-    - What does it mean to
-    - What does it mean by
-    - What is the definition of
-    - What does it mean to
-    - What does it mean by
-    - What do you mean by
-    - What is the meaning of
-    - What is the definition of
-    - How do you define
-    - How to define
-    - Give me the meaning of
-    - Give me the definition of
-    - Tell me the meaning of
-    - Tell me the definition of
-    - Define the meaning of
-    - Can you define
-    - What is the definition of
-    - define
+    - What is [macroeconomics](concept)?
+    - Define [photosynthesis](concept).
+    - Can you tell me what [tort law](concept) is?
+    - Give me the definition of [target audience](concept).
+    - What is a [metaphor](concept)?
+    - Could you define [mitosis](concept)?
+    - define [brand equity](concept)
+    - Could you define [just in time production](concept)?
+    - what are [sensors](concept)?
 
 - intent: ask_for_examples
   examples: |
