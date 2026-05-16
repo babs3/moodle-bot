@@ -222,10 +222,19 @@ nlu:
     - Which topics do students understand the least?
     - Is there any document that no one is consulting?
     - How has student interest evolved over the month?
-    - Summarize the main learning roadblocks from this week.
+    - Summarize the main learning from this week.
     - Are students asking complex questions or just seeking simple definitions?
     - How many different students used the bot this week?
     - Are the questions coming mainly from a few students, or is the whole class participating?
     - Is there any student (ID) asking too many questions on the same topic?
     - What is the average number of questions per student?
     - Identify the IDs of the students who seem to be struggling the most.
+    - How is my class performing?
+    - How are my students doing?
+    - What are the main difficulties my students are facing?
+    - What are the main interests of my students based on their questions?
+    - What are the main topics my students are asking about?
+    - What are the main materials my students are consulting?
+    - How many students are using the bot?
+    - How is the class engagement with the bot?
+    - How is the course engagement?
