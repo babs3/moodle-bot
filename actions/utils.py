@@ -431,6 +431,17 @@ def dense_vector_search(keywords, query, split_keywords, collection, authorized_
     vector_metadata = vector_results["metadatas"][0]
     vector_scores = vector_results["distances"][0]  # Lower is better (L2 distance)
     
+    # stay only with different documents (remove duplicates with same file and page)
+    unique_docs = []
+    seen_combinations = set()
+    for doc, meta, score in zip(vector_docs, vector_metadata, vector_scores):
+        file_page_combo = (meta['file'], meta['page'])
+        if file_page_combo not in seen_combinations:
+            unique_docs.append((doc, meta, score))
+            seen_combinations.add(file_page_combo)
+    
+    vector_docs, vector_metadata, normalized_vector_scores = zip(*unique_docs) if unique_docs else ([], [], [])
+    
     #print(f"\n📖  1. Found {len(vector_docs)} documents with vector search.")
     #for doc, meta, score in zip(vector_docs, vector_metadata, vector_scores):
     #    print(f"📄  PDF: {meta['file'][:25]} | Page: {meta['page']} | Score: {score:.4f}")
@@ -442,7 +453,7 @@ def dense_vector_search(keywords, query, split_keywords, collection, authorized_
     print(f"\n📖  2. Vector scores Normalized:")
     for doc, meta, score in zip(vector_docs, vector_metadata, normalized_vector_scores):
         print(f"📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
-    
+        
     return vector_docs, vector_metadata, normalized_vector_scores
 
 
@@ -561,10 +572,20 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
     bm25_meta = [bm25_metadata[i] for i in top_bm25_indices]
     bm25_scores = [final_scores[i] for i in top_bm25_indices]
     
+    # stay only with different documents (remove duplicates with same file and page)
+    unique_docs = []
+    seen_combinations = set()
+    for doc, meta, score in zip(bm25_docs, bm25_meta, bm25_scores):
+        file_page_combo = (meta['file'], meta['page'])
+        if file_page_combo not in seen_combinations:
+            unique_docs.append((doc, meta, score))
+            seen_combinations.add(file_page_combo)
+    
+    bm25_docs, bm25_meta, normalized_bm25_scores = zip(*unique_docs) if unique_docs else ([], [], [])
+    
     #print(f"\n📖  1. Found {len(bm25_docs)} documents with bm25 search.")
     #for doc, meta, score in zip(bm25_docs, bm25_meta, bm25_scores):
     #    print(f"📄  PDF: {meta['file'][:25]} | Page: {meta['page']} | Score: {score:.4f}")            
-        
         
     # === NORMALIZE SCORES === #
     
@@ -608,9 +629,9 @@ def hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_d
 
     # Sort results by hybrid score
     hybrid_results = sorted(hybrid_results, key=lambda x: x[2], reverse=True)
-    #print("\n📊  All Merged Results:")
-    #for i, (doc, meta, score) in enumerate(hybrid_results):
-    #    print(f"{i+1}. 📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
+    print("\n📊  All Merged Results:")
+    for i, (doc, meta, score) in enumerate(hybrid_results):
+        print(f"{i+1}. 📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
 
     # === ADAPTIVE THRESHOLDING BASED ON PERCENTILE === #
     scores = [score for _, _, score in hybrid_results]

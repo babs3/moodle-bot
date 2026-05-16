@@ -183,7 +183,7 @@ def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_thre
     total_pages = len(doc)
     title = None
     
-    print(f"\n\n📄 Processing {pdf_path} with {total_pages} pages...\n")
+    print(f"\n\n📄  Processing {pdf_path} with {total_pages} pages...\n")
 
     i = 0
     while i < total_pages:
@@ -195,7 +195,7 @@ def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_thre
         
         while i < total_pages:
             cleaned_image_text = ""
-            print(f"📄 - Page {i + 1} of {total_pages}")
+            print(f"📄  - Page {i + 1} of {total_pages}")
             
             current_text = doc[i].get_text("text").strip()
             current_text = re.sub(r'/\*\*|\*/|LGP\[\]', "", current_text) # for LGP slides style
