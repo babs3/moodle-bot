@@ -402,6 +402,16 @@ def obter_perguntas_do_quiz(quiz_id, moodle_url, moodle_token):
 
     return perguntas_extraidas
 
+def get_user_firstname(user_id, moodle_url, moodle_token):
+    
+    response = call_moodle(moodle_url, moodle_token, 'core_user_get_users', {
+        'criteria[0][key]': 'id',
+        'criteria[0][value]': user_id
+    })
+    if response and 'users' in response and response['users']:
+        return response['users'][0].get('firstname', 'Unknown')
+    return 'Unknown'
+
 def extrair_conteudo_pergunta(html_raw):
     # 1. Carregar o HTML no BeautifulSoup
     soup = BeautifulSoup(html_raw, 'html.parser')

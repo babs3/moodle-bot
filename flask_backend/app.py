@@ -48,13 +48,13 @@ def wait_for_rasa():
 def index():        
     return "Flask está a correr na porta 8082!"
 
-def session_init_rasa(user_email, user_name, user_role):
+def session_init_rasa(user_email, user_firstname, user_role):
     # 2. "Injetar" o papel do utilizador no Rasa via Tracker API
     try:
         payload = {
             "sender": user_email, # O Rasa precisa de um email para identificar o sender, mas como isto é só para definir o slot, podemos usar um placeholder
             "message": "set username trigger",
-            "metadata": {"user_name": user_name, "user_role": user_role}
+            "metadata": {"user_name": user_firstname, "user_role": user_role}
         }
         headers = {"Content-Type": "application/json"}
         response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", data=json.dumps(payload), headers=headers)
@@ -68,8 +68,7 @@ def session_init_rasa(user_email, user_name, user_role):
 def chat():    
     data = request.json
     app.logger.info(f"---------> Received chat request with data: {data}")
-    moodle_id = data.get('user_id')
-    user_name = data.get('user_name')
+    moodle_id = data.get('user_id')    
     course_id = data.get('course_id')
     user_message = data.get('message')
     moodle_token = data.get('token')
@@ -77,15 +76,17 @@ def chat():
     is_teacher = data.get('is_teacher', False)
     if moodle_url == "http://localhost":
         moodle_url = "http://host.docker.internal"
-    print(f"Received message for {user_name} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
-            
+        
+    user_firstname = get_user_firstname(moodle_id, moodle_url, moodle_token)
+    print(f"Received message for {user_firstname} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
+    
     # Busca os dados reais no Moodle
     info_utilizador = get_moodle_user_data(moodle_id, moodle_token, moodle_url)
     user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
     username = info_utilizador.get("nome") if info_utilizador else "NOME_"
     check_moodle_user_in_db(moodle_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
     
-    session_init_rasa(user_email, user_name, "teacher" if is_teacher else "student") # Define o papel do utilizador para personalizar as respostas do Rasa
+    session_init_rasa(user_email, user_firstname, "teacher" if is_teacher else "student") # Define o papel do utilizador para personalizar as respostas do Rasa
     
     moodle_contents, moodle_contents_names = get_moodle_contents(course_id, moodle_url, moodle_token)
     if moodle_contents_names == None:
