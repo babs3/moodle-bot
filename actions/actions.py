@@ -222,8 +222,8 @@ def keywords_to_tokens(keywords, query):
     
     print(f"\n🔛  Getting lemmas for keyphrase/keywords: '{keywords}'")
     query_length = len(query.split())
-    print(f"👻  --> Original query: {query}")
-    print(f"👻  --> Query length: {query_length} words")
+    #print(f"👻  --> Original query: {query}")
+    #print(f"👻  --> Query length: {query_length} words")
     
     if keywords == []:
         print("\n👻  --> No keywords found in the query. Using just .split()")
@@ -260,7 +260,7 @@ def keywords_to_tokens(keywords, query):
     for i, keyword in enumerate(keywords):        
         if " " in keyword:
             lemma_words = tokenize_and_clean_text(keyword)
-            print(f"\n👻  --> Lemmas for phrase '{keyword}': {lemma_words}")
+            print(f"    👻  --> Lemmas for phrase '{keyword}': {lemma_words}")
             for word in lemma_words:
                 simple_tokens.append(word)  # e.g., ["pestel", "analysis"]
             if len(lemma_words) > 1:
@@ -285,17 +285,18 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             SlotSet("input_time", input_time)
             ]
         
+    print(f"\n🧒  --------- Getting Knowledge --------- 🔖 ")
+    
     print(f"\n🧒  User ({user_email}) said: {user_message} 📩")
     query = treat_raw_query(user_message)
     
     complex_tokens = []
     simple_tokens = []
-    if concept != "":
+    if concept and concept.strip() != "":
         # check if concept is just one word or multiple words
         if " " in concept:
             complex_tokens = [concept]
-            for word in concept.split():
-                simple_tokens.append(tokenize_and_clean_text(word)[0]) # Get the lemma of each word in the concept and add to simple_tokens
+            simple_tokens = tokenize_and_clean_text(concept)
             print(f"🔍  Concept '{concept}' split into simple lemma tokens: {simple_tokens}")
         else:
             _simple_tokens = [concept]
@@ -306,10 +307,19 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             
             if len(simple_tokens) > 2*len(_simple_tokens):
                 print(f"⚠️  Rasa extracted the concept wrong. The number of simple tokens ({len(simple_tokens)}) is more than double the number of simple tokens from the concept ({len(_simple_tokens)}).")
+                # add the concept lemma to the beggining of simple_tokens if it's not already there
+                for token in _simple_tokens:
+                    if token.lower() not in simple_tokens:
+                        simple_tokens.insert(0, token.lower())
+                        print(f"🔍  Added concept lemma '{token.lower()}' to the beginning of simple tokens: {simple_tokens}")
+                    if token.lower() not in complex_tokens[0].split():
+                        complex_tokens[0] = token.lower() + " " + complex_tokens[0]
+                        print(f"🔍  Added concept lemma '{token.lower()}' to the beginning of complex token: {complex_tokens}")
             else:
-                simple_tokens = _simple_tokens         
-            
+                simple_tokens = _simple_tokens
+                print(f"🔍  Using concept '{concept}' as the only simple token: {simple_tokens}")
     else:
+        print(f"\n🔍  No concept identified by Rasa. Proceeding with keywords extraction from the entire query.")
         # Keywords Extraction Process 
         no_punct_query = re.sub(r"[^\w\s\-\&]", "", query).strip()  # Remove punctuation except '-' and '&'
         keywords = extract_query_keywords(no_punct_query)
@@ -330,7 +340,8 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             SlotSet("bot_response", "no_access"),  # Store the bot response -> trigger
             SlotSet("user_email", user_email),  # Store the sender ID
             SlotSet("user_id", user_id),  # Store the user ID
-            SlotSet("input_time", input_time)
+            SlotSet("input_time", input_time),
+            SlotSet("concept", concept) # Store the concept for future use
             ]
     if normalized_bm25_scores == []:
         print(f"\n⚠️  Normalized BM25 scores is empty for user query: '{query}'")
@@ -340,11 +351,11 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             SlotSet("bot_response", "no_response"),  # Store the bot response
             SlotSet("user_email", user_email),  # Store the sender ID
             SlotSet("user_id", user_id),  # Store the user ID
-            SlotSet("input_time", input_time)
+            SlotSet("input_time", input_time),
+            SlotSet("concept", concept) 
             ]
-        
     
-    if concept != "":
+    if concept and concept.strip() != "":
         if intent == "definition of ":
             alpha = 0.6 # Use a lower alpha for definitions
             print(f"\n🔍  Found keywords: {complex_tokens} and {simple_tokens}. \n     Using hybrid search with alpha = {alpha} because of the 'DEFINE' intent ")
@@ -419,7 +430,8 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
                 SlotSet("bot_response", "gemini_error"),  # Store the bot response -> trigger
                 SlotSet("user_email", user_email),  # Store the sender ID
                 SlotSet("user_id", user_id),  # Store the user ID
-                SlotSet("input_time", input_time)
+                SlotSet("input_time", input_time),
+                SlotSet("concept", concept) 
             ]
 
     return  [
@@ -428,7 +440,10 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
         SlotSet("bot_response", formatted_response),  # Store the bot response
         SlotSet("user_email", user_email),  # Store the sender ID
         SlotSet("user_id", user_id),  # Store the user ID
-        SlotSet("input_time", input_time)
+        SlotSet("input_time", input_time),
+        SlotSet("concept", concept),
+        SlotSet("complex_tokens", complex_tokens),
+        SlotSet("simple_tokens", simple_tokens)
         ]
 
 class ActionCreateTopic(Action):
@@ -523,13 +538,11 @@ class ActionGetDefinition(Action):
         print(f"DEBUG TRACKER SLOTSS: {tracker.current_slot_values()}")
         
         # print slot of user_role
-        user_role = tracker.get_slot("user_role")
-        print(f"👤  User role from slot: {user_role}")
+        #user_role = tracker.get_slot("user_role")
+        #print(f"👤  User role from slot: {user_role}")
         # Extract variables from chat memory
         concept = tracker.get_slot("concept")        
         print(f"🔍  Concept from slot: '{concept}'")
-
-        #concept_clean = concept.lower().strip()
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
@@ -543,7 +556,7 @@ class ActionGetDefinition(Action):
         #print(f"🎓  Tutor mode from metadata: {tutor_mode}")
         
         is_teacher = tracker.latest_message.get("metadata", {}).get("is_teacher", False)
-        print(f"👩‍🏫  Is teacher ({user_email}) from metadata: {is_teacher}")
+        #print(f"👩‍🏫  Is teacher ({user_email}) from metadata: {is_teacher}")
         
         intent = "definition of"      
         
@@ -634,44 +647,43 @@ class ActionGetClassMaterialLocation(Action):
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         user_email = tracker.get_slot("user_email")
         user_message = tracker.get_slot("user_query")
-        query = treat_raw_query(user_message)
         tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
         #print(f"tutor_mode in ActionGetClassMaterialLocation: {tutor_mode}")
-        
+                
         if bot_response == "no_access":
             dispatcher.utter_message(text="You don't have access to any class materials yet. Please check with your instructor to gain access to the course materials and try again.")
-            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
+            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", "")]
 
         if bot_response == "no_response":
             response = f"I couldn't find any relevant content on this topic in the course materials. Please try again."
             save_user_progress(course_id, user_email, user_message, response, [], input_time, user_id, tutor_mode)
             dispatcher.utter_message(text=response)
-            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
+            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", "")]
 
         if bot_response == "gemini_error":
             response = f"Sorry, I couldn't process that request due to an error calling Gemini API. Please try again later."
             save_user_progress(course_id, user_email, user_message, response, [], input_time, user_id, tutor_mode)
             dispatcher.utter_message(text=response)
-            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
+            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", "")]
         
         if bot_response == "I couldn't find relevant content in the course materials.":
             response = "</br>Please try rephrasing your query."
             save_user_progress(course_id, user_email, user_message, response, [], input_time, user_id, tutor_mode)
             dispatcher.utter_message(text=response)
-            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
+            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", "")]
+
+
+        print(f"\n🔖  --------- Getting class materials location --------- 🔖 ")
         
-        
-        print(f"\n\n 🔖  --------- Getting class materials location --------- 🔖 ")
+        query = treat_raw_query(user_message)
         
         if len(selected_results) == 0:
             dispatcher.utter_message(text="I couldn't find relevant class materials for your query.")
             print("\n🚨  No relevant materials found!")
 
         else: # get materials location:
-            no_punct_query = re.sub(r"[^\w\s]", "", query).strip()  # Remove punctuation
-            # get relevant keywords from the query
-            keywords = extract_query_keywords(no_punct_query)
-            complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, query)       
+            complex_tokens = tracker.get_slot("complex_tokens") or []
+            simple_tokens = tracker.get_slot("simple_tokens") or []
             location_results, pdfs_insights = get_materials_location(selected_results, complex_tokens, simple_tokens, course_id)
 
             if location_results:
@@ -699,7 +711,7 @@ class ActionGetClassMaterialLocation(Action):
                     dispatcher.utter_message(text="I couldn't find specific page references for your question.")
 
         #clear the slots
-        return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
+        return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", ""), SlotSet("complex_tokens", []), SlotSet("simple_tokens", "")]
 
 
 class ActionGenerateInitialMenuButtons(Action):

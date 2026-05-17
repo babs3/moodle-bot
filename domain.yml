@@ -25,6 +25,18 @@ slots:
       - type: from_entity
         entity: concept
 
+  complex_tokens:
+    type: list
+    influence_conversation: false
+    mappings:
+      - type: custom
+  
+  simple_tokens:
+    type: list
+    influence_conversation: false
+    mappings:
+      - type: custom
+
   sender_id:
     type: text
     mappings:

@@ -82,7 +82,10 @@ def load_bm25_index(course_id):
         return [], [], [], [], []
     
 def tokenize_and_clean_text(text):
-    doc = nlp(text)
+    text_clean = text.replace('-', ' ')
+    doc = nlp(text_clean)
+    for token in doc:
+        print(f"Token: '{token.text}' | Lemma: '{token.lemma_}' | is_alpha: {token.is_alpha} | is_stop: {token.is_stop}")
     tokens = [
         token.lemma_.lower()  # use lemma (base form), lowercase
         for token in doc
@@ -473,9 +476,9 @@ def dense_vector_search(intent, complex_tokens, simple_tokens, query, collection
     
     normalized_vector_scores = normalize_score(vector_scores, True)
     
-    print(f"\n📖  2. Vector scores Normalized:")
-    for doc, meta, score in zip(vector_docs, vector_metadata, normalized_vector_scores):
-        print(f"📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
+    #print(f"\n📖  2. Vector scores Normalized:")
+    #for doc, meta, score in zip(vector_docs, vector_metadata, normalized_vector_scores):
+    #    print(f"📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
         
     return vector_docs, vector_metadata, normalized_vector_scores
 
@@ -509,18 +512,14 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
                 bm25_scores_complex_3 = normalize_bm25_indexes(bm25_scores_complex_3)
                 
                 if bm25_scores_complex_3.max() == 0:
-                    print(f"👻  --> No matching for 3 Complex Tokens '{[token]}'")
-                else:
                     print(f"--> Complex Tokens match with len == 3: {[token]}") 
                 
                 complex_tokens_2 = get_ngrams(token, 2)
                 bm25_scores_complex_2 = bm25_2gram.get_scores(complex_tokens_2)
                 bm25_scores_complex_2 = normalize_bm25_indexes(bm25_scores_complex_2)  
                 
-                if bm25_scores_complex_2.max() == 0:
-                    print(f"👻  --> Also, no matching for 2 Complex Tokens '{complex_tokens_2}'")
-                else:
-                    print(f"--> Also, Complex Tokens match with len == 2: {complex_tokens_2}")
+                if bm25_scores_complex_2.max() != 0:
+                    print(f"--> Complex Tokens match with len == 2: {complex_tokens_2}")
 
                 # combine both scores
                 if i == 0:
@@ -538,9 +537,8 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
                 
                 if len(token.split()) == 2:
                     if bm25_scores_complex.max() == 0:
-                        print(f"👻  --> No match for Complex Tokens w/len == 2: '{[token]}'")
-                    else:
                         print(f"--> Complex Tokens match with len == 2: {[token]}")
+                        
 
     # Perform BM25 Search
     bm25_scores_simple = bm25_simple.get_scores(simple_tokens)
@@ -616,9 +614,9 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
     
     if bm25_scores:            
         normalized_bm25_scores = normalize_score(bm25_scores, False)
-        print(f"\n📖  BM25 scores Normalized:")
-        for doc, meta, score in zip(bm25_docs, bm25_meta, normalized_bm25_scores):
-            print(f"📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
+        #print(f"\n📖  BM25 scores Normalized:")
+        #for doc, meta, score in zip(bm25_docs, bm25_meta, normalized_bm25_scores):
+        #    print(f"📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
             
         return bm25_docs, bm25_meta, normalized_bm25_scores
     else:
@@ -675,9 +673,9 @@ def hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_d
     
     # Filter results
     selected_results = [(doc, meta, score) for doc, meta, score in hybrid_results if score >= threshold]
-    print(f"\n📖  Found {len(selected_results)} relevant documents in a total of {len(hybrid_results)}:")
-    for doc, meta, score in selected_results:
-        print(f"    📄  PDF: {meta['file']} | Page: {meta['page']}") #| Score: {score:.4f}
+    #print(f"\n📖  Found {len(selected_results)} relevant documents in a total of {len(hybrid_results)}:")
+    #for doc, meta, score in selected_results:
+    #    print(f"    📄  PDF: {meta['file']} | Page: {meta['page']}") #| Score: {score:.4f}
     
     return selected_results
     

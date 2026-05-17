@@ -67,6 +67,8 @@ nlu:
 
 - intent: ask_for_definition
   examples: |
+    - Acording to the lecture slides, what is [a digital twin](concept)?
+    - What is the definition of [Fog computing](concept) according to the lecture notes?
     - What is [Edge computing](concept)?
     - Define [Fog computing](concept).
     - Can you tell me what [Cloud computing](concept) is?
