@@ -197,9 +197,8 @@ class ActionSetUsername(Action):
             tracker: Tracker,
             domain: dict):
         
-        print(f"DEBUG TRACKER SLOTS: {tracker.current_slot_values()}")
+        #print(f"DEBUG TRACKER SLOTS: {tracker.current_slot_values()}")
         
-
         sender_id = tracker.sender_id
         # Extract metadata
         metadata = tracker.latest_message.get("metadata", {})
@@ -217,19 +216,18 @@ def keywords_to_tokens(keywords, query):
     Convert keywords to complex and simple lemmatized tokens.
     Complex tokens are phrases (e.g., "pestel analysis"), while simple tokens are individual words (e.g., "pestel", "analysis").
     """
-    
     keywords = list(dict.fromkeys(keywords)) # Remove duplicates
     
-    print(f"\n🔛  Getting lemmas for keyphrase/keywords: '{keywords}'")
+    #print(f"\n🔛  Getting lemmas for keyphrase/keywords: '{keywords}'")
     query_length = len(query.split())
     #print(f"👻  --> Original query: {query}")
     #print(f"👻  --> Query length: {query_length} words")
     
     if keywords == []:
-        print("\n👻  --> No keywords found in the query. Using just .split()")
+        #print("\n👻  --> No keywords found in the query. Using just .split()")
         query = " ".join(query.split())
         simple_tokens = tokenize_and_clean_text(query)
-        print(f"👻  --> New keywords: {simple_tokens}")
+        #print(f"👻  --> New keywords: {simple_tokens}")
         return [], simple_tokens, True         
         
     if query_length <= 5:
@@ -248,19 +246,19 @@ def keywords_to_tokens(keywords, query):
                 simple_keywords.append(keyword)
 
         if len(simple_keywords) < query_length * percentage:
-            print(f"👻  --> Keywords are less than {percentage} of the query length ({query_length}). Using just .split()")
+            #print(f"👻  --> Keywords are less than {percentage} of the query length ({query_length}). Using just .split()")
             query = " ".join(query.split())
             simple_tokens = tokenize_and_clean_text(query)
-            print(f"👻  --> New keywords: {simple_tokens}")
+            #print(f"👻  --> New keywords: {simple_tokens}")
             return [], simple_tokens, True         
         
-    print(f"\n🔛  Current keywords: {keywords}")
+    #print(f"\n🔛  Current keywords: {keywords}")
     complex_tokens = []  # e.g., ["pestel analysis", "pestel framework"]
     simple_tokens = []  # e.g., ["pestel", "analysis"]
     for i, keyword in enumerate(keywords):        
         if " " in keyword:
             lemma_words = tokenize_and_clean_text(keyword)
-            print(f"    👻  --> Lemmas for phrase '{keyword}': {lemma_words}")
+            #print(f"    👻  --> Lemmas for phrase '{keyword}': {lemma_words}")
             for word in lemma_words:
                 simple_tokens.append(word)  # e.g., ["pestel", "analysis"]
             if len(lemma_words) > 1:
@@ -285,7 +283,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             SlotSet("input_time", input_time)
             ]
         
-    print(f"\n🧒  --------- Getting Knowledge --------- 🔖 ")
+    print(f"\n📖  --------- Getting Knowledge --------- 📖 ")
     
     print(f"\n🧒  User ({user_email}) said: {user_message} 📩")
     query = treat_raw_query(user_message)
@@ -535,7 +533,7 @@ class ActionGetDefinition(Action):
         
         print("\n📊  Generating bot 'action_get_definition' response...")
         
-        print(f"DEBUG TRACKER SLOTSS: {tracker.current_slot_values()}")
+        #print(f"DEBUG TRACKER SLOTSS: {tracker.current_slot_values()}")
         
         # print slot of user_role
         #user_role = tracker.get_slot("user_role")
