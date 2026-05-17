@@ -273,7 +273,7 @@ def keywords_to_tokens(keywords, query):
     
     return complex_tokens, simple_tokens, False # Return complex tokens, simple tokens, and split_keywords flag
 
-def action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id):
+def action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, concept, user_id, course_id):
     if authorized_resources == []:
         print(f"\n❌  No authorized resources found for user: {user_email}")
         return  [
@@ -288,15 +288,38 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
     print(f"\n🧒  User ({user_email}) said: {user_message} 📩")
     query = treat_raw_query(user_message)
     
-    # Keywords Extraction Process 
-    no_punct_query = re.sub(r"[^\w\s\-\&]", "", query).strip()  # Remove punctuation except '-' and '&'
-    keywords = extract_query_keywords(no_punct_query)
-    complex_tokens, simple_tokens, split_keywords = keywords_to_tokens(keywords, no_punct_query)  
-    print(f"\n🔍  Extracted keywords: \n    {complex_tokens} \n    {simple_tokens} \n    Split keywords flag: {split_keywords}")
+    complex_tokens = []
+    simple_tokens = []
+    if concept != "":
+        # check if concept is just one word or multiple words
+        if " " in concept:
+            complex_tokens = [concept]
+            for word in concept.split():
+                simple_tokens.append(tokenize_and_clean_text(word)[0]) # Get the lemma of each word in the concept and add to simple_tokens
+            print(f"🔍  Concept '{concept}' split into simple lemma tokens: {simple_tokens}")
+        else:
+            _simple_tokens = [concept]
+            
+            no_punct_query = re.sub(r"[^\w\s\-\&]", "", query).strip()  # Remove punctuation except '-' and '&'
+            keywords = extract_query_keywords(no_punct_query)
+            complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query)  
+            
+            if len(simple_tokens) > 2*len(_simple_tokens):
+                print(f"⚠️  Rasa extracted the concept wrong. The number of simple tokens ({len(simple_tokens)}) is more than double the number of simple tokens from the concept ({len(_simple_tokens)}).")
+            else:
+                simple_tokens = _simple_tokens         
+            
+    else:
+        # Keywords Extraction Process 
+        no_punct_query = re.sub(r"[^\w\s\-\&]", "", query).strip()  # Remove punctuation except '-' and '&'
+        keywords = extract_query_keywords(no_punct_query)
+        complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query)  
+    
+    print(f"\n🔍  Final tokens to be used in search: \n    > Complex tokens: {complex_tokens} \n    > Simple tokens: {simple_tokens}")
     
     print(f"\n🔍  Starting search process in resources: {authorized_resources}")
     # Hybrid Search Process    
-    vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(keywords, query, split_keywords, collection, authorized_resources, intent)        
+    vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(intent, complex_tokens, simple_tokens, query, collection, authorized_resources)        
     bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id)
     
     if bm25_docs == [] and bm25_meta == [] and normalized_bm25_scores == []:
@@ -321,7 +344,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             ]
         
     
-    if not split_keywords:
+    if concept != "":
         if intent == "definition of ":
             alpha = 0.6 # Use a lower alpha for definitions
             print(f"\n🔍  Found keywords: {complex_tokens} and {simple_tokens}. \n     Using hybrid search with alpha = {alpha} because of the 'DEFINE' intent ")
@@ -522,9 +545,9 @@ class ActionGetDefinition(Action):
         is_teacher = tracker.latest_message.get("metadata", {}).get("is_teacher", False)
         print(f"👩‍🏫  Is teacher ({user_email}) from metadata: {is_teacher}")
         
-        intent = "definition of "      
+        intent = "definition of"      
         
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, concept, user_id, course_id)
     
 # === ACTION 2: GET EXPLANATION === #
 class ActionGetExplanation(Action):
@@ -534,6 +557,10 @@ class ActionGetExplanation(Action):
     def run(self, dispatcher, tracker, domain):
         
         print("\n📊  Generating bot 'action_get_explanation' response...")
+        
+        concept = tracker.get_slot("concept")
+        concept = concept.lower().strip() if concept else ""        
+        print(f"🔍  Concept from slot: '{concept}'")
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
@@ -542,9 +569,9 @@ class ActionGetExplanation(Action):
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
 
-        intent = "explanation of "
+        intent = "explanation of"
 
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, concept, user_id, course_id)
 
 # === ACTION 3: GET EXAMPLES === #
 class ActionGetExamples(Action):
@@ -554,6 +581,10 @@ class ActionGetExamples(Action):
     def run(self, dispatcher, tracker, domain):
         
         print("\n📊  Generating bot 'action_get_examples' response...")
+        
+        concept = tracker.get_slot("concept")
+        concept = concept.lower().strip() if concept else ""
+        print(f"🔍  Concept from slot: '{concept}'")
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
@@ -562,8 +593,8 @@ class ActionGetExamples(Action):
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
 
-        intent = "examples of "
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
+        intent = "examples of"
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, concept, user_id, course_id)
 
 # === ACTION 4: SUMMARIZE === #
 class ActionGetSummary(Action):
@@ -573,6 +604,10 @@ class ActionGetSummary(Action):
     def run(self, dispatcher, tracker, domain):
         
         print("\n📊  Generating bot 'action_get_summary' response...")
+        
+        concept = tracker.get_slot("concept")
+        concept = concept.lower().strip() if concept else ""
+        print(f"🔍  Concept from slot: '{concept}'")
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
@@ -581,8 +616,8 @@ class ActionGetSummary(Action):
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
 
-        intent = "summary of "
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
+        intent = "summary of"
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, concept, user_id, course_id)
 
 
 # === FINAL ACTION: GET PDF NAMES & PAGE LOCATIONS === #
@@ -618,6 +653,13 @@ class ActionGetClassMaterialLocation(Action):
             save_user_progress(course_id, user_email, user_message, response, [], input_time, user_id, tutor_mode)
             dispatcher.utter_message(text=response)
             return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
+        
+        if bot_response == "I couldn't find relevant content in the course materials.":
+            response = "</br>Please try rephrasing your query."
+            save_user_progress(course_id, user_email, user_message, response, [], input_time, user_id, tutor_mode)
+            dispatcher.utter_message(text=response)
+            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", "")]
+        
         
         print(f"\n\n 🔖  --------- Getting class materials location --------- 🔖 ")
         

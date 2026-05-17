@@ -152,6 +152,7 @@ nlu:
 
 - intent: ask_for_explanation
   examples: |
+    - explain me the [System Architecture in CPS](concept)
     - Explain [Edge computing](concept) to me.
     - Can you explain [Fog computing](concept)?
     - I don't understand [Cloud computing](concept), can you explain it?

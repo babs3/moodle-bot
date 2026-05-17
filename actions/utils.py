@@ -411,11 +411,34 @@ def get_user_history(course_id):
         print("⚠️  Failed to retrieve user progress data.")
         return pd.DataFrame()    
 
-def dense_vector_search(keywords, query, split_keywords, collection, authorized_resources, intent="definition of "):
+def filtrar_e_expandir_tokens(complex_tokens):
+    lista_final = []
+    
+    for token in complex_tokens:
+        palavras = token.split()
+        num_palavras = len(palavras)
+        
+        # Se tiver 4 ou mais palavras, decompõe em sub-expressões de 3 e 2 palavras
+        if num_palavras >= 4:
+            # 1. Adiciona todas as combinações de 3 palavras (tri-grams)
+            for i in range(num_palavras - 2):
+                lista_final.append(" ".join(palavras[i:i+3]))
+                
+            # 2. Adiciona todas as combinações de 2 palavras (bi-grams)
+            for i in range(num_palavras - 1):
+                lista_final.append(" ".join(palavras[i:i+2]))
+        else:
+            # Se já tiver 2 ou 3 palavras (ou menos), mantém o token original
+            lista_final.append(token)
+            
+    return lista_final
 
-    if keywords != []:
-        if not split_keywords:
-            query = intent + " ".join(keywords)  # Add a prefix to the query
+def dense_vector_search(intent, complex_tokens, simple_tokens, query, collection, authorized_resources):
+
+    if complex_tokens != []:
+        query = intent + " " + " ".join(complex_tokens)  # Give more weight to complex tokens in the query
+    elif simple_tokens != []:
+        query = intent + " " + " ".join(simple_tokens)  # If no complex tokens, use simple tokens
 
     # === DENSE (Vector) SEARCH === #
     print(f"\n🔛  Getting query embeddings for query: '{query}'\n...")
@@ -459,7 +482,9 @@ def dense_vector_search(keywords, query, split_keywords, collection, authorized_
 
 def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id, alpha=0.8):
     # === Perform Hybrid BM25 search === #
-    print(f"\n🔛 Getting BM25 sparse vectors for both:\n - {complex_tokens}\n - {simple_tokens}")
+    
+    complex_tokens = filtrar_e_expandir_tokens(complex_tokens)
+    print(f"\n🔛  Getting BM25 sparse vectors for both:\n - {complex_tokens}\n - {simple_tokens}")
     
     # grant access to the BM25 index updated with new documents (if any)
     try:
