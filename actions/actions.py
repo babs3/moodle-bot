@@ -286,7 +286,6 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
     print(f"\n📖  --------- Getting Knowledge --------- 📖 ")
     
     print(f"\n🧒  User ({user_email}) said: {user_message} 📩")
-    query = treat_raw_query(user_message)
     
     complex_tokens = []
     simple_tokens = []
@@ -299,7 +298,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
         else:
             _simple_tokens = [concept]
             
-            no_punct_query = re.sub(r"[^\w\s\-\&]", "", query).strip()  # Remove punctuation except '-' and '&'
+            no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
             keywords = extract_query_keywords(no_punct_query)
             complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query)  
             
@@ -319,7 +318,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
     else:
         print(f"\n🔍  No concept identified by Rasa. Proceeding with keywords extraction from the entire query.")
         # Keywords Extraction Process 
-        no_punct_query = re.sub(r"[^\w\s\-\&]", "", query).strip()  # Remove punctuation except '-' and '&'
+        no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
         keywords = extract_query_keywords(no_punct_query)
         complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query)  
     
@@ -327,13 +326,13 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
     
     print(f"\n🔍  Starting search process in resources: {authorized_resources}")
     # Hybrid Search Process    
-    vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(intent, complex_tokens, simple_tokens, query, collection, authorized_resources)        
+    vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(intent, complex_tokens, simple_tokens, user_message, collection, authorized_resources)        
     bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id)
     
     if bm25_docs == [] and bm25_meta == [] and normalized_bm25_scores == []:
-        print(f"\n⚠️  BM25 search returned no results for user query: '{query}'")
+        print(f"\n⚠️  BM25 search returned no results for user query: '{user_message}'")
         return  [
-            SlotSet("user_query", query),  # Store the query
+            SlotSet("user_query", user_message),  # Store the query
             SlotSet("materials_location", ""), #gemini_results),  # Store selected materials
             SlotSet("bot_response", "no_access"),  # Store the bot response -> trigger
             SlotSet("user_email", user_email),  # Store the sender ID
@@ -342,9 +341,9 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             SlotSet("concept", concept) # Store the concept for future use
             ]
     if normalized_bm25_scores == []:
-        print(f"\n⚠️  Normalized BM25 scores is empty for user query: '{query}'")
+        print(f"\n⚠️  Normalized BM25 scores is empty for user query: '{user_message}'")
         return  [
-            SlotSet("user_query", query),  # Store the query
+            SlotSet("user_query", user_message),  # Store the query
             SlotSet("materials_location", ""), #gemini_results),  # Store selected materials
             SlotSet("bot_response", "no_response"),  # Store the bot response
             SlotSet("user_email", user_email),  # Store the sender ID
@@ -409,7 +408,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             )
             
             # O input do utilizador leva apenas a pergunta direta
-            user_prompt = f"Student Query: {query}"
+            user_prompt = f"Student Query: {user_message}"
             response = g_model.generate_content(user_prompt)
 
             if hasattr(response, "text") and response.text:
@@ -423,7 +422,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             selected_results = []  # Clear selected results
             print(f"\n❌  Error calling Gemini API: {e}")
             return  [
-                SlotSet("user_query", query),  # Store the query
+                SlotSet("user_query", user_message),  # Store the query
                 SlotSet("materials_location", ""), #gemini_results),  # Store selected materials
                 SlotSet("bot_response", "gemini_error"),  # Store the bot response -> trigger
                 SlotSet("user_email", user_email),  # Store the sender ID
@@ -673,8 +672,6 @@ class ActionGetClassMaterialLocation(Action):
 
         print(f"\n🔖  --------- Getting class materials location --------- 🔖 ")
         
-        query = treat_raw_query(user_message)
-        
         if len(selected_results) == 0:
             dispatcher.utter_message(text="I couldn't find relevant class materials for your query.")
             print("\n🚨  No relevant materials found!")
@@ -685,7 +682,7 @@ class ActionGetClassMaterialLocation(Action):
             location_results, pdfs_insights = get_materials_location(selected_results, complex_tokens, simple_tokens, course_id)
 
             if location_results:
-                response = save_user_progress(course_id, user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)
+                response = save_user_progress(course_id, user_email, user_message, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)
                 print_results(location_results)              
                 dispatcher.utter_message(
                     text="</br></br><span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>" 
@@ -696,7 +693,7 @@ class ActionGetClassMaterialLocation(Action):
                 # no exact references found, so return related PDFs found in previous function
                 if selected_results:
                     location_results, pdfs_insights = update_materials_location(selected_results)
-                    response = save_user_progress(course_id, user_email, query, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)
+                    response = save_user_progress(course_id, user_email, user_message, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)
                     #dispatcher.utter_message(text="</br></br>You can find related information in:</br>" + "</br>".join(location_results))
                     dispatcher.utter_message(
                         text="</br></br><span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>" 

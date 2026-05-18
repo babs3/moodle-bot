@@ -59,25 +59,11 @@ nlp = spacy.load("en_core_web_sm")
 model_path = "/app/models/all-MiniLM-L6-v2"
 embedding_model = SentenceTransformer(model_path)
 
-# Collect all unique words from BM25 documents to compare for spell correction
-VALID_SIMPLE_WORDS = set()
-
 def load_bm25_index(course_id):
     pkl_path = os.path.join("vector_store", f"bm25_index_{course_id}.pkl")
     if os.path.exists(pkl_path):
         with open(pkl_path, "rb") as f:
-            # 1. Carrega os dados uma única vez
-            data = pickle.load(f)
-            
-            # 2. Desempacota para processar (assumindo que o pkl é um tuplo de 5 elementos)
-            _, _, _, _, bm25_documents = data
-            
-            # 3. Atualiza as palavras válidas
-            for doc_text in bm25_documents:
-                VALID_SIMPLE_WORDS.update(extract_simple_tokens(doc_text))
-            
-            # 4. Retorna os dados que já tens em memória
-            return data 
+            return pickle.load(f)
     else:
         return [], [], [], [], []
     
@@ -203,83 +189,6 @@ def format_gemini_response(text: str) -> str:
     
     return text
 
-def lemmatize_word(word):
-    """Returns the lemma of a given word (e.g., 'methods' → 'method')."""
-    doc = nlp(word)
-    return doc[0].lemma_  # Return the base form (lemma)
-
-def fuzzy_match_old(query_tokens, document_tokens, threshold=80):
-    """Matches query tokens against document tokens, handling lemmatization & fuzzy similarity."""
-    
-    #doc_text = " ".join(document_tokens).lower()  # Join doc tokens into full text
-    query_tokens = [qt.lower() for qt in query_tokens]  # Lowercase query tokens
-    
-    for query_token in query_tokens:
-        lemma_query = lemmatize_word(query_token)  # Convert to base form
-        print(f"\n- 🐟  Query token: '{query_token}' (lemma: '{lemma_query}')")
-        
-        if " " in query_token:  # If query token is a phrase (e.g., "pestel framework")
-            if query_token in document_tokens: # or lemma_query in doc_text:  # Check for phrase
-                print(f"  💚  Complex match in query_token '{query_token}'.") #:\n{doc_text}")
-                return True
-        else:  # Single word matching
-            for doc_token in document_tokens:
-                lemma_doc = lemmatize_word(doc_token)  # Lemmatize doc token
-                # Allow exact match, lemmatized match, or fuzzy match
-                if (query_token == doc_token or  
-                    lemma_query == lemma_doc or  
-                    fuzz.token_set_ratio(query_token, doc_token) >= threshold):
-                    print(f"\n  🤍  Simple Match in query_token '{query_token}'=='{doc_token}' or lemma_query '{lemma_query}'=='{lemma_doc}'")
-                    return True  
-
-    return False  # No match found
-
-def fuzzy_match_simple_tokens(query_tokens, simple_tokens, threshold=80):
-    matched = []
-    if not simple_tokens:
-        print("⚠️  Warning: No tokens provided for matching.")
-        return matched
-    
-    for token in query_tokens:
-        match, score = process.extractOne(token, simple_tokens, scorer=fuzz.ratio)
-        print(f"Query Simple Token: '{token}' → Best Match: '{match}' (Score: {score})")
-        if score >= threshold:
-            print("✅  Match accepted!")
-            matched.append((token, match, score))
-            
-    return matched
-
-
-def fuzzy_match_complex_tokens(query_tokens, multi_word_tokens, threshold=80):
-
-    matched = []
-    if not multi_word_tokens:
-        print("⚠️  Warning: No multi-word tokens provided for matching.")
-        return matched
-    
-    for token in query_tokens:
-        result = process.extractOne(token, multi_word_tokens, scorer=fuzz.token_set_ratio)
-        if result is None:
-            #print(f"❌ No matches found for query token: '{token}'")
-            continue
-        
-        match, score = result
-        print(f"Query Complex Token: '{token}' → Best Match: '{match}' (Score: {score})")
-        
-        # Check actual word overlap
-        token_words = set(token.lower().split())
-        match_words = set(match.lower().split())
-        common_words = token_words & match_words
-
-        if score >= threshold and len(common_words) >= 2:
-            print(f"✅  Match accepted! Shared words: {common_words}")
-            matched.append((token, match, score))
-        #else:
-            #print("❌ Match rejected. Too little overlap.")
-
-    return matched
-
-
 def extract_simple_tokens(query): # ['pestel', 'analysis']
     """Extracts only meaningful single-word tokens from a query (excluding stopwords & phrases)."""
     doc = nlp(query.lower())  # Process query with NLP model
@@ -362,46 +271,12 @@ def format_page_range(file_name, pages):
 
     return f"📄  {file_name} (p. {', '.join(ranges)})"
 
-def treat_raw_query(query):
-    # === Treat user query === #
-    print(f"\n📍  Raw query: {query}")
-
-    query_tokens = [token.text for token in nlp(query)]
-    print(f"    📖  Query tokens: {query_tokens}")
-
-    imp_tokens = extract_simple_tokens(query) # Extract meaningful keywords
-    imp_tokens_dict = {}
-    for token in imp_tokens:
-        # Correct potential misspellings in the student query 
-        imp_tokens_dict.update({token: correct_spelling(token)})
-
-    updated_query_tokens = []
-    for token in query_tokens:
-        if imp_tokens_dict.get(token):
-            updated_query_tokens.append(imp_tokens_dict.get(token))
-        else: 
-            updated_query_tokens.append(token)
-    print(f"    ✅  Corrected Tokens After Spell Check: {updated_query_tokens}")
- 
-    corrected_query = " ".join(updated_query_tokens)
-    print(f"📍  Treated query: {corrected_query}")
-    
-    return corrected_query
 
 def treat_pdf_name(pdf_name):
     # remove 'EDITED_' or 'BOOK_' from the beginning of the pdf name
     pdf_name = re.sub(r'^(EDITED_|BOOK_)?', '', pdf_name)
     return pdf_name
     
-
-# === SPELL CORRECTION === #
-
-def correct_spelling(word, set=VALID_SIMPLE_WORDS):
-    """Corrects spelling by finding the closest valid match."""
-    closest_match = get_close_matches(word, set, n=1, cutoff=0.8)  # 80% similarity threshold
-    if closest_match:
-        print(f"    - 🐟  best match for '{word}': {closest_match[0]}")
-    return closest_match[0] if closest_match else word  # Return the match or original word
 
 # Function to fetch student progress for a teacher’s classes
 def get_user_history(course_id):
