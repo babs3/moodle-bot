@@ -329,28 +329,24 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
     vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(intent, complex_tokens, simple_tokens, user_message, collection, authorized_resources)        
     bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id)
     
-    if bm25_docs == [] and bm25_meta == [] and normalized_bm25_scores == []:
+    bot_response = None
+    if bm25_docs == [] and bm25_meta == []:
         print(f"\n⚠️  BM25 search returned no results for user query: '{user_message}'")
+        bot_response = "no_access"
+    elif normalized_bm25_scores == []:
+        print(f"\n⚠️  Normalized BM25 scores is empty for user query: '{user_message}'")
+        bot_response = "no_response"
+    if bot_response:
         return  [
             SlotSet("user_query", user_message),  # Store the query
             SlotSet("materials_location", ""), #gemini_results),  # Store selected materials
-            SlotSet("bot_response", "no_access"),  # Store the bot response -> trigger
+            SlotSet("bot_response", bot_response),  # Store the bot response -> trigger
             SlotSet("user_email", user_email),  # Store the sender ID
             SlotSet("user_id", user_id),  # Store the user ID
             SlotSet("input_time", input_time),
             SlotSet("concept", concept) # Store the concept for future use
             ]
-    if normalized_bm25_scores == []:
-        print(f"\n⚠️  Normalized BM25 scores is empty for user query: '{user_message}'")
-        return  [
-            SlotSet("user_query", user_message),  # Store the query
-            SlotSet("materials_location", ""), #gemini_results),  # Store selected materials
-            SlotSet("bot_response", "no_response"),  # Store the bot response
-            SlotSet("user_email", user_email),  # Store the sender ID
-            SlotSet("user_id", user_id),  # Store the user ID
-            SlotSet("input_time", input_time),
-            SlotSet("concept", concept) 
-            ]
+
     
     if concept and concept.strip() != "":
         if intent == "definition of ":
