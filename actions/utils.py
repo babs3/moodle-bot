@@ -69,15 +69,22 @@ def load_bm25_index(course_id):
     
 def tokenize_and_clean_text(text):
     text_clean = text.replace('-', ' ')
+    print(f"\n🔍  Tokenizing and cleaning text: '{text}'\nCleaned Text: '{text_clean}'")
     doc = nlp(text_clean)
+    print("\n🔍  Tokens after Spacy processing:")
+    
     for token in doc:
         print(f"Token: '{token.text}' | Lemma: '{token.lemma_}' | is_alpha: {token.is_alpha} | is_stop: {token.is_stop}")
+        
     tokens = [
-        token.lemma_.lower()  # use lemma (base form), lowercase
+        # Se estiver toda em maiúsculas (ex: MQTT), mantém o texto original. 
+        # Caso contrário, usa o lemma em minúsculas.
+        token.text if token.text.isupper() else token.lemma_.lower()
         for token in doc
-        if not token.is_stop and token.is_alpha  # remove stopwords and punctuation/numbers
+        if not token.is_stop and token.is_alpha  # remove stopwords e pontuação/números
     ]
-    # Remove duplicates while preserving order
+    
+    # Remove duplicados mantendo a ordem
     tokens = list(dict.fromkeys(tokens))
     return tokens
 
@@ -141,7 +148,7 @@ def extract_query_keywords(query):
     Extracts the most meaningful keyword or phrase from a user query.
     Returns a list of keywords, prioritizing multi-word noun phrases.
     """
-    doc = nlp(query.lower())
+    doc = nlp(query)
 
     multi_word_phrases = []
     used_tokens = set()
@@ -163,7 +170,13 @@ def extract_query_keywords(query):
     for token in doc:
         if token.pos_ in {"NOUN", "PROPN"} and not token.is_stop:
             if token.text:
-                single_words.append(token.text.lower())
+                if token.text.isupper():  # Keep acronyms as they are
+                    single_words.append(token.text)
+                else:
+                    single_words.append(token.text.lower())
+        elif not token.is_stop:
+            if token.text and token.text.isupper():  # Keep standalone acronyms
+                single_words.append(token.text)
 
     return single_words
     #return list(dict.fromkeys(single_words))  # Preserve order, remove duplicates

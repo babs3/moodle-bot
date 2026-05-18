@@ -414,9 +414,10 @@ def clean_doc_text(text):
     return text.strip()
 
 def tokenize_and_clean_text(text):
-    doc = nlp(text)
+    text_clean = text.replace('-', ' ')
+    doc = nlp(text_clean)
     tokens = [
-        token.lemma_.lower()  # use lemma (base form), lowercase
+        token.text if token.text.isupper() else token.lemma_.lower()
         for token in doc
         if not token.is_stop and token.is_alpha  # remove stopwords and punctuation/numbers
     ]

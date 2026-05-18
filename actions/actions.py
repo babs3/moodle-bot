@@ -226,6 +226,7 @@ def keywords_to_tokens(keywords, query):
     if keywords == []:
         #print("\n👻  --> No keywords found in the query. Using just .split()")
         query = " ".join(query.split())
+        print(f"👻  --> Cleaned query (extra spaces removed): '{query}'")
         simple_tokens = tokenize_and_clean_text(query)
         #print(f"👻  --> New keywords: {simple_tokens}")
         return [], simple_tokens, True         
@@ -239,6 +240,7 @@ def keywords_to_tokens(keywords, query):
         simple_keywords = []
         for keyword in keywords:
             if " " in keyword:
+                print(f"👻  --> Keyword '{keyword}' is a phrase. Tokenizing and lemmatizing it to extract simple keywords.")
                 lemma_words = tokenize_and_clean_text(keyword)
                 for word in lemma_words:
                     simple_keywords.append(word)
@@ -248,6 +250,7 @@ def keywords_to_tokens(keywords, query):
         if len(simple_keywords) < query_length * percentage:
             #print(f"👻  --> Keywords are less than {percentage} of the query length ({query_length}). Using just .split()")
             query = " ".join(query.split())
+            print(f"👻  --> Cleaned query (extra spaces removed): '{query}'")
             simple_tokens = tokenize_and_clean_text(query)
             #print(f"👻  --> New keywords: {simple_tokens}")
             return [], simple_tokens, True         
@@ -300,6 +303,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             
             no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
             keywords = extract_query_keywords(no_punct_query)
+            print(f"🔍  Extracted keywords from query for comparison: {keywords}")
             complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query)  
             
             if len(simple_tokens) > 2*len(_simple_tokens):
@@ -320,6 +324,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
         # Keywords Extraction Process 
         no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
         keywords = extract_query_keywords(no_punct_query)
+        print(f"🔍  no_punct_query: {no_punct_query}")
         complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query)  
     
     print(f"\n🔍  Final tokens to be used in search: \n    > Complex tokens: {complex_tokens} \n    > Simple tokens: {simple_tokens}")
