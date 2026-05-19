@@ -13,6 +13,7 @@ intents:
   - generate_menu_buttons
   - create_topic
   - view_metrics
+  - ask_course_info
 
 entities:
   - concept
@@ -143,6 +144,7 @@ actions:
 - action_setup_user_role
 - action_get_metrics_from_db
 - action_call_llm_with_context
+- action_get_course_info
 
 session_config:
   session_expiration_time: 60

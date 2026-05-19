@@ -280,3 +280,40 @@ nlu:
     - How many students are using the bot?
     - How is the class engagement with the bot?
     - How is the course engagement?
+
+- intent: ask_course_info
+  examples: |
+    - What are the office hours for this course?
+    - What are the main topics covered in this course?
+    - Can you give me an overview of the course syllabus?
+    - What are the learning objectives of this course?
+    - Who is the instructor for this course?
+    - What is the grading policy for this course?
+    - how many credits is this course worth?
+    - What is the course schedule like?
+    - How can I contact the instructor for this course?
+    - how many assignments are there in this course?
+    - what are the required textbooks for this course?
+    - Are there any recommended readings for this course?
+    - What is the format of the exams in this course?
+    - Is there a discussion forum for this course?
+    - What is the attendance policy for this course?
+    - Are there any group projects in this course?
+    - how will I be evaluated in this course?
+    - How will I be evaluated?
+    - What is the course code for this class?
+    - What is the course name?
+    - What is the course description?
+    - can you give me a brief summary of the course content?
+    - Can you give me an overview of the main themes covered in this course?
+    - What are the key learning outcomes of this course?
+    - Who is the professor teaching this course?
+    - What is the professor's contact information?
+    - what is the program of this course?
+    - What are the main subjects covered in this course?
+    - give me a brief overview of the course structure and content.
+    - talk about the main themes and topics that are covered in this course.
+    - exlain the key learning outcomes and objectives of this course.
+    - explain me what will I learn in this course.
+    - what I can expect to learn from this course?
+    - How many classes can I fail to attend?

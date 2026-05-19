@@ -369,8 +369,18 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
     selected_results = hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_docs, bm25_meta, normalized_bm25_scores, alpha)
     
     if len(selected_results) == 0:
-        dispatcher.utter_message(text="I couldn't find relevant class materials for your query.")
         print("\n🚨  No relevant materials found!")
+        return  [
+            SlotSet("user_query", user_message),  # Store the query
+            SlotSet("materials_location", selected_results), #gemini_results),  # Store selected materials
+            SlotSet("bot_response", "I couldn't find relevant content in the course materials."),  # Store the bot response
+            SlotSet("user_email", user_email),  # Store the sender ID
+            SlotSet("user_id", user_id),  # Store the user ID
+            SlotSet("input_time", input_time),
+            SlotSet("concept", concept),
+            SlotSet("complex_tokens", complex_tokens),
+            SlotSet("simple_tokens", simple_tokens)
+            ]
     else: 
         # Format results
         results_text = []
@@ -380,17 +390,31 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
         # === PREPARE CONTEXT AND RULES FOR SYSTEM === #
         raw_text = "\n".join(results_text)
         
-        system_instruction = f"""
-        You are a precise academic tutor assistant. Your task is to answer the student's query based strictly on the provided educational course material.
+        if intent != "course info":
+            system_instruction = f"""
+            You are a precise academic tutor assistant. Your task is to answer the student's query based strictly on the provided educational course material.
 
-        [COURSE MATERIAL CONTEXT]
-        {raw_text}
+            [COURSE MATERIAL CONTEXT]
+            {raw_text}
 
-        [CRITICAL RULES]
-        1. CONCISENESS: Be extremely precise and direct. Do NOT exceed 50 words in your answer.
-        2. STRICTNESS: Base your answer ONLY on the provided course material above. Do not extrapolate or use outside knowledge.
-        3. FALLBACK: If you cannot find the relevant information to answer the query within the provided course material, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials."
-        """
+            [CRITICAL RULES]
+            1. CONCISENESS: Be extremely precise and direct. Do NOT exceed 50 words in your answer.
+            2. STRICTNESS: Base your answer ONLY on the provided course material above. Do not extrapolate or use outside knowledge.
+            3. FALLBACK: If you cannot find the relevant information to answer the query within the provided course material, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials."
+            """
+        else:
+            print(f"\n🔍  Intent is 'course info'. Using a different system instruction focused on administrative and logistical information.")
+            system_instruction = f"""
+            You are a precise academic assistant and course coordinator. Your task is to answer the student's query regarding course logistics, administration, or syllabus details based strictly on the provided course documentation (such as the course syllabus, grading policy, or official announcements).
+
+            [COURSE MATERIAL CONTEXT]
+            {raw_text}
+
+            [CRITICAL RULES]
+            1. CONCISENESS & CLARITY: Be precise and direct. Do NOT exceed 80 words in your answer, but ensure all administrative details requested (dates, percentages, names) are clearly stated.
+            2. STRICTNESS: Base your answer ONLY on the provided course documentation above. Do not extrapolate, assume, or use outside knowledge about university policies.
+            3. FALLBACK: If the specific administrative info (e.g., a specific deadline or professor's email) is not explicitly mentioned in the provided text, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials."
+            """
 
         # === PREPARE PARAMETERS === #
         generation_config = {
@@ -630,6 +654,27 @@ class ActionGetSummary(Action):
         intent = "summary of"
         return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, concept, user_id, course_id)
 
+class ActionGetCourseInfo(Action):
+    def name(self):
+        return "action_get_course_info"
+
+    def run(self, dispatcher, tracker, domain):
+        
+        print("\n📊  Generating bot 'action_get_course_info' response...")
+    
+        # Extract variables from chat memory
+        user_message = tracker.latest_message.get("text")
+        user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
+        user_id = tracker.latest_message.get("metadata", {}).get("user_id")
+        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+        input_time = tracker.latest_message.get("metadata", {}).get("input_time")
+        print(f"🕓  latest_message INPUT TIME: {input_time}")
+        authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
+        print(f"📚  Authorized resources from metadata: {authorized_resources}")
+        intent = "course info"      
+        
+        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, None, user_id, course_id)
+    
 
 # === FINAL ACTION: GET PDF NAMES & PAGE LOCATIONS === #
 class ActionGetClassMaterialLocation(Action):
@@ -647,6 +692,9 @@ class ActionGetClassMaterialLocation(Action):
         user_message = tracker.get_slot("user_query")
         tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
         #print(f"tutor_mode in ActionGetClassMaterialLocation: {tutor_mode}")
+        
+        print(f"\n📊  Generating bot 'action_get_class_material_location' response..."
+              f"\n> bot_response: {bot_response}")
                 
         if bot_response == "no_access":
             dispatcher.utter_message(text="You don't have access to any class materials yet. Please check with your instructor to gain access to the course materials and try again.")
