@@ -109,6 +109,25 @@ nlu:
     - What exactly constitutes a [Machine State Optimization](concept) plan?
     - I keep hearing about [F-messaging API](concept), but I don't know its precise definition. Can you help?
     - Could you write down the definition of [Trend Analyzer](concept)?
+    - what does [DTLS](concept) mean?
+    - can u define [OPC UA](concept)??
+    - what is the precise definision of [Federated Learning](concept)?
+    - whats the meanig of [Message Queuing](concept)?
+    - What is the definition of [Inflation](concept)?
+    - Can you define [Gross Domestic Product](concept)?
+    - Meaning of [Fiscal Deficit](concept)?
+    - What exactly is a [Monopoly](concept) in economics?
+    - Define [Opportunity Cost](concept).
+    - What is the definition of [Geopolitics](concept)?
+    - Can you explain what a [Bicameral System](concept) means?
+    - What does [Gerrymandering](concept) stand for and what is its definition?
+    - Give me the formal definition of [Separation of Powers](concept).
+    - define [Proportional Representation](concept)
+    - What is the definition of [Homeostasis](concept)?
+    - Can you define [Autoimmune Disease](concept)?
+    - What does the term [Myocardial Infarction](concept) mean?
+    - Meaning of [Anaphylaxis](concept)?
+    - Could you define what [Pathogens](concept) represent?
 
 - intent: ask_for_examples
   examples: |
@@ -151,6 +170,26 @@ nlu:
     - Provide examples of a [Machine State Optimization](concept) tool workflow.
     - Can you show examples of how the [F-messaging API](concept) communicates?
     - What are examples of metrics tracked by the [Trend Analyzer](concept)?
+    - show me some exampels of [Edge computing](concept)
+    - give me 3 examples of [Fog computing](concept)
+    - can u give examples of [Cyber-physical systems](concept)?
+    - i need exmples of [Minimum Viable Product](concept) ASAP
+    - examples of [Value Propositions](concept) please
+    - Give me examples of [Microeconomics](concept) principles in daily life.
+    - What are some examples of [Regressive Taxes](concept)?
+    - Can you provide examples of [Liquid Assets](concept)?
+    - Show me some real-world examples of [Hyperinflation](concept).
+    - Can you list some examples of [Oligopolies](concept)?
+    - What are some examples of [Direct Democracy](concept) in action today?
+    - Can you give examples of [Authoritarian Regimes](concept)?
+    - Could you provide a few examples of [Public Policies](concept) that failed?
+    - Give me examples of [Executive Orders](concept) in recent history.
+    - I need examples of [Coalition Governments](concept).
+    - Can you give me some examples of [Chronic Illnesses](concept)?
+    - What are some examples of [Broad-Spectrum Antibiotics](concept)?
+    - Give me examples of symptoms for [Type 2 Diabetes](concept).
+    - Show me some examples of [Neurodegenerative Diseases](concept).
+    - Are there any notable examples of [Zoonotic Viruses](concept)?
 
 - intent: ask_for_explanation
   examples: |
@@ -194,6 +233,27 @@ nlu:
     - Can you explain how [Machine State Optimization](concept) works within the RECLAIM framework?
     - Could you explain the role of [F-messaging API](concept) in docker containers?
     - Please explain how the [Trend Analyzer](concept) processes historical and real-time data.
+    - explane me how [Cloud computing](concept) works
+    - i dont understnd [Internet of Things](concept), can u explain?
+    - explain the concept of [Product-Market Fit](concept) to a beginner
+    - im confused about [Balance Sheet](concept), clarify pls
+    - can u break down [Data Anonymization](concept) so anyone can get it?
+    - Can you explain how the [Law of Supply and Demand](concept) regulates prices?
+    - I don't fully understand [Quantitative Easing](concept), can you explain it to me?
+    - Could you explain why [Keynesian Economics](concept) is relevant during a recession?
+    - Explain the concept of [Circular Economy](concept) in simple terms.
+    - I'm struggling to grasp the inner workings of [Monetary Policy](concept).
+    - Can you explain the difference between [Socialism and Capitalism](concept)?
+    - I am confused about the whole process of the [Electoral College](concept), could you explain it?
+    - Could you break down the concept of [Diplomatic Immunity](concept)?
+    - Explain what [Lobbying](concept) means for democratic decision-making.
+    - I don't understand how [Constitutional Checks and Balances](concept) function.
+    - Can you explain the logic behind [Geopolitical Deterrence](concept)?
+    - Can you explain how [mRNA Vaccines](concept) work inside the body?
+    - I'm really struggling to understand [Cellular Respiration](concept), could you walk me through it step by step?
+    - Could you explain the mechanism behind [Allergic Reactions](concept)?
+    - Explain how the [Sympathetic Nervous System](concept) triggers fight-or-flight.
+    - I don't understand what [Antibiotic Resistance](concept) actually means, can you explain?
 
 - intent: ask_for_summary
   examples: |
@@ -236,6 +296,28 @@ nlu:
     - Could you summarize the architecture of [Machine State Optimization](concept)?
     - Summarize the main purpose of the [F-messaging API](concept).
     - Can you give me a summary of the [Trend Analyzer](concept) component in RECLAIM?
+    - can u sumarize [Edge computing](concept) for me real quick?
+    - give me a tl;dr of [Fog computing](concept)
+    - i need a quick sumary of [Cyber-physical systems](concept)
+    - can you wrap up the main ideas of [Cloud computing](concept)?
+    - whats the recap on [Internet of Things](concept)?
+    - bullet point summary of [Predictive maintenance](concept) pls
+    - can u do a short digest of [Federated Learning](concept)?
+    - Can you summarize the concept of [Macroeconomics](concept)?
+    - Give me a brief summary of how [Fiscal Policy](concept) impacts inflation.
+    - I need a high-level summary of the [Stock Market](concept) mechanics.
+    - Can you synthesize the core ideas of [Cryptocurrency Regulation](concept)?
+    - Provide a short summary of [Behavioral Economics](concept).
+    - Can you summarize the main points of [The Social Contract](concept) theory?
+    - Give me a quick summary of [International Relations](concept) paradigms.
+    - What is the overall summary of [Fascism vs Communism](concept) according to the political science notes?
+    - Can you provide a concise summary of [Global Governance](concept)?
+    - Summarize the history of the [United Nations](concept) structure.
+    - Can you summarize the process of [Phagocytosis](concept)?
+    - Give me a high-level summary of [Cardiovascular Diseases](concept).
+    - I need a quick digest of how the [Immune System](concept) remembers pathogens.
+    - Can you summarize the key takeaways of the [Antibiotic Stewardship](concept) guidelines?
+    - Summarize the main stages of [Mitosis](concept) in human cells.
 
 - intent: set_username
   examples: |
@@ -280,6 +362,33 @@ nlu:
     - How many students are using the bot?
     - How is the class engagement with the bot?
     - How is the course engagement?
+    - Show me the usage dashboard.
+    - Give me a visual breakdown of this month's stats.
+    - Can I see the activity charts for the current semester?
+    - Display the engagement graphs.
+    - Bot usage overview, please.
+    - stats for this week
+    - show metrics dashboard
+    - What are the main conceptual bottlenecks this week?
+    - Provide a list of concepts with the highest failure rate in the bot's fallback.
+    - Which lecture slides are causing the most confusion?
+    - Are there any critical knowledge gaps identified in the class?
+    - Show me the topics where students triggered the fallback intent the most.
+    - map student difficulties
+    - Which uploaded documents have zero interactions?
+    - Is the new syllabus PDF being opened by the students?
+    - Audit material usage for the marketing module.
+    - Report on material consultation frequency.
+    - most read PDFs?
+    - What is the daily active users (DAU) count for this week?
+    - Give me the ratio of active students vs total enrolled students.
+    - Is there a high concentration of queries coming from specific user IDs?
+    - Retention metrics for the last 14 days.
+    - total unique users this month?
+    - Are students using the bot during the weekend?
+    - Do we have a high volume of queries late at night?
+    - Identify peak usage hours for this course.
+    - traffic spikes during exam week?
 
 - intent: ask_course_info
   examples: |
@@ -317,3 +426,43 @@ nlu:
     - explain me what will I learn in this course.
     - what I can expect to learn from this course?
     - How many classes can I fail to attend?
+    - Who is the professor?
+    - When are the weekly classes?
+    - Is attendance mandatory for the lectures?
+    - Where can I find the link for the online classes?
+    - What time does the class start?
+    - whats the course schedule?
+    - is attendance compulsory?
+    - can u tell me the timetable?
+    - schedule of classes please
+    - classroom location?
+    - What is the weight of the final exam?
+    - Do we have to do a midterm exam?
+    - What happens if I fail the first assignment?
+    - Is there a minimum grade required for the exam?
+    - Are the projects done in groups or individually?
+    - how will i b evaluated?
+    - what is the gradin policy?
+    - how much is the exam worth?
+    - weight of assignments?
+    - is there a group project?
+    - final exm weight?
+    - do we need to submit assignments weekly?
+    - How do I book a meeting with the professor?
+    - What is the teacher's email address?
+    - Who are the teaching assistants for this course?
+    - Can I clear my doubts during office hours?
+    - prof email?
+    - how to contact the prof?
+    - whos the instructor?
+    - office hours room?
+    - teachrs contact info
+    - Do I need any prior knowledge for this class?
+    - What are the prerequisites for this course?
+    - Where can I download the course syllabus?
+    - What is the main objective of this module?
+    - what will we learn?
+    - give me course info
+    - course summery please
+    - main topics of the course?
+    - sylabus overview
