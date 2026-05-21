@@ -775,7 +775,7 @@ class ActionGenerateInitialMenuButtons(Action):
         progress = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id})
         if progress.status_code == 200:
             progress_data = progress.json()
-            print(f"📊  User progress data retrieved: {progress_data}")
+            #print(f"📊  User progress data retrieved: {progress_data}")
         else:
             print(f"❌  Failed to retrieve user progress. Status code: {progress.status_code}")
             progress_data = []

@@ -742,6 +742,8 @@ if __name__ == "__main__":
         print("🛠️  A verificar/criar tabelas na base de dados...")
         db.create_all() 
         print("✅  Verificação concluída.")
+        # comment if you don't want to populate the database with initial data every time you start the app
+        # populate_database()
         
     # 1. Lançar o Polling em Background para NÃO bloquear o app.run
     import threading
