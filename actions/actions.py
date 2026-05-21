@@ -298,27 +298,17 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             complex_tokens = [concept]
             simple_tokens = tokenize_and_clean_text(concept)
             print(f"🔍  Concept '{concept}' split into simple lemma tokens: {simple_tokens}")
-        else:
-            _simple_tokens = [concept]
-            
+        else:            
             no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
             keywords = extract_query_keywords(no_punct_query)
             print(f"🔍  Extracted keywords from query for comparison: {keywords}")
             complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query)  
             
-            if len(simple_tokens) > 2*len(_simple_tokens):
-                print(f"⚠️  Rasa extracted the concept wrong. The number of simple tokens ({len(simple_tokens)}) is more than double the number of simple tokens from the concept ({len(_simple_tokens)}).")
-                # add the concept lemma to the beggining of simple_tokens if it's not already there
-                for token in _simple_tokens:
-                    if token.lower() not in simple_tokens:
-                        simple_tokens.insert(0, token.lower())
-                        print(f"🔍  Added concept lemma '{token.lower()}' to the beginning of simple tokens: {simple_tokens}")
-                    if token.lower() not in complex_tokens[0].split():
-                        complex_tokens[0] = token.lower() + " " + complex_tokens[0]
-                        print(f"🔍  Added concept lemma '{token.lower()}' to the beginning of complex token: {complex_tokens}")
-            else:
-                simple_tokens = _simple_tokens
-                print(f"🔍  Using concept '{concept}' as the only simple token: {simple_tokens}")
+            lower_simple_tokens = [token.lower() for token in simple_tokens]
+            if concept.lower() not in lower_simple_tokens:
+                simple_tokens.append(concept.lower())
+                print(f"🔍  Added concept '{concept.lower()}' to simple tokens: {simple_tokens}")
+            
     else:
         print(f"\n🔍  No concept identified by Rasa. Proceeding with keywords extraction from the entire query.")
         # Keywords Extraction Process 

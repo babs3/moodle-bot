@@ -460,6 +460,7 @@ def process_pdfs(pdf_folder, course_id):
             for chunk in page_chunks:
                 doc_text = chunk["text"]
                 documents.append(doc_text)
+                #print(f"> text from {file} (page {chunk['page']}):\n{doc_text}\n\n")
                 
                 metadata.append({
                     "file": file, 
@@ -470,6 +471,7 @@ def process_pdfs(pdf_folder, course_id):
                 cleaned_text = tokenize_and_clean_text(clean_doc_text(doc_text))
                 simple_tokens.append(cleaned_text)
                 ngram_docs_2.append(delete_duplicated_ngrams(get_ngrams(" ".join(cleaned_text), 2)))
+                #print(f" last 2grams: {ngram_docs_2[-1]}")
                 ngram_docs_3.append(delete_duplicated_ngrams(get_ngrams(" ".join(cleaned_text), 3)))
                 
 

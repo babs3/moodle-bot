@@ -128,7 +128,7 @@ nlu:
     - What does the term [Myocardial Infarction](concept) mean?
     - Meaning of [Anaphylaxis](concept)?
     - Could you define what [Pathogens](concept) represent?
-    - What are the [four layers defined in the 5-Layer IoT Architecture graph](concept)?
+    - What are the four layers defined in the [5-Layer IoT Architecture graph](concept)?
 
 - intent: ask_for_examples
   examples: |
@@ -255,6 +255,8 @@ nlu:
     - Could you explain the mechanism behind [Allergic Reactions](concept)?
     - Explain how the [Sympathetic Nervous System](concept) triggers fight-or-flight.
     - I don't understand what [Antibiotic Resistance](concept) actually means, can you explain?
+    - How do [IoT and CPS](concept) differ in terms of their historical lineage?
+    - Why is [UDP](concept) often prioritized over [TCP](concept) in constrained [IoT applications](concept)?
 
 - intent: ask_for_summary
   examples: |

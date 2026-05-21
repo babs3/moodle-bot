@@ -150,11 +150,13 @@ def extract_query_keywords(query):
     """
     doc = nlp(query)
 
+    acronyms = [token.text for token in doc if token.is_upper and len(token.text) > 1]
     multi_word_phrases = []
     used_tokens = set()
 
     # Extract cleaned multi-word noun phrases
     for chunk in doc.noun_chunks:
+        print(f"🔍  Found noun chunk: '{chunk.text}' in query: '{query}'")
         phrase = clean_key_phrase(chunk.text)
         if len(phrase.split()) > 1:
             multi_word_phrases.append(phrase)
@@ -162,7 +164,7 @@ def extract_query_keywords(query):
 
     # If we got a strong multi-word phrase, prefer it
     if multi_word_phrases:
-        return multi_word_phrases
+        return acronyms + multi_word_phrases
         #return list(dict.fromkeys(multi_word_phrases))  # Remove duplicates while preserving order
 
     # Fallback: extract individual nouns/proper nouns not part of previous phrases
@@ -321,13 +323,41 @@ def filtrar_e_expandir_tokens(complex_tokens):
         else:
             # Se já tiver 2 ou 3 palavras (ou menos), mantém o token original
             lista_final.append(token)
-            
-    return lista_final
+    
+    print(f"\n🔍  ComplexTokens after filtering and expansion: {lista_final}")
+    
+    lista_final_cleaned = []        
+    # para cada expressão complexa, verifica se as palavras individuais sao .isupper(), e põe tudo em lowercase (exceto as palavras que são acrônimos)
+    for expression in lista_final:
+        doc = nlp(expression)
+        nova_expressao = ""
+        for token in doc:
+            if token.text.isupper():  # Mantém acrônimos como estão
+                nova_expressao += token.text + " "
+            elif token.is_stop:  # Ignora stopwords
+                print(f"🔹  Ignoring stopword: '{token.text}' in token: '{expression}'")
+                continue
+            else:
+                nova_expressao += token.text.lower() + " "
+        if nova_expressao.strip():  # Verifica se a expressão não está vazia após limpeza
+            if len(nova_expressao.split()) > 1:  # Garante que seja uma expressão multi-palavra
+                if nova_expressao.strip() not in lista_final_cleaned:  # Evita adicionar duplicados
+                    lista_final_cleaned.append(nova_expressao.strip())
+        
+    print(f"\n🔍  ComplexTokens after case normalization: {lista_final_cleaned}")
+    
+    return lista_final_cleaned
 
 def dense_vector_search(intent, complex_tokens, simple_tokens, query, collection, authorized_resources):
 
     if complex_tokens != []:
-        query = intent + " " + " ".join(complex_tokens)  # Give more weight to complex tokens in the query
+        if simple_tokens != []:
+            # se existir acronimos nos simple tokens, adiciona-os ao início da query, seguido dos complex tokens
+            acronimos = [token for token in simple_tokens if token.isupper()]
+            query = intent + " " + " ".join(acronimos) + " " + " ".join(complex_tokens)  # Give more weight to complex tokens in the query
+            query = re.sub(r'\s+', ' ', query).strip()  # Remove extra spaces
+        else:          
+            query = intent + " " + " ".join(complex_tokens)  # Give more weight to complex tokens in the query
     elif simple_tokens != []:
         query = intent + " " + " ".join(simple_tokens)  # If no complex tokens, use simple tokens
 
@@ -374,7 +404,8 @@ def dense_vector_search(intent, complex_tokens, simple_tokens, query, collection
 def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id, alpha=0.8):
     # === Perform Hybrid BM25 search === #
     
-    complex_tokens = filtrar_e_expandir_tokens(complex_tokens)
+    if complex_tokens != []:
+        complex_tokens = filtrar_e_expandir_tokens(complex_tokens)
     print(f"\n🔛  Getting BM25 sparse vectors for both:\n - {complex_tokens}\n - {simple_tokens}")
     
     # grant access to the BM25 index updated with new documents (if any)
