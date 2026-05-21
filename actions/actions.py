@@ -211,12 +211,20 @@ class ActionSetUsername(Action):
         else:
             return []
 
-def keywords_to_tokens(keywords, query):
+def keywords_to_tokens(keywords, query, context):
     """
     Convert keywords to complex and simple lemmatized tokens.
     Complex tokens are phrases (e.g., "pestel analysis"), while simple tokens are individual words (e.g., "pestel", "analysis").
     """
     keywords = list(dict.fromkeys(keywords)) # Remove duplicates
+    if context and context.strip() != "":
+        # remove context expression from query independent from lower/upper case and extra spaces
+        context_clean = context.strip()
+        
+        # 2. re.escape garante que caracteres especiais no contexto (como ?, * etc.) não partam o regex
+        # re.IGNORECASE faz a magia de ignorar se é maiúscula ou minúscula
+        query = re.sub(re.escape(context_clean), "", query, flags=re.IGNORECASE).strip()
+        print(f"\n👻  Context '{context_clean}' removed from query. New query: '{query}'")
     
     #print(f"\n🔛  Getting lemmas for keyphrase/keywords: '{keywords}'")
     query_length = len(query.split())
@@ -274,7 +282,7 @@ def keywords_to_tokens(keywords, query):
     
     return complex_tokens, simple_tokens, False # Return complex tokens, simple tokens, and split_keywords flag
 
-def action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, concept, user_id, course_id):
+def action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id):
     if authorized_resources == []:
         print(f"\n❌  No authorized resources found for user: {user_email}")
         return  [
@@ -287,8 +295,14 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             ]
         
     print(f"\n📖  --------- Getting Knowledge --------- 📖 ")
-    
     print(f"\n🧒  User ({user_email}) said: {user_message} 📩")
+    
+    # Extract variables from chat memory
+    concept = tracker.get_slot("concept")  
+    concept = concept.lower().strip() if concept else ""        
+    context = tracker.get_slot("context")   
+    context = context.lower().strip() if context else ""     
+    print(f"🔍  Concept from slot: '{concept}' || Context from slot: '{context}'")
     
     complex_tokens = []
     simple_tokens = []
@@ -301,27 +315,33 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
         else:            
             no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
             keywords = extract_query_keywords(no_punct_query)
-            print(f"🔍  Extracted keywords from query for comparison: {keywords}")
-            complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query)  
+            print(f"\n🔍  Extracted keywords from query for comparison: {keywords}")
+            for keyword in keywords:
+                if context.lower().strip() == keyword.lower().strip():
+                    keywords.remove(keyword)
+            print(f"🔍  Keywords after removing context duplicates: {keywords}")
+            complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query, context)  
             
             lower_simple_tokens = [token.lower() for token in simple_tokens]
             if concept.lower() not in lower_simple_tokens:
                 simple_tokens.append(concept.lower())
                 print(f"🔍  Added concept '{concept.lower()}' to simple tokens: {simple_tokens}")
-            
     else:
         print(f"\n🔍  No concept identified by Rasa. Proceeding with keywords extraction from the entire query.")
         # Keywords Extraction Process 
         no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
         keywords = extract_query_keywords(no_punct_query)
         print(f"🔍  no_punct_query: {no_punct_query}")
-        complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query)  
+        complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query, context)  
+    
+    context = " ".join(tokenize_and_clean_text(context)) if context else ""
+    print(f"🔍  Tokenized context: {context}")
     
     print(f"\n🔍  Final tokens to be used in search: \n    > Complex tokens: {complex_tokens} \n    > Simple tokens: {simple_tokens}")
     
     print(f"\n🔍  Starting search process in resources: {authorized_resources}")
     # Hybrid Search Process    
-    vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(intent, complex_tokens, simple_tokens, user_message, collection, authorized_resources)        
+    vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(intent, complex_tokens, simple_tokens, context, user_message, collection, authorized_resources)        
     bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id)
     
     bot_response = None
@@ -391,7 +411,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             ### CRITICAL RULES
             1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
             2. **HTML ONLY:** Use <b>text</b> for bold, <ul><li></li></ul> for lists, and <br> for line breaks.
-            3. **CONCISENESS:** Be extremely precise and direct. Do NOT exceed 60 words in your answer.
+            3. **CONCISENESS:** Be extremely precise and direct. Do NOT exceed 100 words in your answer.
             4. **STRICTNESS:** Base your answer ONLY on the provided course material above. Do not extrapolate or use outside knowledge.
             5. **FALLBACK:** If you cannot find the relevant information to answer the query within the provided course material, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials."
             6. **LANGUAGE:** Always respond in English (UK).
@@ -410,7 +430,7 @@ def action_process(dispatcher, user_message, user_email, input_time, authorized_
             ### CRITICAL RULES
             1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
             2. **HTML ONLY:** Use <b>text</b> for bold, <ul><li></li></ul> for lists, and <br> for line breaks.
-            3. **CONCISENESS & CLARITY:** Be precise and direct. Do NOT exceed 60 words in your answer, but ensure all administrative details requested (dates, percentages, names) are clearly stated.
+            3. **CONCISENESS & CLARITY:** Be precise and direct. Do NOT exceed 100 words in your answer, but ensure all administrative details requested (dates, percentages, names) are clearly stated.
             4. **STRICTNESS:** Base your answer ONLY on the provided course documentation above. Do not extrapolate, assume, or use outside knowledge about university policies.
             5. **FALLBACK:** If the specific administrative info (e.g., a specific deadline or professor's email) is not explicitly mentioned in the provided text, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials."
             6. **LANGUAGE:** Always respond in English (UK).
@@ -561,15 +581,8 @@ class ActionGetDefinition(Action):
         
         #print(f"DEBUG TRACKER SLOTSS: {tracker.current_slot_values()}")
         
-        # print slot of user_role
         #user_role = tracker.get_slot("user_role")
         #print(f"👤  User role from slot: {user_role}")
-        # Extract variables from chat memory
-        concept = tracker.get_slot("concept")  
-        concept = concept.lower().strip() if concept else ""        
-        context = tracker.get_slot("context")   
-        context = context.lower().strip() if context else ""     
-        print(f"🔍  Concept from slot: '{concept}' || Context from slot: '{context}'")
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
@@ -587,7 +600,7 @@ class ActionGetDefinition(Action):
         
         intent = "definition of"      
         
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, concept, user_id, course_id)
+        return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
     
 # === ACTION 2: GET EXPLANATION === #
 class ActionGetExplanation(Action):
@@ -597,12 +610,6 @@ class ActionGetExplanation(Action):
     def run(self, dispatcher, tracker, domain):
         
         print("\n📊  Generating bot 'action_get_explanation' response...")
-        
-        concept = tracker.get_slot("concept")
-        concept = concept.lower().strip() if concept else ""        
-        context = tracker.get_slot("context")   
-        context = context.lower().strip() if context else ""     
-        print(f"🔍  Concept from slot: '{concept}' || Context from slot: '{context}'")
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
@@ -613,7 +620,7 @@ class ActionGetExplanation(Action):
 
         intent = "explanation of"
 
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, concept, user_id, course_id)
+        return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
 
 # === ACTION 3: GET EXAMPLES === #
 class ActionGetExamples(Action):
@@ -623,12 +630,6 @@ class ActionGetExamples(Action):
     def run(self, dispatcher, tracker, domain):
         
         print("\n📊  Generating bot 'action_get_examples' response...")
-        
-        concept = tracker.get_slot("concept")
-        concept = concept.lower().strip() if concept else ""
-        context = tracker.get_slot("context")   
-        context = context.lower().strip() if context else ""     
-        print(f"🔍  Concept from slot: '{concept}' || Context from slot: '{context}'")
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
@@ -638,7 +639,7 @@ class ActionGetExamples(Action):
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
 
         intent = "examples of"
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, concept, user_id, course_id)
+        return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
 
 # === ACTION 4: SUMMARIZE === #
 class ActionGetSummary(Action):
@@ -648,12 +649,6 @@ class ActionGetSummary(Action):
     def run(self, dispatcher, tracker, domain):
         
         print("\n📊  Generating bot 'action_get_summary' response...")
-        
-        concept = tracker.get_slot("concept")
-        concept = concept.lower().strip() if concept else ""
-        context = tracker.get_slot("context")   
-        context = context.lower().strip() if context else ""     
-        print(f"🔍  Concept from slot: '{concept}' || Context from slot: '{context}'")
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
@@ -663,7 +658,7 @@ class ActionGetSummary(Action):
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
 
         intent = "summary of"
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, concept, user_id, course_id)
+        return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
 
 class ActionGetCourseInfo(Action):
     def name(self):
@@ -684,7 +679,7 @@ class ActionGetCourseInfo(Action):
         print(f"📚  Authorized resources from metadata: {authorized_resources}")
         intent = "course info"      
         
-        return action_process(dispatcher, user_message, user_email, input_time, authorized_resources, intent, None, user_id, course_id)
+        return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
     
 
 # === FINAL ACTION: GET PDF NAMES & PAGE LOCATIONS === #

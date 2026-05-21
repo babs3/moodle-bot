@@ -69,13 +69,8 @@ def load_bm25_index(course_id):
     
 def tokenize_and_clean_text(text):
     text_clean = text.replace('-', ' ')
-    print(f"\n🔍  Tokenizing and cleaning text: '{text}'\nCleaned Text: '{text_clean}'")
     doc = nlp(text_clean)
-    print("\n🔍  Tokens after Spacy processing:")
     
-    for token in doc:
-        print(f"Token: '{token.text}' | Lemma: '{token.lemma_}' | is_alpha: {token.is_alpha} | is_stop: {token.is_stop}")
-        
     tokens = [
         # Se estiver toda em maiúsculas (ex: MQTT), mantém o texto original. 
         # Caso contrário, usa o lemma em minúsculas.
@@ -156,7 +151,6 @@ def extract_query_keywords(query):
 
     # Extract cleaned multi-word noun phrases
     for chunk in doc.noun_chunks:
-        print(f"🔍  Found noun chunk: '{chunk.text}' in query: '{query}'")
         phrase = clean_key_phrase(chunk.text)
         if len(phrase.split()) > 1:
             multi_word_phrases.append(phrase)
@@ -181,8 +175,7 @@ def extract_query_keywords(query):
                 single_words.append(token.text)
 
     return single_words
-    #return list(dict.fromkeys(single_words))  # Preserve order, remove duplicates
-    
+
 
 def format_gemini_response(text: str) -> str:
     """
@@ -348,7 +341,7 @@ def filtrar_e_expandir_tokens(complex_tokens):
     
     return lista_final_cleaned
 
-def dense_vector_search(intent, complex_tokens, simple_tokens, query, collection, authorized_resources):
+def dense_vector_search(intent, complex_tokens, simple_tokens, context, query, collection, authorized_resources):
 
     if complex_tokens != []:
         if simple_tokens != []:
@@ -360,6 +353,9 @@ def dense_vector_search(intent, complex_tokens, simple_tokens, query, collection
             query = intent + " " + " ".join(complex_tokens)  # Give more weight to complex tokens in the query
     elif simple_tokens != []:
         query = intent + " " + " ".join(simple_tokens)  # If no complex tokens, use simple tokens
+        
+    if context and context.strip() != "":
+        query += " in " + context  # Add context to the query if it exists
 
     # === DENSE (Vector) SEARCH === #
     print(f"\n🔛  Getting query embeddings for query: '{query}'\n...")
