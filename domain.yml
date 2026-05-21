@@ -10,6 +10,7 @@ intents:
   - ask_for_examples
   - ask_for_explanation
   - ask_for_summary
+  - ask_for_comparison
   - generate_menu_buttons
   - create_topic
   - view_metrics
@@ -146,6 +147,7 @@ actions:
 - action_get_examples
 - action_get_explanation
 - action_get_summary
+- action_get_comparison
 - action_get_class_material_location
 - action_generate_initial_menu_buttons
 - action_create_topic

@@ -327,41 +327,41 @@ nlu:
 
 - intent: ask_for_comparison
   examples: |
-    - Can you compare [Edge computing](concept) and [Fog computing](concept)?
+    - what differs [Edge computing](concept) from [Fog computing](concept)?
     - I want to understand the differences between [Cloud computing](concept) and [Cyber-physical systems](concept), can you compare them?
-    - Could you compare the advantages of [Internet of Things](concept) vs traditional embedded systems?
+    - pleasecompare the advantages of [Internet of Things](concept) vs [traditional embedded systems](concept)
     - Can you compare the concept of a [Minimum Viable Product](concept) with a prototype?
     - I need a comparison between [Product-Market Fit](concept) and [Product-Solution Fit](concept), can you help?
     - Could you compare the key features of [Value Propositions](concept) and [Unique Selling Propositions](concept)?
-    - Can you compare the concept of [Customer Development](concept) with traditional market research?
-    - I want to understand how a [Balance Sheet](concept) differs from an [Income Statement](concept), can you compare them?
+    - give me a comparison of the concept of [Customer Development](concept) with [traditional market research](context)?
+    - I want to understand how a [Balance Sheet](concept) differs from an [Income Statement](concept)
     - Could you compare the security features of [OPC UA](concept) with other industrial communication protocols?
     - Can you compare the main components of the [TOSCA framework](concept) with other orchestration frameworks?
-    - I need a comparison between [Federated Learning](concept) and centralized machine learning, can you provide it?
-    - Could you compare the potential applications of [Quantum Integration](concept) in different industries?
-    - Can you compare the benefits of using [Predictive maintenance](concept) versus reactive maintenance strategies?
-    - I want to understand how an [Income Statement](concept) compares to a [Cash-Flow Statement](concept), can you explain the differences?
-    - Could you compare the role of tracking [Amortizations and Depreciations](concept) in financial reporting versus tax purposes?
-    - Can you compare the concepts of [Points of parity](concept) and points of difference in terms of their impact on brand positioning?
+    - I need a comparison between [Federated Learning](concept) & [centralized machine learning](concept), can you provide it?
+    - Could you compare the potential applications of [Quantum Integration](concept) in [different industries](context)?
+    - Can you compare the benefits of using [Predictive maintenance](concept) vs [reactive maintenance strategies](concept)?
+    - I want to understand how an [Income Statement](concept) compares to a [Cash-Flow Statement](concept)
+    - Could you compare the role of tracking [Amortizations and Depreciations](concept) in [financial reporting](context) versus [tax purposes](concept)?
+    - Can you compare the concepts of [Points of parity](concept) and [points of difference](concept) in terms of [their impact on brand positioning](context)?
     - I need a comparison between a well-crafted [Positioning statement](concept) and a weak one, can you provide examples?
-    - Could you compare the challenges posed by [Ecosystem Heterogeneity](concept) with those of data heterogeneity in IoT environments?
-    - Can you compare the user experience implications of different approaches to obtaining [User Consent](concept)?
-    - I want to understand how different implementations of [Data Minimization](concept) can affect user privacy, can you compare them?
-    - Could you compare the key elements of a [Data Retention Policy](concept) for [a startup versus a large enterprise](context)?
-    - Can you compare the effectiveness of different [Data Anonymization](concept) techniques in protecting user privacy?
-    - I need a comparison between [Cross-Domain Interoperability](concept) solutions for [smart cities versus industrial IoT](context), can you provide it?
-    - Could you compare the challenges of [Legacy Systems Integration](concept) in the manufacturing sector versus the healthcare sector?
-    - Can you compare the accuracy of different machine learning models used for [Customer Demand Prediction](concept)?
-    - I want to understand the differences between the [Publish-Subscribe pattern](concept) and the request-response model, can you compare them?
-    - Could you compare the performance of different [Message Queuing](concept) tools in high-throughput environments?
-    - Can you compare the security features of [DTLS](concept) with those of TLS in the context of IoT communications?
-    - I need a comparison between [Predictive analytics](concept) and traditional statistical analysis, can you provide it?
-    - Could you compare the implications of [Data Collection Limitation](concept) for [user privacy versus data-driven innovation](context)?
-    - Can you compare the key features of the [6G Vision](concept) with those of 5G technology?
-    - I want to understand the differences between [Category points of parity](concept) and points of difference in terms of their impact on consumer perception, can you compare them?
+    - Could you compare the challenges posed by [Ecosystem Heterogeneity](concept) with those of [data heterogeneity](concept) in [IoT environments](context)?
+    - Can you compare the [user experience](concept) implications of different approaches to obtaining [User Consent](concept)?
+    - I want to understand how different implementations of [Data Minimization](concept) can affect [user privacy](concept), can you compare them?
+    - Could you compare the key elements of a [Data Retention Policy](concept) for [a startup](context) versus a [large enterprise](context)?
+    - Can you compare the effectiveness of different [Data Anonymization](concept) techniques in [protecting user privacy](context)?
+    - I need a comparson between [Cross-Domain Interoperability](concept) solutions for [smart cities versus industrial IoT](context), can you provide it?
+    - Could you compare the challenges of [Legacy Systems Integration](concept) in [the manufacturing sector](context) versus [the healthcare sector](concept)?
+    - Can you compare the accuracy of different [machine learning models](concept) used for [Customer Demand Prediction](context)?
+    - I want to understand the differences between the [Publish-Subscribe pattern](concept) and the [request-response model](concept), can you compare them?
+    - Could you compare the performance of different [Message Queuing](concept) tools in [high-throughput environments](context)?
+    - Can u compare the security features of [DTLS](concept) with those of [TLS](concept) in the context of [IoT communications](context)?
+    - I need a comparison between [Predictive analytics](concept) & [traditional statistical analysis](concept), can you provide it?
+    - Could you compare the implications of [Data Collection Limitation](concept) for [user privacy](context) versus [data-driven innovation](concept)?
+    - can you compare the key features of the [6G Vision](concept) with those of [5G technology](concept)?
+    - I want to understand the differences between [Category points of parity](concept) and [points of difference](concept) in terms of [their impact on consumer perception](context)
     - Differentiate between a [Digital Model](concept), a [Digital Shadow](concept), and a [Digital Twin](concept).
-    - How does [predictive maintenance](concept) differ from [preventive maintenance](concept)?
-    - Compare [CoAP](concept) and [MQTT](concept) in terms of architecture design choices.
+    - how does [predictive maintenance](concept) differ from [preventive maintenance](concept)?
+    - Compare [CoAP](concept) and [MQTT](concept) in terms of [architecture design choices](context).
 
 - intent: set_username
   examples: |
