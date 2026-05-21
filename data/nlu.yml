@@ -86,7 +86,7 @@ nlu:
     - What exactly is [Quantum Integration](concept)?
     - Please provide the definition of [Predictive maintenance](concept).
     - What is an [Income Statement](concept)?
-    - Define [Cash-Flow Statement](concept) in financial accounting.
+    - Define [Cash-Flow Statement](concept) in [financial accounting](context).
     - Could you define what [Amortizations and Depreciations](concept) represent?
     - What do you mean by [Points of parity](concept)?
     - Can you define [Positioning statement](concept)?
@@ -116,7 +116,7 @@ nlu:
     - What is the definition of [Inflation](concept)?
     - Can you define [Gross Domestic Product](concept)?
     - Meaning of [Fiscal Deficit](concept)?
-    - What exactly is a [Monopoly](concept) in economics?
+    - What exactly is a [Monopoly](concept) in [economics](context)?
     - Define [Opportunity Cost](concept).
     - What is the definition of [Geopolitics](concept)?
     - Can you explain what a [Bicameral System](concept) means?
@@ -128,7 +128,7 @@ nlu:
     - What does the term [Myocardial Infarction](concept) mean?
     - Meaning of [Anaphylaxis](concept)?
     - Could you define what [Pathogens](concept) represent?
-    - What are the four layers defined in the [5-Layer IoT Architecture graph](concept)?
+    - What are the [four layers](concept) defined in the [5-Layer IoT Architecture graph](context)?
 
 - intent: ask_for_examples
   examples: |
@@ -144,11 +144,11 @@ nlu:
     - Can you give me examples of [Balance Sheet](concept) items?
     - What are some examples related to [OPC UA](concept) implementations?
     - Can you provide examples related to the [TOSCA framework](concept)?
-    - What are some examples of [Federated Learning](concept) in healthcare?
+    - What are some examples of [Federated Learning](concept) in [healthcare](context)?
     - Could you give me examples of [Quantum Integration](concept)?
-    - Give me examples of [Predictive maintenance](concept) in manufacturing.
+    - Give me examples of [Predictive maintenance](concept) in [manufacturing](context).
     - Show me some examples of an [Income Statement](concept).
-    - I need examples of transactions in a [Cash-Flow Statement](concept).
+    - I need examples of [transactions](concept) in a [Cash-Flow Statement](context).
     - Can you give some real-world examples of [Amortizations and Depreciations](concept)?
     - What are some examples of [Points of parity](concept) for a 4-star hotel?
     - Could you provide a few examples of a strong [Positioning statement](concept)?
@@ -158,15 +158,15 @@ nlu:
     - Could you provide a list of examples where [Data Minimization](concept) is applied successfully?
     - What are some typical examples of a [Data Retention Policy](concept) that startups use?
     - Can you show me how [Data Anonymization](concept) looks in practice by giving a few real examples?
-    - Are there any notable examples of [Cross-Domain Interoperability](concept) in smart cities?
-    - Give me some clear examples of [Legacy Systems Integration](concept) in the industrial sector.
+    - Are there any notable examples of [Cross-Domain Interoperability](concept) in [smart cities](context)?
+    - Give me some clear examples of [Legacy Systems Integration](concept) in the [industrial sector](context).
     - I would like to see examples of [Customer Demand Prediction](concept) models.
     - Provide examples of protocols that use the [Publish-Subscribe pattern](concept).
     - Can you list some examples of [Message Queuing](concept) tools?
     - What are some examples of applications that rely on [DTLS](concept)?
     - Show me some examples of [Predictive analytics](concept) algorithms.
     - Give me examples of [Data Collection Limitation](concept) rules.
-    - What are some examples of technologies envisioned in the [6G Vision](concept)?
+    - What are some examples of [technologies](concept) envisioned in the [6G Vision](context)?
     - Can you give examples of [Category points of parity](concept)?
     - Provide examples of a [Machine State Optimization](concept) tool workflow.
     - Can you show examples of how the [F-messaging API](concept) communicates?
@@ -194,7 +194,7 @@ nlu:
 
 - intent: ask_for_explanation
   examples: |
-    - explain me the [System Architecture in CPS](concept)
+    - explain me the [System Architecture](concept) in [CPS](context)
     - Explain [Edge computing](concept) to me.
     - Can you explain [Fog computing](concept)?
     - I don't understand [Cloud computing](concept), can you explain it?
@@ -208,31 +208,31 @@ nlu:
     - Can you explain the concept of [OPC UA](concept)?
     - I'm having trouble understanding the [TOSCA framework](concept), can you explain it?
     - Could you explain how [Federated Learning](concept) keeps data private?
-    - Can you explain how [Quantum Integration](concept) works in next-generation networks?
+    - Can you explain how [Quantum Integration](concept) works in [next-generation networks](context)?
     - Explain the concept of [Predictive maintenance](concept) to a beginner.
     - Can you explain the difference between a balance sheet and an [Income Statement](concept)?
     - I don't fully understand the [Cash-Flow Statement](concept), can you explain it to me?
-    - Could you explain why we need [Amortizations and Depreciations](concept) in financial management?
+    - Could you explain why we need [Amortizations and Depreciations](concept) in [financial management](context)?
     - I'm confused about [Points of parity](concept), could you clarify what it means?
     - Can you explain how to construct a proper [Positioning statement](concept)?
     - I don't understand the difference between points of parity and [Points of Difference](concept), can you explain?
     - I'm really struggling to grasp the inner workings of [Ecosystem Heterogeneity](concept), could you walk me through it step by step?
-    - Can you explain the underlying mechanism and logic behind [User Consent](concept) in the Strava app case?
-    - I don't fully understand how [Data Minimization](concept) operates in real-time environments, can you explain?
+    - Can you explain the underlying mechanism and logic behind [User Consent](concept) in [the Strava app case](context)?
+    - I don't fully understand how [Data Minimization](concept) operates in [real-time environments](context), can you explain?
     - Could you break down the concept of [Data Retention Policy](concept) so that anyone can understand it easily?
     - Can you explain how [Data Anonymization](concept) actually functions when dealing with public heatmaps?
     - I am confused about the whole process of [Cross-Domain Interoperability](concept), could you explain it in detail?
-    - Can you explain why [Legacy Systems Integration](concept) is considered a major challenge in IoT?
+    - Can you explain why [Legacy Systems Integration](concept) is considered a major challenge in [IoT](context)?
     - Could you explain the logic behind [Customer Demand Prediction](concept) for perishable products?
     - Explain how the [Publish-Subscribe pattern](concept) differs from the request-response model.
-    - Can you explain how [Message Queuing](concept) guarantees reliable delivery in enterprise messaging?
+    - Can you explain how [Message Queuing](concept) guarantees reliable delivery in [enterprise messaging](context)?
     - I don't understand what [DTLS](concept) is used for, can you explain it to me?
     - Can you explain how [Predictive analytics](concept) can reduce equipment downtime significantly?
     - Could you explain the concept of [Data Collection Limitation](concept) in simple terms?
     - Explain what the [6G Vision](concept) means for future deeply personalized connectivity.
     - I am struggling to understand [Category points of parity](concept), can you explain it?
     - Can you explain how [Machine State Optimization](concept) works within the RECLAIM framework?
-    - Could you explain the role of [F-messaging API](concept) in docker containers?
+    - Could you explain the role of [F-messaging API](concept) in [docker containers](context)?
     - Please explain how the [Trend Analyzer](concept) processes historical and real-time data.
     - explane me how [Cloud computing](concept) works
     - i dont understnd [Internet of Things](concept), can u explain?
@@ -256,7 +256,7 @@ nlu:
     - Explain how the [Sympathetic Nervous System](concept) triggers fight-or-flight.
     - I don't understand what [Antibiotic Resistance](concept) actually means, can you explain?
     - How do [IoT and CPS](concept) differ in terms of their historical lineage?
-    - Why is [UDP](concept) often prioritized over [TCP](concept) in constrained [IoT applications](concept)?
+    - Why is [UDP](concept) often prioritized over [TCP](concept) in [constrained IoT applications](context)?
 
 - intent: ask_for_summary
   examples: |
@@ -290,7 +290,7 @@ nlu:
     - Could you summarize the challenges associated with [Legacy Systems Integration](concept)?
     - I need a quick summary of how [Customer Demand Prediction](concept) uses machine learning.
     - Can you summarize the main benefits of using the [Publish-Subscribe pattern](concept)?
-    - Give me a short summary of how [Message Queuing](concept) operates in business-critical systems.
+    - Give me a short summary of how [Message Queuing](concept) operates in [business-critical systems](context).
     - Could you summarize the security performance of [DTLS](concept)?
     - Synthesize the core concepts of [Predictive analytics](concept) into a small summary.
     - Provide a summary of [Data Collection Limitation](concept) as a top privacy measure.
@@ -298,7 +298,7 @@ nlu:
     - Give me a summary of what [Category points of parity](concept) means for a brand's credibility.
     - Could you summarize the architecture of [Machine State Optimization](concept)?
     - Summarize the main purpose of the [F-messaging API](concept).
-    - Can you give me a summary of the [Trend Analyzer](concept) component in RECLAIM?
+    - Can you give me a summary of the [Trend Analyzer](concept) component in [RECLAIM](context)?
     - can u sumarize [Edge computing](concept) for me real quick?
     - give me a tl;dr of [Fog computing](concept)
     - i need a quick sumary of [Cyber-physical systems](concept)
@@ -320,7 +320,7 @@ nlu:
     - Give me a high-level summary of [Cardiovascular Diseases](concept).
     - I need a quick digest of how the [Immune System](concept) remembers pathogens.
     - Can you summarize the key takeaways of the [Antibiotic Stewardship](concept) guidelines?
-    - Summarize the main stages of [Mitosis](concept) in human cells.
+    - Summarize the main stages of [Mitosis](concept) in [human cells](context).
 
 - intent: set_username
   examples: |

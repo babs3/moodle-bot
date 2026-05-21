@@ -17,6 +17,7 @@ intents:
 
 entities:
   - concept
+  - context
 
 slots:
   concept:
@@ -25,6 +26,13 @@ slots:
     mappings:
       - type: from_entity
         entity: concept
+
+  context:
+    type: text
+    influence_conversation: false
+    mappings:
+      - type: from_entity
+        entity: context
 
   complex_tokens:
     type: list

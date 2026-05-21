@@ -565,8 +565,11 @@ class ActionGetDefinition(Action):
         #user_role = tracker.get_slot("user_role")
         #print(f"👤  User role from slot: {user_role}")
         # Extract variables from chat memory
-        concept = tracker.get_slot("concept")        
-        print(f"🔍  Concept from slot: '{concept}'")
+        concept = tracker.get_slot("concept")  
+        concept = concept.lower().strip() if concept else ""        
+        context = tracker.get_slot("context")   
+        context = context.lower().strip() if context else ""     
+        print(f"🔍  Concept from slot: '{concept}' || Context from slot: '{context}'")
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
@@ -597,7 +600,9 @@ class ActionGetExplanation(Action):
         
         concept = tracker.get_slot("concept")
         concept = concept.lower().strip() if concept else ""        
-        print(f"🔍  Concept from slot: '{concept}'")
+        context = tracker.get_slot("context")   
+        context = context.lower().strip() if context else ""     
+        print(f"🔍  Concept from slot: '{concept}' || Context from slot: '{context}'")
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
@@ -621,7 +626,9 @@ class ActionGetExamples(Action):
         
         concept = tracker.get_slot("concept")
         concept = concept.lower().strip() if concept else ""
-        print(f"🔍  Concept from slot: '{concept}'")
+        context = tracker.get_slot("context")   
+        context = context.lower().strip() if context else ""     
+        print(f"🔍  Concept from slot: '{concept}' || Context from slot: '{context}'")
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
@@ -644,7 +651,9 @@ class ActionGetSummary(Action):
         
         concept = tracker.get_slot("concept")
         concept = concept.lower().strip() if concept else ""
-        print(f"🔍  Concept from slot: '{concept}'")
+        context = tracker.get_slot("context")   
+        context = context.lower().strip() if context else ""     
+        print(f"🔍  Concept from slot: '{concept}' || Context from slot: '{context}'")
 
         user_message = tracker.latest_message.get("text")
         user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
