@@ -347,7 +347,11 @@ def dense_vector_search(intent, complex_tokens, simple_tokens, context, query, c
         if simple_tokens != []:
             # se existir acronimos nos simple tokens, adiciona-os ao início da query, seguido dos complex tokens
             acronimos = [token for token in simple_tokens if token.isupper()]
-            query = intent + " " + " ".join(acronimos) + " " + " ".join(complex_tokens)  # Give more weight to complex tokens in the query
+            # se complex_token acabar com 'and', adicionar o acronimo depois
+            if complex_tokens and complex_tokens[-1].endswith('and'):
+                query = intent + " " + " ".join(complex_tokens) + " " + " ".join(acronimos)
+            else: 
+                query = intent + " " + " ".join(acronimos) + " " + " ".join(complex_tokens)
             query = re.sub(r'\s+', ' ', query).strip()  # Remove extra spaces
         else:          
             query = intent + " " + " ".join(complex_tokens)  # Give more weight to complex tokens in the query

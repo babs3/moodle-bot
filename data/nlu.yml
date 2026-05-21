@@ -191,6 +191,7 @@ nlu:
     - Give me examples of symptoms for [Type 2 Diabetes](concept).
     - Show me some examples of [Neurodegenerative Diseases](concept).
     - Are there any notable examples of [Zoonotic Viruses](concept)?
+    - List three [publicly traded IoT middleware platforms](concept) mentioned in the slides.
 
 - intent: ask_for_explanation
   examples: |

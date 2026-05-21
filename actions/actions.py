@@ -291,7 +291,9 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
             SlotSet("bot_response", "no_access"),  # Store the bot response -> trigger
             SlotSet("user_email", user_email),  # Store the sender ID
             SlotSet("user_id", user_id),  # Store the user ID
-            SlotSet("input_time", input_time)
+            SlotSet("input_time", input_time),
+            SlotSet("concept", ""),
+            SlotSet("context", "") # Store the context for future use
             ]
         
     print(f"\n📖  --------- Getting Knowledge --------- 📖 ")
@@ -299,7 +301,10 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
     
     # Extract variables from chat memory
     concept = tracker.get_slot("concept")  
-    concept = concept.lower().strip() if concept else ""        
+    concept = concept.lower().strip() if concept else ""  
+    # remove stopwords from concept for better matching with keywords later
+    #concept_tokens = tokenize_and_clean_text(concept)
+    #concept = " ".join(concept_tokens) if concept_tokens else ""     
     context = tracker.get_slot("context")   
     context = context.lower().strip() if context else ""     
     print(f"🔍  Concept from slot: '{concept}' || Context from slot: '{context}'")
@@ -309,9 +314,15 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
     if concept and concept.strip() != "":
         # check if concept is just one word or multiple words
         if " " in concept:
-            complex_tokens = [concept]
+            complex_tokens = [concept]            
             simple_tokens = tokenize_and_clean_text(concept)
             print(f"🔍  Concept '{concept}' split into simple lemma tokens: {simple_tokens}")
+            # stay with acronyms in uppercase from user_message:
+            query_tokens = user_message.split()
+            for token in query_tokens:
+                if token.isupper():
+                    simple_tokens.append(token)
+                    print(f"🔍  Added uppercase token '{token}' from user message to simple tokens: {simple_tokens}")
         else:            
             no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
             keywords = extract_query_keywords(no_punct_query)
@@ -359,7 +370,8 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
             SlotSet("user_email", user_email),  # Store the sender ID
             SlotSet("user_id", user_id),  # Store the user ID
             SlotSet("input_time", input_time),
-            SlotSet("concept", concept) # Store the concept for future use
+            SlotSet("concept", ""),
+            SlotSet("context", "")
             ]
 
     
@@ -388,6 +400,7 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
             SlotSet("user_id", user_id),  # Store the user ID
             SlotSet("input_time", input_time),
             SlotSet("concept", concept),
+            SlotSet("context", context),
             SlotSet("complex_tokens", complex_tokens),
             SlotSet("simple_tokens", simple_tokens)
             ]
@@ -475,7 +488,8 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
                 SlotSet("user_email", user_email),  # Store the sender ID
                 SlotSet("user_id", user_id),  # Store the user ID
                 SlotSet("input_time", input_time),
-                SlotSet("concept", concept) 
+                SlotSet("concept", ""),
+                SlotSet("context", "")
             ]
 
     return  [
@@ -486,6 +500,7 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
         SlotSet("user_id", user_id),  # Store the user ID
         SlotSet("input_time", input_time),
         SlotSet("concept", concept),
+        SlotSet("context", context),
         SlotSet("complex_tokens", complex_tokens),
         SlotSet("simple_tokens", simple_tokens)
         ]
@@ -681,7 +696,6 @@ class ActionGetCourseInfo(Action):
         
         return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
     
-
 # === FINAL ACTION: GET PDF NAMES & PAGE LOCATIONS === #
 class ActionGetClassMaterialLocation(Action):
     def name(self):
@@ -704,25 +718,25 @@ class ActionGetClassMaterialLocation(Action):
                 
         if bot_response == "no_access":
             dispatcher.utter_message(text="You don't have access to any class materials yet. Please check with your instructor to gain access to the course materials and try again.")
-            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", "")]
+            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", ""), SlotSet("context", "")]
 
         if bot_response == "no_response":
             response = f"I couldn't find any relevant content on this topic in the course materials. Please try again."
             save_user_progress(course_id, user_email, user_message, response, [], input_time, user_id, tutor_mode)
             dispatcher.utter_message(text=response)
-            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", "")]
+            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", ""), SlotSet("context", "")]
 
         if bot_response == "gemini_error":
             response = f"Sorry, I couldn't process that request due to an error calling Gemini API. Please try again later."
             save_user_progress(course_id, user_email, user_message, response, [], input_time, user_id, tutor_mode)
             dispatcher.utter_message(text=response)
-            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", "")]
-        
+            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", ""), SlotSet("context", "")]
+
         if bot_response == "I couldn't find relevant content in the course materials.":
             response = "</br>Please try rephrasing your query."
             save_user_progress(course_id, user_email, user_message, response, [], input_time, user_id, tutor_mode)
             dispatcher.utter_message(text=response)
-            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", "")]
+            return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", ""), SlotSet("context", "")]
 
 
         print(f"\n🔖  --------- Getting class materials location --------- 🔖 ")
@@ -761,7 +775,7 @@ class ActionGetClassMaterialLocation(Action):
                     dispatcher.utter_message(text="I couldn't find specific page references for your question.")
 
         #clear the slots
-        return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", ""), SlotSet("complex_tokens", []), SlotSet("simple_tokens", "")]
+        return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", ""), SlotSet("context", ""), SlotSet("complex_tokens", []), SlotSet("simple_tokens", "")]
 
 
 class ActionGenerateInitialMenuButtons(Action):
