@@ -68,19 +68,36 @@ def load_bm25_index(course_id):
         return [], [], [], [], []
     
 def tokenize_and_clean_text(text):
-    text_clean = text.replace('-', ' ')
-    doc = nlp(text_clean)
+    # REMOVIDO: text.replace('-', ' ') -> Mantemos os hifens!
+    doc = nlp(text)
     
-    tokens = [
-        # Se estiver toda em maiúsculas (ex: MQTT), mantém o texto original. 
-        # Caso contrário, usa o lemma em minúsculas.
-        token.text if token.text.isupper() else token.lemma_.lower()
-        for token in doc
-        if not token.is_stop and token.is_alpha  # remove stopwords e pontuação/números
-    ]
+    tokens = []
+    tokens_text = [t.text for t in doc]
     
+    for i, token in enumerate(doc):
+        # Verifica se o token atual está colado a um hifen
+        is_hyphenated = (
+            token.text == "-" or 
+            (i > 0 and tokens_text[i-1] == "-") or 
+            (i < len(doc) - 1 and tokens_text[i+1] == "-")
+        )
+        
+        # Filtro: aceita se for alfabético OU se for o próprio hifen
+        if token.is_alpha or token.text == "-":
+            # Se for stopword, só ignoramos se NÃO fizer parte de um termo com hifen
+            if token.is_stop and not is_hyphenated:
+                continue
+                
+            # Define a formatação (Acrónimo vs Lemma)
+            valor_token = token.text if token.text.isupper() else token.lemma_.lower()
+            tokens.append(valor_token)
+    
+    text = " ".join(tokens)
+    cleaned_text = text.replace(" - ", "-")
+    cleaned_tokens = cleaned_text.split()
+            
     # Remove duplicados mantendo a ordem
-    tokens = list(dict.fromkeys(tokens))
+    tokens = list(dict.fromkeys(cleaned_tokens))
     return tokens
 
 def normalize_score(scores, is_vector):
@@ -123,7 +140,7 @@ def save_user_progress(course_id, user_email, user_message, bot_response, pdfs, 
     requests.post("http://flask-server:8080/api/save_student_moodle_messages", json=data)
     
 
-QUESTION_WORDS = {"what", "who", "where", "when", "why", "how"}
+QUESTION_WORDS = {"what", "who", "where", "when", "why", "how", "compare", "differentiate", "list", "give", "show", "are there", "could you", "explain", "define", "meaning of", "examples of", "definition of", "what is", "what are", "can you", "do you know", "tell me about", "describe", "summarize", "elaborate on", "details about", "information on", "clarify", "expand on", "insights on", "break down", "illustrate with examples", "provide examples of", "what do you know about", "how does", "why is", "what's the difference between", "what's the meaning of", "what's an example of", "can you explain", "can you define", "can you give me examples of", "could you explain", "could you define", "could you give me examples of"}
 
 def clean_key_phrase(phrase):
     """Basic cleaner to normalize noun phrases."""
@@ -320,23 +337,43 @@ def filtrar_e_expandir_tokens(complex_tokens):
     print(f"\n🔍  ComplexTokens after filtering and expansion: {lista_final}")
     
     lista_final_cleaned = []        
-    # para cada expressão complexa, verifica se as palavras individuais sao .isupper(), e põe tudo em lowercase (exceto as palavras que são acrônimos)
+
     for expression in lista_final:
         doc = nlp(expression)
         nova_expressao = ""
-        for token in doc:
+        
+        # Criamos uma lista com o texto original dos tokens para espreitar os vizinhos
+        tokens_text = [token.text for token in doc]
+        
+        for i, token in enumerate(doc):
+            # --- NOVA LÓGICA PARA HIFENS ---
+            # Verifica se o token atual é um hifen, ou se está colado a um hifen (antes ou depois)
+            is_hyphenated = (
+                token.text == "-" or 
+                (i > 0 and tokens_text[i-1] == "-") or 
+                (i < len(doc) - 1 and tokens_text[i+1] == "-")
+            )
+            
             if token.text.isupper():  # Mantém acrônimos como estão
                 nova_expressao += token.text + " "
-            elif token.is_stop:  # Ignora stopwords
+                
+            elif token.is_stop and not is_hyphenated:  # SÓ ignora stopword se NÃO tiver hifen
                 print(f"🔹  Ignoring stopword: '{token.text}' in token: '{expression}'")
                 continue
+                
             else:
                 nova_expressao += token.text.lower() + " "
-        if nova_expressao.strip():  # Verifica se a expressão não está vazia após limpeza
-            if len(nova_expressao.split()) > 1:  # Garante que seja uma expressão multi-palavra
-                if nova_expressao.strip() not in lista_final_cleaned:  # Evita adicionar duplicados
-                    lista_final_cleaned.append(nova_expressao.strip())
+                
+        # --- LIMPEZA DE ESPAÇOS NOS HIFENS ---
+        # O spaCy adiciona espaços ao reconstruir (ex: "end - to - end")
+        # Este replace volta a colar o "end-to-end" corretamente
+        expressao_formatada = nova_expressao.strip().replace(" - ", "-")
         
+        if expressao_formatada:  
+            if len(expressao_formatada.split()) > 1 or "-" in expressao_formatada:  # Mantém se for multi-palavra OU tiver hifen
+                if expressao_formatada not in lista_final_cleaned:  
+                    lista_final_cleaned.append(expressao_formatada)
+            
     print(f"\n🔍  ComplexTokens after case normalization: {lista_final_cleaned}")
     
     return lista_final_cleaned

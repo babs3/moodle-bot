@@ -129,6 +129,7 @@ nlu:
     - Meaning of [Anaphylaxis](concept)?
     - Could you define what [Pathogens](concept) represent?
     - What are the [four layers](concept) defined in the [5-Layer IoT Architecture graph](context)?
+    - What is an [End-to-End connectivity middleware platform](concept)?
 
 - intent: ask_for_examples
   examples: |
@@ -258,6 +259,7 @@ nlu:
     - I don't understand what [Antibiotic Resistance](concept) actually means, can you explain?
     - How do [IoT and CPS](concept) differ in terms of their historical lineage?
     - Why is [UDP](concept) often prioritized over [TCP](concept) in [constrained IoT applications](context)?
+    - How does [middleware](concept) solve the issue of data heterogeneity in [multi-vendor environments](context)?
 
 - intent: ask_for_summary
   examples: |

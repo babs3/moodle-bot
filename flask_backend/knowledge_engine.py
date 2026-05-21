@@ -87,12 +87,32 @@ def clean_ocr_text(text):
  
 def get_ngrams(text, n=2):
     doc = nlp(text)
-    tokens = [
-        token.lemma_.lower()
-        for token in doc
-        if token.is_alpha and not token.is_stop
-    ]
-    return [" ".join(tokens[i:i+n]) for i in range(len(tokens) - n + 1)]
+    
+    # 1. Primeiro geramos os tokens limpos seguindo a mesma regra dos hifens
+    tokens_limpos = []
+    tokens_text = [t.text for t in doc]
+    
+    for i, token in enumerate(doc):
+        is_hyphenated = (
+            token.text == "-" or 
+            (i > 0 and tokens_text[i-1] == "-") or 
+            (i < len(doc) - 1 and tokens_text[i+1] == "-")
+        )
+        
+        if token.is_alpha or token.text == "-":
+            if token.is_stop and not is_hyphenated:
+                continue
+            tokens_limpos.append(token.lemma_.lower())
+            
+    # 2. Criamos os n-grams a partir dos tokens limpos
+    ngrams = []
+    for i in range(len(tokens_limpos) - n + 1):
+        janela_tokens = tokens_limpos[i:i+n]
+        # Juntamos com espaço, mas corrigimos o " - " para "-" para o n-gram ficar bonito
+        ngram_texto = " ".join(janela_tokens).replace(" - ", "-")
+        ngrams.append(ngram_texto)
+        
+    return ngrams
 
 LINES_TO_REMOVE = [
     # SCI slides style
@@ -414,13 +434,33 @@ def clean_doc_text(text):
     return text.strip()
 
 def tokenize_and_clean_text(text):
-    text_clean = text.replace('-', ' ')
-    doc = nlp(text_clean)
-    tokens = [
-        token.text if token.text.isupper() else token.lemma_.lower()
-        for token in doc
-        if not token.is_stop and token.is_alpha  # remove stopwords and punctuation/numbers
-    ]
+    # REMOVIDO: text.replace('-', ' ') -> Mantemos os hifens!
+    doc = nlp(text)
+    
+    tokens = []
+    tokens_text = [t.text for t in doc]
+    
+    for i, token in enumerate(doc):
+        # Verifica se o token atual está colado a um hifen
+        is_hyphenated = (
+            token.text == "-" or 
+            (i > 0 and tokens_text[i-1] == "-") or 
+            (i < len(doc) - 1 and tokens_text[i+1] == "-")
+        )
+        
+        # Filtro: aceita se for alfabético OU se for o próprio hifen
+        if token.is_alpha or token.text == "-":
+            # Se for stopword, só ignoramos se NÃO fizer parte de um termo com hifen
+            if token.is_stop and not is_hyphenated:
+                continue
+                
+            # Define a formatação (Acrónimo vs Lemma)
+            valor_token = token.text if token.text.isupper() else token.lemma_.lower()
+            tokens.append(valor_token)
+            
+    # Opcional: Se quiseres juntar os hifens que ficaram com espaços na lista,
+    # podes fazer uma limpeza rápida antes de retornar, mas geralmente para o spaCy
+    # ter a lista ['end', '-', 'to', '-', 'end'] é perfeitamente válido.
     return tokens
 
 def initialize_chroma():
