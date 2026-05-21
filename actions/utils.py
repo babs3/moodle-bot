@@ -399,7 +399,7 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
                 bm25_scores_complex_3 = bm25_3gram.get_scores([token])
                 bm25_scores_complex_3 = normalize_bm25_indexes(bm25_scores_complex_3)
                 
-                if bm25_scores_complex_3.max() == 0:
+                if bm25_scores_complex_3.max() != 0:
                     print(f"--> Complex Tokens match with len == 3: {[token]}") 
                 
                 complex_tokens_2 = get_ngrams(token, 2)
@@ -424,7 +424,7 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
                     bm25_scores_complex +=  bm25_scores_complex_2
                 
                 if len(token.split()) == 2:
-                    if bm25_scores_complex.max() == 0:
+                    if bm25_scores_complex.max() != 0:
                         print(f"--> Complex Tokens match with len == 2: {[token]}")
                         
 

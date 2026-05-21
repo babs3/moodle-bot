@@ -128,6 +128,7 @@ nlu:
     - What does the term [Myocardial Infarction](concept) mean?
     - Meaning of [Anaphylaxis](concept)?
     - Could you define what [Pathogens](concept) represent?
+    - What are the [four layers defined in the 5-Layer IoT Architecture graph](concept)?
 
 - intent: ask_for_examples
   examples: |
