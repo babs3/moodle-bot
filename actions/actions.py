@@ -309,6 +309,9 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
     context = context.lower().strip() if context else ""     
     print(f"🔍  Concept from slot: '{concept}' || Context from slot: '{context}'")
     
+    concepts = list(tracker.get_latest_entity_values("concept"))
+    print(f"\n🔍  Concepts extracted from entities: {concepts}")
+    
     complex_tokens = []
     simple_tokens = []
     if concept and concept.strip() != "":

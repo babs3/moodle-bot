@@ -151,9 +151,9 @@ nlu:
     - Show me some examples of an [Income Statement](concept).
     - I need examples of [transactions](concept) in a [Cash-Flow Statement](context).
     - Can you give some real-world examples of [Amortizations and Depreciations](concept)?
-    - What are some examples of [Points of parity](concept) for a 4-star hotel?
+    - What are some examples of [Points of parity](concept) for [a 4-star hotel](context)?
     - Could you provide a few examples of a strong [Positioning statement](concept)?
-    - Give me examples of [Points of Difference](concept) for a car brand.
+    - Give me examples of [Points of Difference](concept) for [a car brand](context)
     - Can you share some real-world use cases or practical examples of [Ecosystem Heterogeneity](concept) being a challenge?
     - I understand the theory behind [User Consent](concept), but I need some concrete examples to visualize it better.
     - Could you provide a list of examples where [Data Minimization](concept) is applied successfully?
@@ -189,7 +189,7 @@ nlu:
     - I need examples of [Coalition Governments](concept).
     - Can you give me some examples of [Chronic Illnesses](concept)?
     - What are some examples of [Broad-Spectrum Antibiotics](concept)?
-    - Give me examples of symptoms for [Type 2 Diabetes](concept).
+    - Give me examples of [symptoms](concept) for [Type 2 Diabetes](context).
     - Show me some examples of [Neurodegenerative Diseases](concept).
     - Are there any notable examples of [Zoonotic Viruses](concept)?
     - List three [publicly traded IoT middleware platforms](concept) mentioned in the slides.
@@ -201,19 +201,19 @@ nlu:
     - Can you explain [Fog computing](concept)?
     - I don't understand [Cloud computing](concept), can you explain it?
     - I'm having trouble with [Cyber-physical systems](concept), can you explain it?
-    - Could you explain the concept of [Internet of Things](concept)?
+    - Could you explin the concept of [Internet of Things](concept)?
     - I'm confused about [Minimum Viable Product](concept), can you explain it?
     - Can you explain how [Product-Market Fit](concept) works?
     - I'm struggling to understand [Value Propositions](concept), can you explain it?
     - Could you explain the concept of [Customer Development](concept)?
-    - I don't understand what [Balance Sheet](concept) entries mean, can you explain them?
+    - I don't understand what [Balance Sheet](concept) entris mean
     - Can you explain the concept of [OPC UA](concept)?
-    - I'm having trouble understanding the [TOSCA framework](concept), can you explain it?
+    - I'm having trouble understanding the [TOSCA framework](concept)
     - Could you explain how [Federated Learning](concept) keeps data private?
     - Can you explain how [Quantum Integration](concept) works in [next-generation networks](context)?
     - Explain the concept of [Predictive maintenance](concept) to a beginner.
     - Can you explain the difference between a balance sheet and an [Income Statement](concept)?
-    - I don't fully understand the [Cash-Flow Statement](concept), can you explain it to me?
+    - I don't fully undrestand the [Cash-Flow Statement](concept)
     - Could you explain why we need [Amortizations and Depreciations](concept) in [financial management](context)?
     - I'm confused about [Points of parity](concept), could you clarify what it means?
     - Can you explain how to construct a proper [Positioning statement](concept)?
@@ -225,31 +225,31 @@ nlu:
     - Can you explain how [Data Anonymization](concept) actually functions when dealing with public heatmaps?
     - I am confused about the whole process of [Cross-Domain Interoperability](concept), could you explain it in detail?
     - Can you explain why [Legacy Systems Integration](concept) is considered a major challenge in [IoT](context)?
-    - Could you explain the logic behind [Customer Demand Prediction](concept) for perishable products?
+    - Could you explain the logic behind [Customer Demand Prediction](concept) for [perishable products](context)?
     - Explain how the [Publish-Subscribe pattern](concept) differs from the request-response model.
     - Can you explain how [Message Queuing](concept) guarantees reliable delivery in [enterprise messaging](context)?
     - I don't understand what [DTLS](concept) is used for, can you explain it to me?
     - Can you explain how [Predictive analytics](concept) can reduce equipment downtime significantly?
     - Could you explain the concept of [Data Collection Limitation](concept) in simple terms?
-    - Explain what the [6G Vision](concept) means for future deeply personalized connectivity.
-    - I am struggling to understand [Category points of parity](concept), can you explain it?
+    - explain what the [6G Vision](concept) means for [future deeply personalized connectivity](context).
+    - I am struggling to understand [Category points of parity](concept)
     - Can you explain how [Machine State Optimization](concept) works within the RECLAIM framework?
     - Could you explain the role of [F-messaging API](concept) in [docker containers](context)?
-    - Please explain how the [Trend Analyzer](concept) processes historical and real-time data.
+    - Please explain me how the [Trend Analyzer](concept) processes historical and real-time data.
     - explane me how [Cloud computing](concept) works
     - i dont understnd [Internet of Things](concept), can u explain?
     - explain the concept of [Product-Market Fit](concept) to a beginner
     - im confused about [Balance Sheet](concept), clarify pls
     - can u break down [Data Anonymization](concept) so anyone can get it?
     - Can you explain how the [Law of Supply and Demand](concept) regulates prices?
-    - I don't fully understand [Quantitative Easing](concept), can you explain it to me?
+    - i don't fully understand [Quantitative Easing](concept), can you explain it to me?
     - Could you explain why [Keynesian Economics](concept) is relevant during a recession?
     - Explain the concept of [Circular Economy](concept) in simple terms.
     - I'm struggling to grasp the inner workings of [Monetary Policy](concept).
     - Can you explain the difference between [Socialism and Capitalism](concept)?
     - I am confused about the whole process of the [Electoral College](concept), could you explain it?
     - Could you break down the concept of [Diplomatic Immunity](concept)?
-    - Explain what [Lobbying](concept) means for democratic decision-making.
+    - Explain what [Lobbying](concept) means for [democratic decision-making](context).
     - I don't understand how [Constitutional Checks and Balances](concept) function.
     - Can you explain the logic behind [Geopolitical Deterrence](concept)?
     - Can you explain how [mRNA Vaccines](concept) work inside the body?
@@ -257,7 +257,7 @@ nlu:
     - Could you explain the mechanism behind [Allergic Reactions](concept)?
     - Explain how the [Sympathetic Nervous System](concept) triggers fight-or-flight.
     - I don't understand what [Antibiotic Resistance](concept) actually means, can you explain?
-    - How do [IoT and CPS](concept) differ in terms of their historical lineage?
+    - How do [IoT](concept) and [CPS](concept) differ in terms of their historical lineage?
     - Why is [UDP](concept) often prioritized over [TCP](concept) in [constrained IoT applications](context)?
     - How does [middleware](concept) solve the issue of data heterogeneity in [multi-vendor environments](context)?
 
@@ -298,7 +298,7 @@ nlu:
     - Synthesize the core concepts of [Predictive analytics](concept) into a small summary.
     - Provide a summary of [Data Collection Limitation](concept) as a top privacy measure.
     - Can you summarize the key aspects of the [6G Vision](concept) presentation?
-    - Give me a summary of what [Category points of parity](concept) means for a brand's credibility.
+    - Give me a summary of what [Category points of parity](concept) means for [a brand's credibility](context).
     - Could you summarize the architecture of [Machine State Optimization](concept)?
     - Summarize the main purpose of the [F-messaging API](concept).
     - Can you give me a summary of the [Trend Analyzer](concept) component in [RECLAIM](context)?
@@ -324,6 +324,44 @@ nlu:
     - I need a quick digest of how the [Immune System](concept) remembers pathogens.
     - Can you summarize the key takeaways of the [Antibiotic Stewardship](concept) guidelines?
     - Summarize the main stages of [Mitosis](concept) in [human cells](context).
+
+- intent: ask_for_comparison
+  examples: |
+    - Can you compare [Edge computing](concept) and [Fog computing](concept)?
+    - I want to understand the differences between [Cloud computing](concept) and [Cyber-physical systems](concept), can you compare them?
+    - Could you compare the advantages of [Internet of Things](concept) vs traditional embedded systems?
+    - Can you compare the concept of a [Minimum Viable Product](concept) with a prototype?
+    - I need a comparison between [Product-Market Fit](concept) and [Product-Solution Fit](concept), can you help?
+    - Could you compare the key features of [Value Propositions](concept) and [Unique Selling Propositions](concept)?
+    - Can you compare the concept of [Customer Development](concept) with traditional market research?
+    - I want to understand how a [Balance Sheet](concept) differs from an [Income Statement](concept), can you compare them?
+    - Could you compare the security features of [OPC UA](concept) with other industrial communication protocols?
+    - Can you compare the main components of the [TOSCA framework](concept) with other orchestration frameworks?
+    - I need a comparison between [Federated Learning](concept) and centralized machine learning, can you provide it?
+    - Could you compare the potential applications of [Quantum Integration](concept) in different industries?
+    - Can you compare the benefits of using [Predictive maintenance](concept) versus reactive maintenance strategies?
+    - I want to understand how an [Income Statement](concept) compares to a [Cash-Flow Statement](concept), can you explain the differences?
+    - Could you compare the role of tracking [Amortizations and Depreciations](concept) in financial reporting versus tax purposes?
+    - Can you compare the concepts of [Points of parity](concept) and points of difference in terms of their impact on brand positioning?
+    - I need a comparison between a well-crafted [Positioning statement](concept) and a weak one, can you provide examples?
+    - Could you compare the challenges posed by [Ecosystem Heterogeneity](concept) with those of data heterogeneity in IoT environments?
+    - Can you compare the user experience implications of different approaches to obtaining [User Consent](concept)?
+    - I want to understand how different implementations of [Data Minimization](concept) can affect user privacy, can you compare them?
+    - Could you compare the key elements of a [Data Retention Policy](concept) for [a startup versus a large enterprise](context)?
+    - Can you compare the effectiveness of different [Data Anonymization](concept) techniques in protecting user privacy?
+    - I need a comparison between [Cross-Domain Interoperability](concept) solutions for [smart cities versus industrial IoT](context), can you provide it?
+    - Could you compare the challenges of [Legacy Systems Integration](concept) in the manufacturing sector versus the healthcare sector?
+    - Can you compare the accuracy of different machine learning models used for [Customer Demand Prediction](concept)?
+    - I want to understand the differences between the [Publish-Subscribe pattern](concept) and the request-response model, can you compare them?
+    - Could you compare the performance of different [Message Queuing](concept) tools in high-throughput environments?
+    - Can you compare the security features of [DTLS](concept) with those of TLS in the context of IoT communications?
+    - I need a comparison between [Predictive analytics](concept) and traditional statistical analysis, can you provide it?
+    - Could you compare the implications of [Data Collection Limitation](concept) for [user privacy versus data-driven innovation](context)?
+    - Can you compare the key features of the [6G Vision](concept) with those of 5G technology?
+    - I want to understand the differences between [Category points of parity](concept) and points of difference in terms of their impact on consumer perception, can you compare them?
+    - Differentiate between a [Digital Model](concept), a [Digital Shadow](concept), and a [Digital Twin](concept).
+    - How does [predictive maintenance](concept) differ from [preventive maintenance](concept)?
+    - Compare [CoAP](concept) and [MQTT](concept) in terms of architecture design choices.
 
 - intent: set_username
   examples: |
