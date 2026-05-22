@@ -87,23 +87,35 @@ def clean_ocr_text(text):
  
 def get_ngrams(text, n=2):
     doc = nlp(text)
+    print(f"\n🔍  Doc text for n-grams: {doc}")
     
     # 1. Primeiro geramos os tokens limpos seguindo a mesma regra dos hifens
     tokens_limpos = []
     tokens_text = [t.text for t in doc]
     
     for i, token in enumerate(doc):
+                
         is_hyphenated = (
             token.text == "-" or 
             (i > 0 and tokens_text[i-1] == "-") or 
             (i < len(doc) - 1 and tokens_text[i+1] == "-")
-        )
+        )            
         
-        if token.is_alpha or token.text == "-":
-            if token.is_stop and not is_hyphenated:
+        # se nao tiver hifenados, segue a regra normal de limpeza
+        if not is_hyphenated:
+            # se o token nao for stop ou for um hifen, mantem o token
+            if not token.is_stop or token.text != "-":
+                tokens_limpos.append(token.lemma_.lower())
                 continue
-            tokens_limpos.append(token.lemma_.lower())
-            
+        # se tiver hifenados, mantem o token original (sem lematizar) e junta com os tokens vizinhos se forem hifenados
+        else:
+            if token.text == "-":
+                if i > 0 and i < len(doc) - 1:
+                    print(f"⚠️  Token '-' is hyphenated between '{tokens_text[i-1]}' and '{tokens_text[i+1]}'. Keeping them as a single token.")
+                    new_token = tokens_text[i-1] + "-" + tokens_text[i+1]
+                    tokens_limpos.append(new_token.lower())
+                    continue  # Skip the next token since it's already merged        
+        
     # 2. Criamos os n-grams a partir dos tokens limpos
     ngrams = []
     for i in range(len(tokens_limpos) - n + 1):
@@ -426,15 +438,13 @@ def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_thre
 
 
 def clean_doc_text(text):
-    text = text.replace("\n", " ")  # Normalize line breaks
-    text = re.sub(r"\s{2,}", " ", text)  # Remove excessive whitespace
-    text = re.sub(r"(?<=\w)- (?=\w)", "", text)  # Remove hyphenated line breaks
-    text = re.sub(r"\s*-\s*", " - ", text)  # Normalize dash spacing (useful for multiword splits)
-    #text = re.sub(r"[^\w\s\-]", "", text)  # Optionally remove punctuation except hyphens
+    text = text.replace("\n", " ")
+    # remove excessive whitespace
+    text = re.sub(r"\s{2,}", " ", text)
+    text = text.replace(" - ", " ")
     return text.strip()
 
 def tokenize_and_clean_text(text):
-    # REMOVIDO: text.replace('-', ' ') -> Mantemos os hifens!
     doc = nlp(text)
     
     tokens = []
@@ -458,10 +468,11 @@ def tokenize_and_clean_text(text):
             valor_token = token.text if token.text.isupper() else token.lemma_.lower()
             tokens.append(valor_token)
             
-    # Opcional: Se quiseres juntar os hifens que ficaram com espaços na lista,
-    # podes fazer uma limpeza rápida antes de retornar, mas geralmente para o spaCy
-    # ter a lista ['end', '-', 'to', '-', 'end'] é perfeitamente válido.
-    return tokens
+    text = " ".join(tokens)
+    cleaned_text = text.replace(" - ", "-")
+    cleaned_tokens = cleaned_text.split()
+    
+    return cleaned_tokens
 
 def initialize_chroma():
     # Agora ligamo-nos ao container 'chroma' via HTTP
@@ -511,7 +522,6 @@ def process_pdfs(pdf_folder, course_id):
                 cleaned_text = tokenize_and_clean_text(clean_doc_text(doc_text))
                 simple_tokens.append(cleaned_text)
                 ngram_docs_2.append(delete_duplicated_ngrams(get_ngrams(" ".join(cleaned_text), 2)))
-                #print(f" last 2grams: {ngram_docs_2[-1]}")
                 ngram_docs_3.append(delete_duplicated_ngrams(get_ngrams(" ".join(cleaned_text), 3)))
                 
 
@@ -645,9 +655,9 @@ def delete_pdf_from_knowledge(filename, course_id):
     # 2. Se encontrarmos IDs, apagamos por ID (que é o método mais rápido e infalível)
     if results['ids']:
         collection.delete(ids=results['ids'])
-        print(f"🗑️ Removidos {len(results['ids'])} chunks do ficheiro: {filename}")
+        print(f"🗑️  Removidos {len(results['ids'])} chunks do ficheiro: {filename}")
     else:
-        print(f"⚠️ Nenhum registo encontrado para {filename} no curso {course_id}")
+        print(f"⚠️  Nenhum registo encontrado para {filename} no curso {course_id}")
         return False
 
     # 3. Atualizar o BM25 (O BM25 não permite 'delete', temos de reconstruir)

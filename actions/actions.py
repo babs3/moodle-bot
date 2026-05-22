@@ -317,12 +317,13 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
     if concepts: # and concept.strip() != "":
         # check if concept is just one word or multiple words
         for concept in concepts:
-            if " " in concept:
-                complex_tokens.append(concept)          
+            if " " in concept:         
                 complex_tokens_split = tokenize_and_clean_text(concept)
                 print(f"🔍  Concept '{concept}' split into simple lemma tokens: {complex_tokens_split}")
                 for token in complex_tokens_split:
                     simple_tokens.append(token)        
+                text = " ".join(complex_tokens_split)
+                complex_tokens.append(text)
             else: 
                 simple_tokens.append(concept)
                 print(f"🔍  Concept '{concept}' is a single word. Added to simple tokens: {simple_tokens}")
