@@ -310,36 +310,32 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
     print(f"🔍  Concept from slot: '{concept}' || Context from slot: '{context}'")
     
     concepts = list(tracker.get_latest_entity_values("concept"))
-    print(f"\n🔍  Concepts extracted from entities: {concepts}")
+    print(f"\n🔍 🔍  Concepts extracted from entities: {concepts}")
     
     complex_tokens = []
     simple_tokens = []
-    if concept and concept.strip() != "":
+    if concepts: # and concept.strip() != "":
         # check if concept is just one word or multiple words
-        if " " in concept:
-            complex_tokens = [concept]            
-            simple_tokens = tokenize_and_clean_text(concept)
-            print(f"🔍  Concept '{concept}' split into simple lemma tokens: {simple_tokens}")
-            # stay with acronyms in uppercase from user_message:
-            query_tokens = user_message.split()
-            for token in query_tokens:
-                if token.isupper():
-                    simple_tokens.append(token)
-                    print(f"🔍  Added uppercase token '{token}' from user message to simple tokens: {simple_tokens}")
-        else:            
-            no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
-            keywords = extract_query_keywords(no_punct_query)
-            print(f"\n🔍  Extracted keywords from query for comparison: {keywords}")
-            for keyword in keywords:
-                if context.lower().strip() == keyword.lower().strip():
-                    keywords.remove(keyword)
-            print(f"🔍  Keywords after removing context duplicates: {keywords}")
-            complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query, context)  
+        for concept in concepts:
+            if " " in concept:
+                complex_tokens.append(concept)          
+                complex_tokens_split = tokenize_and_clean_text(concept)
+                print(f"🔍  Concept '{concept}' split into simple lemma tokens: {complex_tokens_split}")
+                for token in complex_tokens_split:
+                    simple_tokens.append(token)        
+            else: 
+                simple_tokens.append(concept)
+                print(f"🔍  Concept '{concept}' is a single word. Added to simple tokens: {simple_tokens}")
+                
+        # stay with acronyms in uppercase from user_message:
+        query_tokens = user_message.split()
+        for token in query_tokens:
+            if token.isupper() and len(token) > 1: # Check if the token is uppercase and has more than 1 character (to avoid adding single letters)
+                simple_tokens.append(token)
+                print(f"🔍  Added uppercase token '{token}' from user message to simple tokens: {simple_tokens}")
+        # remove duplicates from simple_tokens
+        simple_tokens = list(set(simple_tokens))
             
-            lower_simple_tokens = [token.lower() for token in simple_tokens]
-            if concept.lower() not in lower_simple_tokens:
-                simple_tokens.append(concept.lower())
-                print(f"🔍  Added concept '{concept.lower()}' to simple tokens: {simple_tokens}")
     else:
         print(f"\n🔍  No concept identified by Rasa. Proceeding with keywords extraction from the entire query.")
         # Keywords Extraction Process 
@@ -378,7 +374,7 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
             ]
 
     
-    if concept and concept.strip() != "":
+    if complex_tokens:
         if intent == "definition of ":
             alpha = 0.6 # Use a lower alpha for definitions
             print(f"\n🔍  Found keywords: {complex_tokens} and {simple_tokens}. \n     Using hybrid search with alpha = {alpha} because of the 'DEFINE' intent ")
@@ -426,7 +422,7 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
 
             ### CRITICAL RULES
             1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
-            2. **HTML ONLY:** Use <b>text</b> for bold, <ul><li></li></ul> for lists, and <br> for line breaks.
+            2. **HTML ONLY:** Use <b>text</b> for bold and <br> for line breaks.
             3. **CONCISENESS:** Be extremely precise and direct. Do NOT exceed 100 words in your answer.
             4. **STRICTNESS:** Base your answer ONLY on the provided course material above. Do not extrapolate or use outside knowledge.
             5. **FALLBACK:** If you cannot find the relevant information to answer the query within the provided course material, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials."
@@ -445,7 +441,7 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
 
             ### CRITICAL RULES
             1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
-            2. **HTML ONLY:** Use <b>text</b> for bold, <ul><li></li></ul> for lists, and <br> for line breaks.
+            2. **HTML ONLY:** Use <b>text</b> for bold and <br> for line breaks.
             3. **CONCISENESS & CLARITY:** Be precise and direct. Do NOT exceed 100 words in your answer, but ensure all administrative details requested (dates, percentages, names) are clearly stated.
             4. **STRICTNESS:** Base your answer ONLY on the provided course documentation above. Do not extrapolate, assume, or use outside knowledge about university policies.
             5. **FALLBACK:** If the specific administrative info (e.g., a specific deadline or professor's email) is not explicitly mentioned in the provided text, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials."
@@ -677,6 +673,26 @@ class ActionGetSummary(Action):
 
         intent = "summary of"
         return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
+
+# === ACTION 4: COMPARE === #
+class ActionGetComparison(Action):
+    def name(self):
+        return "action_get_comparison"
+
+    def run(self, dispatcher, tracker, domain):
+        
+        print("\n📊  Generating bot 'action_get_comparison' response...")
+
+        user_message = tracker.latest_message.get("text")
+        user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
+        input_time = tracker.latest_message.get("metadata", {}).get("input_time")
+        user_id = tracker.latest_message.get("metadata", {}).get("user_id")
+        authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
+        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+
+        intent = "comparison of"
+        return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
+
 
 class ActionGetCourseInfo(Action):
     def name(self):
