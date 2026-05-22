@@ -683,8 +683,8 @@ def delete_pdf_from_knowledge(filename, course_id):
         
         # Precisas de re-tokenizar para o BM25 (ou guardar os tokens no pkl anteriormente para ser mais rápido)
         new_simple_tokens = [tokenize_and_clean_text(clean_doc_text(doc)) for doc in new_documents]
-        new_ngram_docs_2 = [delete_duplicated_ngrams(get_ngrams(" ".join(tokens), 2)) for tokens in new_simple_tokens]
-        new_ngram_docs_3 = [delete_duplicated_ngrams(get_ngrams(" ".join(tokens), 3)) for tokens in new_simple_tokens]
+        new_ngram_docs_2 = [get_ngrams(" ".join(tokens), 2) for tokens in new_simple_tokens]
+        new_ngram_docs_3 = [get_ngrams(" ".join(tokens), 3) for tokens in new_simple_tokens]
 
         # Re-inicializar os objetos BM25
         new_bm25_simple = BM25Okapi(new_simple_tokens)
