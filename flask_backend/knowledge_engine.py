@@ -521,8 +521,8 @@ def process_pdfs(pdf_folder, course_id):
                 
                 cleaned_text = tokenize_and_clean_text(clean_doc_text(doc_text))
                 simple_tokens.append(cleaned_text)
-                ngram_docs_2.append(delete_duplicated_ngrams(get_ngrams(" ".join(cleaned_text), 2)))
-                ngram_docs_3.append(delete_duplicated_ngrams(get_ngrams(" ".join(cleaned_text), 3)))
+                ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
+                ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
                 
 
     if not documents:
@@ -550,16 +550,6 @@ def process_pdfs(pdf_folder, course_id):
         pickle.dump((bm25_simple, bm25_2gram, bm25_3gram, metadata, documents), f)
     
     return True
-
-def delete_duplicated_ngrams(ngram_list):
-    """Removes duplicate n-grams from a list."""
-    seen = set()
-    unique_ngrams = []
-    for ngram in ngram_list:
-        if ngram not in seen:
-            seen.add(ngram)
-            unique_ngrams.append(ngram)
-    return unique_ngrams
 
 # To reduce embeddings noise
 def clean_text(text):
