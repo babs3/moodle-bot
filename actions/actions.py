@@ -556,7 +556,7 @@ class ActionCreateTopic(Action):
             response = g_model.generate_content(user_prompt)
 
             if hasattr(response, "text") and response.text:
-                print("\n🎯 Gemini Response Generated Successfully!")
+                print("\n🎯  Gemini Response Generated Successfully!")
                 raw_text = response.text.strip()
                 
                 # 1. Limpar os backticks de Markdown (```json e ```)
