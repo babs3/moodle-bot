@@ -633,7 +633,29 @@ def hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_d
     #for doc, meta, score in selected_results:
     #    print(f"    📄  PDF: {meta['file']} | Page: {meta['page']}") #| Score: {score:.4f}
     
-    return selected_results
+    # access text to replace '__OCR__' withspecific NOTE
+    for i, (doc, meta, score) in enumerate(selected_results):
+        if '__OCR__' in doc:
+            selected_results[i] = (doc.replace('__OCR__', "[NOTE: This text was extracted via OCR from an image/scan and may contain minor spelling errors]"), meta, score)
+    
+    # print for see the OCR notes in the selected results
+    print(f"\n📖  Selected Results after thresholding (with OCR notes if applicable):")
+    updated_results = []
+    
+    for doc, meta, score in selected_results:
+        #print(f"    📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | OCR: {meta['is_ocr']} | DOC text: {doc[:50]}...")
+        if meta.get('is_ocr') == True:
+            #print(f"    ⚠️  Document is OCR. Adding note about potential errors in the text.")
+            note = "[NOTE: This text was extracted via OCR from an image/scan and may contain minor spelling errors]\n"
+            doc = note + doc
+            
+        updated_results.append((doc, meta, score))
+        
+    for doc, meta, score in updated_results:
+        print(f"    📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | OCR: {meta['is_ocr']} | DOC text: {doc[:200]}...")
+    
+
+    return updated_results
     
     
 def generate_topic(question, correct_answer, course_fullname="Ciber-physical Systems and Internet of Things"):

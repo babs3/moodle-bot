@@ -238,8 +238,8 @@ def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_thre
             if len(current_text.split()) == 0 and i != 0:
                 image_text = extract_text_with_ocr(doc[i])
                 if image_text.split() != []:
-                    current_text = clean_by_line(image_text)
-                    #print(f"    🖼️  current_text is OCR text from page {i + 1}:\n{current_text}")
+                    current_text = '__OCR__' + clean_by_line(image_text)
+                    print(f"    🖼️  current_text is OCR text from page {i + 1}")
                 else:
                     print(f"     ⚠️  Skipping empty page {i + 1}")
                     i += 1
@@ -399,12 +399,12 @@ def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_thre
                     current_image_text = extract_text_with_ocr(doc[i-1])
                     if current_image_text.split() != []:
                         current_image_text = clean_by_line(current_image_text)
-                        print(f"       🖼️  Page {i} has images!\n{current_image_text}")
+                        print(f"       🖼️  Page {i} has images!")
                         # Stop if it has sufficient OCR text
                         image_word_count = len(current_image_text.split())
                         if image_word_count >= min_word_threshold:
                             collected_texts.pop()
-                            collected_texts.append('__PARABREAK__' + current_image_text)
+                            collected_texts.append('__PARABREAK__' + '__OCR__' + current_image_text)
                             break
                         else:
                             print(f"     ⚠️  Page {i} has no suficient content, merging with next...")
@@ -413,21 +413,22 @@ def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_thre
                         print(f"     ⚠️  Page {i} has no suficient content, merging with next...")
                         continue  # Merge with next page
                                    
-                    
-        
+                  
+        is_ocr = False
         if write_title:
             #print(f"🏷️  Pages have common title '{title}':") 
-            final_text = title + "\n\n" + clean_text("\n\n".join(collected_texts))
+            cleaned_text, is_ocr = clean_text("\n\n".join(collected_texts))
+            final_text = title + "\n\n" + cleaned_text
         else:
             if edited:
                 #print("=> Edited PDF detected!")
                 final_text = clean_edited_text("\n\n".join(collected_texts))
             else:
-                final_text = clean_text("\n\n".join(collected_texts))
+                final_text, is_ocr = clean_text("\n\n".join(collected_texts))
                 
         
         page_label = "-".join(page_numbers) if len(page_numbers) > 1 else page_numbers[0]
-        page_chunks.append({"text": final_text, "page": page_label})
+        page_chunks.append({"text": final_text, "page": page_label, "is_ocr": is_ocr})
         
         if write_title:
             print(f"\n-----> 🏷️  Text from page(s) {page_label} w/title '{title}':\n{final_text}\n\n")
@@ -516,7 +517,8 @@ def process_pdfs(pdf_folder, course_id):
                 metadata.append({
                     "file": file, 
                     "page": chunk["page"], 
-                    "course_id": str(course_id) 
+                    "course_id": str(course_id),
+                    "is_ocr": chunk["is_ocr"]
                 })
                 
                 cleaned_text = tokenize_and_clean_text(clean_doc_text(doc_text))
@@ -556,6 +558,12 @@ def clean_text(text):
     # remove the first '__PARABREAK__' if it exists
     if text.startswith('__PARABREAK__'):
         text = text[13:]  # remove the first 15 characters
+    
+    is_ocr = False
+    # se contem '__OCR__' em qualquer sitio do texto, remove it and add a note that the text is from OCR
+    if '__OCR__' in text:
+        text = text.replace('__OCR__', '')  # remove the marker
+        is_ocr = True
         
     # removes extra newlines/spaces
     #text = ' '.join(text.split())
@@ -602,7 +610,7 @@ def clean_text(text):
     # Final cleanup of whitespace and over-newlines
     final_text = re.sub(r'\n{3,}', '\n\n', final_text).strip()
     
-    return final_text
+    return final_text, is_ocr
 
 def clean_edited_text(text):
     # Normalize line endings
