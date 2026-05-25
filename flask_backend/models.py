@@ -24,6 +24,7 @@ class MoodleQuizAnalysis(db.Model):
     user_moodle_id = db.Column(db.Integer, db.ForeignKey('moodle_users.moodle_id', ondelete="CASCADE"), nullable=False)
     quiz_id = db.Column(db.Integer, nullable=False)  # ID do Quiz no Moodle
     last_attempt_id = db.Column(db.Integer, nullable=False)  # ID da última tentativa analisada
+    state=db.Column(db.String(20), default="pending", nullable=False)  # Ex: "pending", "analyzed"
     last_updated = db.Column(db.DateTime, default=datetime.now)
 
 class MoodleQuizPolling(db.Model):

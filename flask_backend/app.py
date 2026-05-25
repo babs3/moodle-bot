@@ -446,7 +446,7 @@ def tutor_toggle():
             quiz_id=quiz_id
         ).first()
 
-        if not analise or analise.last_attempt_id < attempt_id:
+        if not analise or analise.state != "analyzed":
             # Temos uma tentativa nova! Analisar...
             review_data = get_quiz_attempt_review(attempt_id, moodle_url, moodle_token)
             
@@ -492,7 +492,7 @@ def tutor_toggle():
                 topic_id=error.get('topic_id'),
                 question=error.get('question'),
                 student_answer=error.get('student_answer'),
-                correct_answer=error.get('correct_answer')
+                correct_answer=error.get('correct_answer'),
             ).first()
             
             if progresso_existente:
