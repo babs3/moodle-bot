@@ -410,6 +410,8 @@ def tutor_toggle():
         user_email = info_utilizador.get("email") if info_utilizador else f"user_{user_id}@example.com"
         check_moodle_user_in_db(user_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
         user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
+    else: 
+        user_email = user.email
 
     tutor = TutorModeState.query.filter_by(user_moodle_id=user_id, course_id=course_id).first()
     if not tutor:
@@ -524,7 +526,37 @@ def tutor_toggle():
         msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}. Would you like to review these points with me?"
     else:
         msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
+        
+        
+    payload = {
+        "sender": user_email,
+        "message": "/show_topics", # Este intent vai mostrar os botões dos tópicos com progresso pendente
+        "metadata": {
+            "user_id": user_id, 
+            "course_id": course_id
+            }
+    }
+    headers = {"Content-Type": "application/json"}
 
+    try:
+        response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", data=json.dumps(payload), headers=headers)
+        response.raise_for_status()
+        messages = response.json()
+        app.logger.info(f"Resposta do Rasa ao ativar tutor mode: {messages}")
+        
+        bot_reply = ""
+
+        for message in messages:
+            if "text" in message:
+                bot_reply += f"\n\n {message['text']}"
+            if "buttons" in message:
+                buttons = message["buttons"]
+                
+        return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
+    
+    except requests.RequestException as e:
+        print(f"⚠️ Error connecting to Rasa: {e}")
+            
     return jsonify({"text": f"{msg}"})
 
 @app.route('/api/get_user_progress', methods=['GET'])
@@ -550,6 +582,16 @@ def get_user_history(course_id):
 @app.route("/api/get_topics", methods=["GET"])
 def get_topics():
     topics = Topics.query.all()
+    return jsonify([{"id": topic.id, "name": topic.name} for topic in topics])
+
+@app.route("/api/get_topics_from_ids", methods=["GET"])
+def get_topics_from_ids():
+    data = request.json
+    topics_ids = data.get("topics_ids", [])
+    if not topics_ids:
+        return jsonify({"error": "No topic IDs provided"}), 400
+    
+    topics = Topics.query.filter(Topics.id.in_(topics_ids)).all()
     return jsonify([{"id": topic.id, "name": topic.name} for topic in topics])
 
 @app.route("/api/save_topic", methods=["POST"])

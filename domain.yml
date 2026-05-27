@@ -15,12 +15,23 @@ intents:
   - create_topic
   - view_metrics
   - ask_course_info
+  - show_topics
+  - select_topic
 
 entities:
   - concept
   - context
+  - topic
 
 slots:
+
+  topic:
+    type: text
+    influence_conversation: true
+    mappings:
+      - type: from_entity
+        entity: topic
+
   concept:
     type: text
     influence_conversation: false
@@ -143,6 +154,8 @@ responses:
 
 actions:
 - action_set_username
+- action_show_topics_for_selection
+- action_analyze_progress
 - action_get_definition
 - action_get_examples
 - action_get_explanation

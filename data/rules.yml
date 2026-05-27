@@ -80,10 +80,18 @@ rules:
   - intent: ask_course_info
   - action: action_get_course_info
 
-- rule: Create initial menu buttons
+- rule: Show topics available for selection
+  condition:
+  - slot_was_set:
+      - user_role: student
   steps:
-  - intent: generate_menu_buttons
-  - action: action_generate_initial_menu_buttons
+  - intent: show_topics
+  - action: action_show_topics_for_selection
+
+- rule: Analisar progresso após clique no botão
+  steps:
+    - intent: select_topic
+    - action: action_analyze_progress
 
 - rule: Create Topic
   steps:

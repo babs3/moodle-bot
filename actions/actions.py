@@ -5,7 +5,8 @@ import chromadb
 from rasa_sdk.executor import CollectingDispatcher
 from rasa_sdk import Action, Tracker
 from rasa_sdk import Action
-from rasa_sdk.events import SlotSet, FollowupAction
+from rasa_sdk.events import SlotSet
+from typing import Any, Text, Dict, List
 from .utils import *
 
 print(f"📂  A tentar ligar ao ChromaDB em: /app/vector_store")
@@ -830,3 +831,76 @@ class ActionGenerateInitialMenuButtons(Action):
         )
         return []
     
+
+
+class ActionShowTopicsForSelection(Action):
+    def name(self) -> Text:
+        return "action_show_topics_for_selection"
+
+    def run(self, dispatcher: CollectingDispatcher,
+            tracker: Tracker,
+            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+        
+        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+        user_id = tracker.latest_message.get("metadata", {}).get("user_id")
+        print(f"🎓  User {user_id} from course {course_id}.")
+        
+        # get user progress
+        progress = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id})
+        if progress.status_code == 200:
+            progress_data = progress.json()
+            print(f"📊  User progress data retrieved: {progress_data}")
+        else:
+            print(f"❌  Failed to retrieve user progress. Status code: {progress.status_code}")
+            progress_data = []
+
+        # A tua lista de tópicos (pode vir de uma BD, API ou slot)
+        topics_ids = []
+        for entry in progress_data:
+            topic_id = entry.get("topic_id")
+            if topic_id and topic_id not in topics_ids:
+                topics_ids.append(topic_id)
+                
+        # get topics from topics_ids
+        topics = requests.get(f"http://flask-server:8080/api/get_topics_from_ids", json={"topics_ids": topics_ids})
+        if topics.status_code == 200:
+            topics_list = topics.json()
+        else:
+            print(f"❌  Failed to retrieve topics. Status code: {topics.status_code}")
+            topics_list = []
+            
+        print(f"📚  Topics retrieved for user {user_id}: {topics_list}")
+
+        buttons = []
+        for topic in topics_list:
+            buttons.append({
+                "title": topic.get("name"),
+                # O payload envia o intent e preenche a entidade 'topic'
+                "payload": f'/select_topic{{"topic": "{topic.get("id")}"}}'
+            })
+            
+        dispatcher.utter_message(text="Escolha um tópico para ver o seu progresso:", buttons=buttons)
+        return []
+
+    
+class ActionAnalyzeProgress(Action):
+    def name(self) -> Text:
+        return "action_analyze_progress"
+
+    def run(self, dispatcher: CollectingDispatcher,
+            tracker: Tracker,
+            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+
+        # Vai buscar o tópico que foi guardado no slot pelo botão
+        selected_topic = tracker.get_slot("topic")
+        
+        if not selected_topic:
+            dispatcher.utter_message(text="Não consegui identificar o tópico.")
+            return []
+
+        # --- A tua lógica de análise entra aqui ---
+        # Exemplo simples:
+        progresso = "75%" # Aqui farias a tua query à BD
+        
+        dispatcher.utter_message(text=f"O teu progresso no tópico *{selected_topic}* é de {progresso}.")
+        return []
