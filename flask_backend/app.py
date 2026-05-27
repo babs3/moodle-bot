@@ -57,7 +57,7 @@ def session_init_rasa(user_email, user_firstname, user_role):
             "metadata": {"user_name": user_firstname, "user_role": user_role}
         }
         headers = {"Content-Type": "application/json"}
-        response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", data=json.dumps(payload), headers=headers)
+        response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", json=payload, headers=headers)
         print(f"Rasa session init response: {response.status_code} - {response.text}")
             
     except Exception as e:
@@ -118,7 +118,7 @@ def chat():
     
     if user and tutor.is_active:
         app.logger.info(f"User {moodle_id} is in tutor mode.")
-        
+        print(RASA_BASE_URL + "/webhooks/rest/webhook")
         current_time = datetime.now(timezone.utc).isoformat() 
         payload = {
             "sender": user_email,
@@ -128,11 +128,12 @@ def chat():
         headers = {"Content-Type": "application/json"}
 
         try:
-            response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", data=json.dumps(payload), headers=headers)
+            response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", json=payload, headers=headers)
             response.raise_for_status()
             messages = response.json()
 
             bot_reply = ""
+            buttons = ""
 
             for message in messages:
                 if "text" in message:
@@ -158,7 +159,7 @@ def chat():
         headers = {"Content-Type": "application/json"}
 
         try:
-            response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", data=json.dumps(payload), headers=headers)
+            response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", json=payload, headers=headers)
             response.raise_for_status()
             messages = response.json()
 
@@ -527,10 +528,11 @@ def tutor_toggle():
     else:
         msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
         
-        
+    
+    print(f"--> user email: {user_email}")
     payload = {
         "sender": user_email,
-        "message": "/show_topics", # Este intent vai mostrar os botões dos tópicos com progresso pendente
+        "message": "show topics trigger", # Este intent vai mostrar os botões dos tópicos com progresso pendente
         "metadata": {
             "user_id": user_id, 
             "course_id": course_id
@@ -539,10 +541,10 @@ def tutor_toggle():
     headers = {"Content-Type": "application/json"}
 
     try:
-        response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", data=json.dumps(payload), headers=headers)
+        response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", json=payload, headers=headers)
         response.raise_for_status()
         messages = response.json()
-        app.logger.info(f"Resposta do Rasa ao ativar tutor mode: {messages}")
+        app.logger.info(f"\nResposta do Rasa ao ativar tutor mode: {messages}")
         
         bot_reply = ""
 
@@ -551,19 +553,24 @@ def tutor_toggle():
                 bot_reply += f"\n\n {message['text']}"
             if "buttons" in message:
                 buttons = message["buttons"]
+        
+        print(f"\nResposta final para o frontend: {bot_reply.strip()} com botões: {buttons}")
                 
-        return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
+        return jsonify([{"text": f"{msg}\n{bot_reply.strip()}"}, {"buttons": buttons}])
     
     except requests.RequestException as e:
         print(f"⚠️ Error connecting to Rasa: {e}")
             
-    return jsonify({"text": f"{msg}"})
+    #return jsonify({"text": f"{msg}"})
 
 @app.route('/api/get_user_progress', methods=['GET'])
 def get_user_progress():
-    data = request.json
-    user_id = data.get('user_id')
-    course_id = data.get('course_id')
+    user_id = request.args.get('user_id')
+    course_id = request.args.get('course_id')
+    
+    # Validação simples de segurança se os parâmetros não vierem
+    if not user_id or not course_id:
+        return jsonify({"error": "Missing parameters"}), 400
     
     progress = TutorProgress.query.filter_by(
         course_id=course_id,

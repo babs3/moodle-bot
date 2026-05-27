@@ -371,6 +371,14 @@ nlu:
   examples: |
     - create topic trigger
 
+- intent: show_topics
+  examples: |
+    - show topics trigger
+
+- intent: select_topic
+  examples: |
+    - select topic trigger
+
 - intent: view_metrics
   examples: |
     - What are today's metrics?

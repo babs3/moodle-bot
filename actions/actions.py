@@ -6,7 +6,6 @@ from rasa_sdk.executor import CollectingDispatcher
 from rasa_sdk import Action, Tracker
 from rasa_sdk import Action
 from rasa_sdk.events import SlotSet
-from typing import Any, Text, Dict, List
 from .utils import *
 
 print(f"📂  A tentar ligar ao ChromaDB em: /app/vector_store")
@@ -834,12 +833,11 @@ class ActionGenerateInitialMenuButtons(Action):
 
 
 class ActionShowTopicsForSelection(Action):
-    def name(self) -> Text:
+    def name(self):
         return "action_show_topics_for_selection"
 
-    def run(self, dispatcher: CollectingDispatcher,
-            tracker: Tracker,
-            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+    def run(self, dispatcher, tracker, domain):
+        print("\n📊  Generating topic selection buttons...")
         
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
@@ -879,28 +877,26 @@ class ActionShowTopicsForSelection(Action):
                 "payload": f'/select_topic{{"topic": "{topic.get("id")}"}}'
             })
             
-        dispatcher.utter_message(text="Escolha um tópico para ver o seu progresso:", buttons=buttons)
+        dispatcher.utter_message(text="Choose a topic to view your progress:", buttons=buttons)
         return []
 
     
 class ActionAnalyzeProgress(Action):
-    def name(self) -> Text:
+    def name(self):
         return "action_analyze_progress"
 
-    def run(self, dispatcher: CollectingDispatcher,
-            tracker: Tracker,
-            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+    def run(self, dispatcher, tracker, domain):
 
         # Vai buscar o tópico que foi guardado no slot pelo botão
         selected_topic = tracker.get_slot("topic")
         
         if not selected_topic:
-            dispatcher.utter_message(text="Não consegui identificar o tópico.")
+            dispatcher.utter_message(text="I couldn't identify the topic.")
             return []
 
         # --- A tua lógica de análise entra aqui ---
         # Exemplo simples:
         progresso = "75%" # Aqui farias a tua query à BD
         
-        dispatcher.utter_message(text=f"O teu progresso no tópico *{selected_topic}* é de {progresso}.")
+        dispatcher.utter_message(text=f"Your progress in the topic *{selected_topic}* is {progresso}.")
         return []
