@@ -788,3 +788,37 @@ def update_materials_location(selected_results):
     
     return location_results, pdfs_insights  # Return both the formatted results and the list of PDFs
     
+def create_topics_buttons(user_id, course_id):
+    # get user progress
+    progress = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id})
+    if progress.status_code == 200:
+        progress_data = progress.json()
+        print(f"📊  User progress data retrieved: {progress_data}")
+    else:
+        print(f"❌  Failed to retrieve user progress. Status code: {progress.status_code}")
+        progress_data = []
+
+    # A tua lista de tópicos (pode vir de uma BD, API ou slot)
+    topics_ids = []
+    for entry in progress_data:
+        topic_id = entry.get("topic_id")
+        if topic_id and topic_id not in topics_ids:
+            topics_ids.append(topic_id)
+            
+    # get topics from topics_ids
+    topics = requests.get(f"http://flask-server:8080/api/get_topics_from_ids", json={"topics_ids": topics_ids})
+    if topics.status_code == 200:
+        topics_list = topics.json()
+    else:
+        print(f"❌  Failed to retrieve topics. Status code: {topics.status_code}")
+        topics_list = []
+    print(f"📚  Topics retrieved for user {user_id}: {topics_list}")
+
+    buttons = []
+    for topic in topics_list:
+        buttons.append({
+            "title": topic.get("name"),
+            "payload": topic.get("id")
+        })
+        
+    return buttons

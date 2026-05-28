@@ -575,8 +575,9 @@ def get_user_progress():
     progress = TutorProgress.query.filter_by(
         course_id=course_id,
         user_moodle_id=user_id,
+        state="pending"
     ).all()
-    return jsonify([{"state": p.state, "question": p.question, "topic_id": p.topic_id, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
+    return jsonify([{"question": p.question, "topic_id": p.topic_id, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
 
 @app.route('/api/get_user_progress_by_topic', methods=['GET'])
 def get_user_progress_by_topic():
@@ -592,7 +593,30 @@ def get_user_progress_by_topic():
         user_moodle_id=user_id,
         topic_id=topic_id
     ).all()
-    return jsonify([{"state": p.state, "question": p.question, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
+    return jsonify([{"id": p.id, "state": p.state, "question": p.question, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
+
+@app.route('/api/update_progress_state', methods=['POST'])
+def update_progress_state():
+    ids = request.args.get('ids', []) # lista de ids
+    new_state = request.args.get('new_state')
+    print(f"Updating progress state for IDs: {ids} to new state: {new_state}")
+
+    if not ids or not new_state:
+        return jsonify({"error": "Missing parameters"}), 400
+
+    for id in ids:
+        progress = TutorProgress.query.filter_by(
+            id=id
+        ).first()
+        
+        if not progress:
+            return jsonify({"error": "Progress record not found"}), 404
+        
+        progress.state = new_state
+        
+    db.session.commit()
+    
+    return jsonify({"message": "Progress state updated successfully"})
 
 @app.route('/api/get_user_history/<course_id>', methods=['GET'])
 def get_user_history(course_id):

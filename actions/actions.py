@@ -843,39 +843,7 @@ class ActionShowTopicsForSelection(Action):
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         print(f"🎓  User {user_id} from course {course_id}.")
         
-        # get user progress
-        progress = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id})
-        if progress.status_code == 200:
-            progress_data = progress.json()
-            print(f"📊  User progress data retrieved: {progress_data}")
-        else:
-            print(f"❌  Failed to retrieve user progress. Status code: {progress.status_code}")
-            progress_data = []
-
-        # A tua lista de tópicos (pode vir de uma BD, API ou slot)
-        topics_ids = []
-        for entry in progress_data:
-            topic_id = entry.get("topic_id")
-            if topic_id and topic_id not in topics_ids:
-                topics_ids.append(topic_id)
-                
-        # get topics from topics_ids
-        topics = requests.get(f"http://flask-server:8080/api/get_topics_from_ids", json={"topics_ids": topics_ids})
-        if topics.status_code == 200:
-            topics_list = topics.json()
-        else:
-            print(f"❌  Failed to retrieve topics. Status code: {topics.status_code}")
-            topics_list = []
-            
-        print(f"📚  Topics retrieved for user {user_id}: {topics_list}")
-
-        buttons = []
-        for topic in topics_list:
-            buttons.append({
-                "title": topic.get("name"),
-                # O payload envia o intent e preenche a entidade 'topic'
-                "payload": topic.get("id")
-            })
+        buttons = create_topics_buttons(user_id, course_id)
             
         dispatcher.utter_message(text="", buttons=buttons)
         return []
@@ -907,12 +875,25 @@ class ActionAnalyzeProgress(Action):
         else:
             print(f"❌  Failed to retrieve user progress for topic. Status code: {progress.status_code}")
             progress_data = {}
-
+            return []
         
-
+        ids_list = [entry.get("id") for entry in progress_data if "id" in entry]
+        print(f"📊  Extracted progress entry IDs for topic {topic_name}: {ids_list}")
+        
+        
         # --- A tua lógica de análise entra aqui ---
         # Exemplo simples:
         progresso = "75%" # Aqui farias a tua query à BD
-        
-        dispatcher.utter_message(text=f"Your progress in the topic *{topic_name}* is {progresso}.")
+
+        update_response = requests.post(f"http://flask-server:8080/api/update_progress_state", params={"ids": ids_list, "new_state": "reviewed"})
+        if update_response.status_code == 200:
+            print(f"✅  Progress entries for topic {topic_name} updated successfully.")
+        else:
+            print(f"❌  Failed to update progress entries for topic. Status code: {update_response.status_code}")
+
+        buttons = create_topics_buttons(user_id, course_id)
+        if not buttons:
+            dispatcher.utter_message(text=f"You have reviewed all topics! Great job! 🎉")
+        else:
+            dispatcher.utter_message(text=f"Your progress in the topic <b>{topic_name}</b> is {progresso}<br/>You can choose another topic to explore:", buttons=buttons)
         return []
