@@ -900,7 +900,7 @@ class ActionAnalyzeProgress(Action):
         topic_name = topic.json()[0].get("name", "the selected topic") if topic.status_code == 200 else "the selected topic"
         print(f"📚  User selected topic ID: {user_message}, name: {topic_name}")
         
-        progress = requests.get(f"http://flask-server:8080/api/get_user_progress_for_topic", params={"user_id": user_id, "course_id": course_id, "topic_id": user_message})
+        progress = requests.get(f"http://flask-server:8080/api/get_user_progress_by_topic", params={"user_id": user_id, "course_id": course_id, "topic_id": user_message})
         if progress.status_code == 200:
             progress_data = progress.json()
             print(f"📊  User progress data for topic {topic_name} retrieved: {progress_data}")
