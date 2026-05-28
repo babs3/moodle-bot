@@ -798,39 +798,6 @@ class ActionGetClassMaterialLocation(Action):
         return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", ""), SlotSet("context", ""), SlotSet("complex_tokens", []), SlotSet("simple_tokens", "")]
 
 
-class ActionGenerateInitialMenuButtons(Action):
-    def name(self):
-        return "action_generate_initial_menu_buttons"
-
-    def run(self, dispatcher, tracker, domain):
-        print("\n📊  Generating initial menu buttons...")
-        
-        #user_email = tracker.sender_id
-        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
-        user_id = tracker.latest_message.get("metadata", {}).get("user_id")
-        user_message = tracker.latest_message.get("metadata", {}).get("user_message", None)
-        print(f"🎓  User {user_id} sent message: {user_message}")
-        
-        # get user progress
-        progress = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id})
-        if progress.status_code == 200:
-            progress_data = progress.json()
-            #print(f"📊  User progress data retrieved: {progress_data}")
-        else:
-            print(f"❌  Failed to retrieve user progress. Status code: {progress.status_code}")
-            progress_data = []
-        
-        dispatcher.utter_message(
-            text="Please select an option:",
-            buttons=[
-                {"title": "option 1", "payload": "/options_menu"},
-                {"title": "option 2", "payload": "/options_menu"},
-                {"title": "option 3", "payload": "/options_menu"}
-            ]
-        )
-        return []
-    
-
 
 class ActionShowTopicsForSelection(Action):
     def name(self):
@@ -881,10 +848,147 @@ class ActionAnalyzeProgress(Action):
         ids_list = [entry.get("id") for entry in progress_data if "id" in entry]
         print(f"📊  Extracted progress entry IDs for topic {topic_name}: {ids_list}")
         
+        if len(progress_data) > 1:
+            print(f"⚠️  Multiple progress entries found for topic {topic_name}. IDs: {ids_list}.")
+            
+            # choose one entry
+            progress_data = progress_data[0]  # For example, we take the first one. You can implement a more complex logic here if needed.
+        else:
+            progress_data = progress_data[0]
+        print(f"🔍  Selected progress entry for analysis: {progress_data}")
+                    
+            
+            
+        # Conteúdo extraído da tua pesquisa de materiais do curso
+        print(f"\n📖  --------- Getting Knowledge --------- 📖 ")
+        print(f"\nQUIZ Question: {progress_data['question']} 📩")
         
-        # --- A tua lógica de análise entra aqui ---
-        # Exemplo simples:
-        progresso = "75%" # Aqui farias a tua query à BD
+        authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
+        print(f"📚  Authorized resources from metadata: {authorized_resources}")
+        intent = "explanation of"  # Podemos usar a explicação para analisar o progresso do aluno, já que queremos entender onde ele errou e como melhorar
+        
+        print(f"\n🔍  No concept identified by Rasa. Proceeding with keywords extraction from the entire query.")
+        # Keywords Extraction Process 
+        no_punct_query = re.sub(r"[^\w\s\-\&]", "", progress_data['question']).strip()  # Remove punctuation except '-' and '&'
+        keywords = extract_query_keywords(no_punct_query)
+        print(f"🔍  no_punct_query: {no_punct_query}")
+        context = None
+        complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query, context)  
+        
+        context = " ".join(tokenize_and_clean_text(context)) if context else ""
+        print(f"🔍  Tokenized context: {context}")
+        
+        print(f"\n🔍  Final tokens to be used in search: \n    > Complex tokens: {complex_tokens} \n    > Simple tokens: {simple_tokens}")
+        
+        print(f"\n🔍  Starting search process in resources: {authorized_resources}")
+        # Hybrid Search Process    
+        vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(intent, complex_tokens, simple_tokens, context, user_message, collection, authorized_resources)        
+        bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id)
+        
+        bot_response = None
+        if bm25_docs == [] and bm25_meta == []:
+            print(f"\n⚠️  BM25 search returned no results for user query: '{user_message}'")
+            bot_response = "no_access"
+        elif normalized_bm25_scores == []:
+            print(f"\n⚠️  Normalized BM25 scores is empty for user query: '{user_message}'")
+            bot_response = "no_response"
+        if bot_response:
+            return  [
+                SlotSet("user_query", user_message),  # Store the query
+                SlotSet("materials_location", ""), #gemini_results),  # Store selected materials
+                SlotSet("bot_response", bot_response),  # Store the bot response -> trigger
+                SlotSet("user_id", user_id),  # Store the user ID
+                SlotSet("concept", ""),
+                SlotSet("context", "")
+                ]
+
+        
+        if complex_tokens:
+            if intent == "definition of ":
+                alpha = 0.6 # Use a lower alpha for definitions
+                print(f"\n🔍  Found keywords: {complex_tokens} and {simple_tokens}. \n     Using hybrid search with alpha = {alpha} because of the 'DEFINE' intent ")
+            else:
+                # For other intents, use a slightly higher alpha
+                alpha = 0.75
+                print(f"\n🔍  Found keywords: {complex_tokens} and {simple_tokens}. \n     Using hybrid search with alpha = {alpha}")
+        else: # Use hybrid search with a higher weight for vector search
+            alpha = 0.85
+            print(f"\n🔍  Split case: found multiple keywords: {complex_tokens} and {simple_tokens}. Using hybrid search with alpha = {alpha}")
+
+            
+        selected_results = hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_docs, bm25_meta, normalized_bm25_scores, alpha)
+        
+        if len(selected_results) == 0:
+            print("\n🚨  No relevant materials found!")
+            return  [
+                SlotSet("user_query", user_message),  # Store the query
+                SlotSet("materials_location", selected_results), #gemini_results),  # Store selected materials
+                SlotSet("bot_response", "I couldn't find relevant content in the course materials."),  # Store the bot response
+                SlotSet("user_id", user_id),  # Store the user ID
+                SlotSet("context", context),
+                SlotSet("complex_tokens", complex_tokens),
+                SlotSet("simple_tokens", simple_tokens)
+                ]
+        else: 
+            # Format results
+            results_text = []
+            for text_chunk, _, _ in selected_results:
+                results_text.append(text_chunk)
+
+            # === PREPARE CONTEXT AND RULES FOR SYSTEM === #
+            raw_text = "\n".join(results_text)   
+        
+        
+
+        # === PREPARE THE PROMPTS === #
+
+        system_instruction = """
+        ROLE:
+        You are an empathetic, precise, and encouraging AI Tutor. Your job is to analyze a student's wrong answer in a quiz, compare it with the correct course material, and explain why their answer was incorrect and how to reach the right conclusion.
+
+        RULES:
+        1. NO MARKDOWN: Do NOT use asterisks (**), hashtags (#), or markdown lists.
+        2. HTML ONLY: Use <b>text</b> for emphasis, <ul><li></li></ul> for lists, and <br> for line breaks.
+        3. LANGUAGE: Always respond in English.
+        4. TONE: Supportive, constructive, and educational. Do not say "You are wrong". Instead, use "Your answer 'X' differs because...".
+        5. BREVITY: Keep it concise. The student is in a sidebar; they need a quick, clear explanation.
+
+        STRUCTURE FOR THE OUTPUT:
+        - <b>Concept Check:</b> Briefly explain the core concept from the course material.
+        - <b>Why it missed the mark:</b> Address the student's specific answer (or if it was 'Sem resposta', encourage them).
+        - <b>How to remember:</b> Give a 1-sentence tip or explanation to secure the correct answer 'Perception Layer'.
+        """
+
+        # No user_prompt passamos as variáveis dinâmicas desta pergunta específica
+        user_prompt = f"""
+        Course Material Context:
+        {raw_text}
+
+        Quiz Interaction:
+        - Question Asked: {progress_data['question']}
+        - Student's Answer: {progress_data['student_answer']}
+        - Correct Answer: {progress_data['correct_answer']}
+
+        Please provide the HTML feedback analysis.
+        """
+
+        # === CALL GEMINI API === #
+        generation_config = {
+            "temperature": 0.1, # Ótimo para manter a precisão e evitar alucinações sobre a matéria
+        }
+
+        try:
+            g_model = genai.GenerativeModel(
+                model_name=MODEL_NAME,
+                system_instruction=system_instruction,
+                generation_config=generation_config
+            )
+            
+            response = g_model.generate_content(user_prompt)
+            html_feedback = response.text
+        except Exception as e:
+            print(f"Error calling Gemini: {e}")
+                    
 
         update_response = requests.post(f"http://flask-server:8080/api/update_progress_state", params={"ids": ids_list, "new_state": "reviewed"})
         if update_response.status_code == 200:
@@ -896,5 +1000,5 @@ class ActionAnalyzeProgress(Action):
         if not buttons:
             dispatcher.utter_message(text=f"You have reviewed all topics! Great job! 🎉")
         else:
-            dispatcher.utter_message(text=f"Your progress in the topic <b>{topic_name}</b> is {progresso}<br/>You can choose another topic to explore:", buttons=buttons)
+            dispatcher.utter_message(text=f"{html_feedback}<br/><br/>You can choose another topic to explore:", buttons=buttons)
         return []
