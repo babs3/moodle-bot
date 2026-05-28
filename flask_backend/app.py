@@ -97,16 +97,14 @@ def chat():
         return jsonify([{"text": "There is no content available for this course. Please check back later or contact your instructor."}])
     else:
         resources = extract_visible_resources(moodle_contents)
-        app.logger.info(f"Extracted resources for course_id {course_id}: {resources}")
+        #app.logger.info(f"Extracted resources for course_id {course_id}: {resources}")
         # Se resources já são os autorizados, basta extrair os nomes:
         authorized_resources = [res.get("filename") for res in resources if res.get("filename")]
 
         if not authorized_resources:
             app.logger.warning("No authorized resources found for this course.")
             #return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
-        else: 
-            app.logger.info(f"Authorized resources for course_id {course_id}: {authorized_resources}")
-            
+        
     # check if user is in tutor mode
     user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
 
@@ -117,12 +115,13 @@ def chat():
         db.session.commit()
     
     if user and tutor.is_active:
-        app.logger.info(f"User {moodle_id} is in tutor mode.")
-        print(RASA_BASE_URL + "/webhooks/rest/webhook")
+        app.logger.info(f"CHAT: User {moodle_id} is in tutor mode.")
+        print(f"    > User message: {user_message}")
+        
         current_time = datetime.now(timezone.utc).isoformat() 
         payload = {
             "sender": user_email,
-            "message": "tutor menu buttons trigger",
+            "message": "select topic trigger",
             "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id, "is_teacher": is_teacher}
         }
         headers = {"Content-Type": "application/json"}
@@ -547,6 +546,7 @@ def tutor_toggle():
         app.logger.info(f"\nResposta do Rasa ao ativar tutor mode: {messages}")
         
         bot_reply = ""
+        buttons = ""
 
         for message in messages:
             if "text" in message:
@@ -556,7 +556,7 @@ def tutor_toggle():
         
         print(f"\nResposta final para o frontend: {bot_reply.strip()} com botões: {buttons}")
                 
-        return jsonify([{"text": f"{msg}\n{bot_reply.strip()}"}, {"buttons": buttons}])
+        return jsonify([{"text": f"{msg}\n\n{bot_reply.strip()}"}, {"buttons": buttons}])
     
     except requests.RequestException as e:
         print(f"⚠️ Error connecting to Rasa: {e}")
@@ -577,6 +577,22 @@ def get_user_progress():
         user_moodle_id=user_id,
     ).all()
     return jsonify([{"state": p.state, "question": p.question, "topic_id": p.topic_id, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
+
+@app.route('/api/get_user_progress_by_topic', methods=['GET'])
+def get_user_progress_by_topic():
+    user_id = request.args.get('user_id')
+    course_id = request.args.get('course_id')
+    topic_id = request.args.get('topic_id')
+
+    if not user_id or not topic_id or not course_id:
+        return jsonify({"error": "Missing parameters"}), 400
+
+    progress = TutorProgress.query.filter_by(
+        course_id=course_id,
+        user_moodle_id=user_id,
+        topic_id=topic_id
+    ).all()
+    return jsonify([{"state": p.state, "question": p.question, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
 
 @app.route('/api/get_user_history/<course_id>', methods=['GET'])
 def get_user_history(course_id):

@@ -874,10 +874,10 @@ class ActionShowTopicsForSelection(Action):
             buttons.append({
                 "title": topic.get("name"),
                 # O payload envia o intent e preenche a entidade 'topic'
-                "payload": f'/select_topic{{"topic": "{topic.get("id")}"}}'
+                "payload": topic.get("id")
             })
             
-        dispatcher.utter_message(text="Choose a topic to view your progress:", buttons=buttons)
+        dispatcher.utter_message(text="", buttons=buttons)
         return []
 
     
@@ -887,16 +887,32 @@ class ActionAnalyzeProgress(Action):
 
     def run(self, dispatcher, tracker, domain):
 
-        # Vai buscar o tópico que foi guardado no slot pelo botão
-        selected_topic = tracker.get_slot("topic")
-        
-        if not selected_topic:
+        print("\n📊  Analyzing user progress for selected topic...")
+        user_id = tracker.latest_message.get("metadata", {}).get("user_id")
+        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+        user_message = tracker.latest_message.get("metadata", {}).get("user_message", None)
+
+        if not user_message:
             dispatcher.utter_message(text="I couldn't identify the topic.")
             return []
+        
+        topic = requests.get(f"http://flask-server:8080/api/get_topics_from_ids", json={"topics_ids": [user_message]})
+        topic_name = topic.json()[0].get("name", "the selected topic") if topic.status_code == 200 else "the selected topic"
+        print(f"📚  User selected topic ID: {user_message}, name: {topic_name}")
+        
+        progress = requests.get(f"http://flask-server:8080/api/get_user_progress_for_topic", params={"user_id": user_id, "course_id": course_id, "topic_id": user_message})
+        if progress.status_code == 200:
+            progress_data = progress.json()
+            print(f"📊  User progress data for topic {topic_name} retrieved: {progress_data}")
+        else:
+            print(f"❌  Failed to retrieve user progress for topic. Status code: {progress.status_code}")
+            progress_data = {}
+
+        
 
         # --- A tua lógica de análise entra aqui ---
         # Exemplo simples:
         progresso = "75%" # Aqui farias a tua query à BD
         
-        dispatcher.utter_message(text=f"Your progress in the topic *{selected_topic}* is {progresso}.")
+        dispatcher.utter_message(text=f"Your progress in the topic *{topic_name}* is {progresso}.")
         return []
