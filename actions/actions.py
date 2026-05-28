@@ -943,20 +943,21 @@ class ActionAnalyzeProgress(Action):
         # === PREPARE THE PROMPTS === #
 
         system_instruction = """
-        ROLE:
+        # ROLE:
         You are an empathetic, precise, and encouraging AI Tutor. Your job is to analyze a student's wrong answer in a quiz, compare it with the correct course material, and explain why their answer was incorrect and how to reach the right conclusion.
 
-        RULES:
+        # RULES:
         1. NO MARKDOWN: Do NOT use asterisks (**), hashtags (#), or markdown lists.
         2. HTML ONLY: Use <b>text</b> for emphasis, <ul><li></li></ul> for lists, and <br> for line breaks.
         3. LANGUAGE: Always respond in English.
         4. TONE: Supportive, constructive, and educational. Do not say "You are wrong". Instead, use "Your answer 'X' differs because...".
         5. BREVITY: Keep it concise. The student is in a sidebar; they need a quick, clear explanation.
 
-        STRUCTURE FOR THE OUTPUT:
+        # STRUCTURE FOR THE OUTPUT:
+        - <b>Question:</b> Restate the quiz question for clarity.
         - <b>Concept Check:</b> Briefly explain the core concept from the course material.
         - <b>Why it missed the mark:</b> Address the student's specific answer (or if it was 'Sem resposta', encourage them).
-        - <b>How to remember:</b> Give a 1-sentence tip or explanation to secure the correct answer 'Perception Layer'.
+        - <b>How to remember:</b> Give a 1-sentence tip or explanation to secure the correct answer.
         """
 
         # No user_prompt passamos as variáveis dinâmicas desta pergunta específica
@@ -1000,5 +1001,5 @@ class ActionAnalyzeProgress(Action):
         if not buttons:
             dispatcher.utter_message(text=f"You have reviewed all topics! Great job! 🎉")
         else:
-            dispatcher.utter_message(text=f"{html_feedback}<br/><br/>You can choose another topic to explore:", buttons=buttons)
+            dispatcher.utter_message(text=f"{html_feedback}<br/><br/>You can choose another topic to explore:<br/>", buttons=buttons)
         return []

@@ -652,7 +652,7 @@ def hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_d
         updated_results.append((doc, meta, score))
         
     for doc, meta, score in updated_results:
-        print(f"    📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | OCR: {meta['is_ocr']} | DOC text: {doc[:200]}...")
+        print(f"    📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | OCR: {meta.get('is_ocr', False)} | DOC text: {doc[:200]}...")
     
 
     return updated_results

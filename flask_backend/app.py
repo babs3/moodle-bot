@@ -523,7 +523,7 @@ def tutor_toggle():
             if topic:
                 temas.append("<strong>" + topic.name + "</strong>")
         
-        msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}. Would you like to review these points with me?"
+        msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}. Would you like to review these points with me?<br/>"
     else:
         msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
         
