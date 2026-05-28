@@ -326,6 +326,14 @@ def background_sync(app, course_id, pdf_folder, moodle_token, moodle_url):
                 
 @app.route('/populate_with_moodle_contents/<int:course_id>', methods=['POST'])
 def populate_with_moodle_contents(course_id):
+    # 1. Trancar imediatamente se já houver um sync ativo (Prevenção de concorrência)
+    if course_id in active_syncs:
+        print(f"Sync rejeitado: Curso {course_id} já está a ser processado.")
+        return jsonify({"message": "Sincronização já em curso para este curso."}), 200
+    
+    # Registamos logo que este curso está ocupado
+    active_syncs.add(course_id) # Ou active_syncs[course_id] = True dependendo do tipo
+    
     auth_header = request.headers.get('Authorization')
     moodle_token = auth_header.split(" ")[1] if auth_header else None
     
@@ -353,12 +361,7 @@ def populate_with_moodle_contents(course_id):
         client.moodle_url = moodle_url # Atualiza se o cliente mudou a URL
     db.session.commit()
     
-    # 1. Verificamos se este curso já está a ser sincronizado neste momento
-    if course_id in active_syncs:
-        return jsonify({"message": "Sincronização já em curso para este curso."}), 200
-    
     # 2. Verificamos se já existem conteúdos na DB para este curso
-    # Substitui 'Knowledge' pelo nome da tua classe/tabela real
     conteudo_existente = KnowledgeFiles.query.filter_by(course_id=course_id).first()
     
     if conteudo_existente:
@@ -709,8 +712,8 @@ def remove_knowledge():
         if file_record:
             db.session.delete(file_record)
             db.session.commit()
+            return jsonify({"message": f"Ficheiro {filename} removido com sucesso!"})
         
-        return jsonify({"message": f"Ficheiro {filename} removido com sucesso!"})
     return jsonify({"error": "Falha ao remover"}), 500
 
 def new_quiz_polling():
@@ -832,7 +835,7 @@ if __name__ == "__main__":
         db.create_all() 
         print("✅  Verificação concluída.")
         # comment if you don't want to populate the database with initial data every time you start the app
-        # populate_database()
+        populate_database()
         
     # 1. Lançar o Polling em Background para NÃO bloquear o app.run
     import threading
