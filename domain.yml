@@ -21,16 +21,13 @@ intents:
 entities:
   - concept
   - context
-  - topic
 
 slots:
 
-  topic:
+  selected_topic:
     type: text
-    influence_conversation: true
     mappings:
-      - type: from_entity
-        entity: topic
+      - type: custom
 
   concept:
     type: text

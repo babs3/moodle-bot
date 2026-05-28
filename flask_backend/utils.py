@@ -307,7 +307,7 @@ def get_moodle_contents(course_id, moodle_url, moodle_token):
                 for module in section.get('modules', []):
                     if 'contents' in module:
                         for content in module['contents']:
-                            print(f"Encontrado conteúdo: {content.get('filename', 'sem nome')} (Moodle ID: {module['id']})")
+                            #print(f"Encontrado conteúdo: {content.get('filename', 'sem nome')} (Moodle ID: {module['id']})")
                             filenames.append(content.get('filename', 'sem nome'))
                                                         
         # Se o Moodle retornar um erro no JSON (ex: token inválido)

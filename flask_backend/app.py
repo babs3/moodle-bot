@@ -53,7 +53,7 @@ def session_init_rasa(user_email, user_firstname, user_role):
     try:
         payload = {
             "sender": user_email, # O Rasa precisa de um email para identificar o sender, mas como isto é só para definir o slot, podemos usar um placeholder
-            "message": "set username trigger",
+            "message": f'/set_username{{"username": "{user_firstname}", "user_role": "{user_role}"}}',
             "metadata": {"user_name": user_firstname, "user_role": user_role}
         }
         headers = {"Content-Type": "application/json"}
@@ -121,7 +121,7 @@ def chat():
         current_time = datetime.now(timezone.utc).isoformat() 
         payload = {
             "sender": user_email,
-            "message": "select topic trigger",
+            "message": f'/select_topic{{}}', #"/select_topic",
             "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id, "is_teacher": is_teacher}
         }
         headers = {"Content-Type": "application/json"}
@@ -531,7 +531,7 @@ def tutor_toggle():
     print(f"--> user email: {user_email}")
     payload = {
         "sender": user_email,
-        "message": "show topics trigger", # Este intent vai mostrar os botões dos tópicos com progresso pendente
+        "message": f'/show_topics{{}}', #/show_topics",
         "metadata": {
             "user_id": user_id, 
             "course_id": course_id

@@ -856,6 +856,7 @@ class ActionAnalyzeProgress(Action):
     def run(self, dispatcher, tracker, domain):
 
         print("\n📊  Analyzing user progress for selected topic...")
+        
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         user_message = tracker.latest_message.get("metadata", {}).get("user_message", None)
