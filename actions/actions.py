@@ -325,7 +325,7 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
                 text = " ".join(complex_tokens_split)
                 complex_tokens.append(text)
             else: 
-                simple_tokens.append(concept)
+                simple_tokens.append(tokenize_and_clean_text(concept)[0]) # lemmatize and add the single word concept to simple tokens
                 print(f"🔍  Concept '{concept}' is a single word. Added to simple tokens: {simple_tokens}")
                 
         # stay with acronyms in uppercase from user_message:

@@ -622,9 +622,9 @@ def hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_d
     max_score_threshold = 0.8 * max_score  # Set a threshold of 70% of the maximum score
     #print(f"📊  Adaptive Threshold: {adaptive_threshold:.3f}")
     #print(f"📊  Percentile_70: {percentile_70:.3f}")
-    print(f"📊  Max Score Threshold: {max_score_threshold:.3f}")
+    #print(f"📊  Max Score Threshold: {max_score_threshold:.3f}")
     
-    threshold = max_score_threshold #min(adaptive_threshold, percentile_70, max_score_threshold)
+    threshold = min(adaptive_threshold, percentile_70, max_score_threshold)
     print(f">>  📊  Final Threshold: {threshold:.3f}")   
     
     # Filter results
