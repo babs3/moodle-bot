@@ -73,6 +73,7 @@ def chat():
     user_message = data.get('message')
     moodle_token = data.get('token')
     moodle_url = data.get('moodle_url')
+    isTutorMode = data.get('tutor_mode', False)
     is_teacher = data.get('is_teacher', False)
     if moodle_url == "http://localhost":
         moodle_url = "http://host.docker.internal"
@@ -114,7 +115,7 @@ def chat():
         db.session.add(tutor)
         db.session.commit()
     
-    if user and tutor.is_active:
+    if user and isTutorMode:#tutor.is_active:
         app.logger.info(f"CHAT: User {moodle_id} is in tutor mode.")
         print(f"    > User message: {user_message}")
         
