@@ -115,38 +115,73 @@ def chat():
         db.session.add(tutor)
         db.session.commit()
     
+    is_message_a_number = user_message.strip().isdigit()
     if user and isTutorMode:#tutor.is_active:
-        app.logger.info(f"CHAT: User {moodle_id} is in tutor mode.")
-        print(f"    > User message: {user_message}")
-        
-        current_time = datetime.now(timezone.utc).isoformat() 
-        payload = {
-            "sender": user_email,
-            "message": f'/select_topic{{}}', #"/select_topic",
-            "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id, "is_teacher": is_teacher}
-        }
-        headers = {"Content-Type": "application/json"}
+        if is_message_a_number:
+            app.logger.info(f"CHAT: User {moodle_id} is in tutor mode.")
+            print(f"    > User message: {user_message}")
+            
+            current_time = datetime.now(timezone.utc).isoformat() 
+            payload = {
+                "sender": user_email,
+                "message": f'/select_topic{{}}', #"/select_topic",
+                "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id, "is_teacher": is_teacher}
+            }
+            headers = {"Content-Type": "application/json"}
 
-        try:
-            response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", json=payload, headers=headers)
-            response.raise_for_status()
-            messages = response.json()
+            try:
+                response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", json=payload, headers=headers)
+                response.raise_for_status()
+                messages = response.json()
 
-            bot_reply = ""
-            buttons = ""
+                bot_reply = ""
+                buttons = ""
 
-            for message in messages:
-                if "text" in message:
-                    bot_reply += f"\n\n {message['text']}"
-                if "buttons" in message:
-                    buttons = message["buttons"]
-                    
-            return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
+                for message in messages:
+                    if "text" in message:
+                        bot_reply += f"\n\n {message['text']}"
+                    if "buttons" in message:
+                        buttons = message["buttons"]
+                        
+                return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
 
-        except requests.RequestException as e:
-            print(f"⚠️ Error connecting to Rasa: {e}")
-            return None
-        
+            except requests.RequestException as e:
+                print(f"⚠️ Error connecting to Rasa: {e}")
+                return None
+        else:
+            # do not send the message to Rasa, just reply that the user is in tutor mode and should select a topic by sending the corresponding number
+            app.logger.info(f"User {moodle_id} is in tutor mode but sent a non-numeric message. Prompting to select a topic.")
+            payload = {
+                "sender": user_email,
+                "message": f'/show_topics{{}}', #/show_topics",
+                "metadata": {
+                    "user_id": moodle_id, 
+                    "course_id": course_id
+                    }
+            }
+            headers = {"Content-Type": "application/json"}
+
+            try:
+                response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", json=payload, headers=headers)
+                response.raise_for_status()
+                messages = response.json()
+                app.logger.info(f"\n-Resposta do Rasa ao ativar tutor mode: {messages}")
+                
+                bot_reply = ""
+                buttons = ""
+
+                for message in messages:
+                    if "text" in message:
+                        bot_reply += f"\n\n {message['text']}"
+                    if "buttons" in message:
+                        buttons = message["buttons"]
+                
+                print(f"\nResposta final para o frontend: {bot_reply.strip()} com botões: {buttons}")
+                        
+                return jsonify([{"text": f"You are in tutor mode. Please select a topic to review.\n\n{bot_reply.strip()}"}, {"buttons": buttons}])
+            
+            except requests.RequestException as e:
+                print(f"⚠️ Error connecting to Rasa: {e}")
     else:
         app.logger.info(f"User {moodle_id} is in normal mode.")
         
