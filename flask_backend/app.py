@@ -177,6 +177,8 @@ def chat():
                         buttons = message["buttons"]
                 
                 print(f"\nResposta final para o frontend: {bot_reply.strip()} com botões: {buttons}")
+                if not buttons:
+                    return jsonify([{"text": " Great job! 🎉 You have reviewed all topics!"}])
                         
                 return jsonify([{"text": f"You are in tutor mode. Please select a topic to review.\n\n{bot_reply.strip()}"}, {"buttons": buttons}])
             
@@ -487,87 +489,99 @@ def tutor_toggle():
             quiz_id=quiz_id
         ).first()
 
-        if not analise or analise.state != "analyzed":
+        if not analise: # not pending and not reviewed, ou seja, nunca analisámos este quiz para este aluno
             # Temos uma tentativa nova! Analisar...
             review_data = get_quiz_attempt_review(attempt_id, moodle_url, moodle_token)
-            
             erros = analisar_desempenho_aluno(review_data) # A tua função BS4
-            
             if erros:
                 novos_erros_encontrados.extend(erros)
             
-            # Atualizar ou criar o registo de análise
-            if not analise:
+            # 3. Preparar Resposta para o Aluno
+            if novos_erros_encontrados:
+                app.logger.info(f"Novos erros encontrados para user_id {user_id}: {novos_erros_encontrados}")
+                
+                # Agora iteramos sobre a lista de objetos reais
+                for error in novos_erros_encontrados:
+                    
+                    error_question = error.get('question', 'N/A')
+                    # get question topic from db
+                    question_data = MoodleQuizData.query.filter_by(question=error_question).first()
+                    topic_id = question_data.topic_id if question_data else None
+                    # atualizar o erro com o topic_id encontrado
+                    error['topic_id'] = topic_id
+
+                    # 2. Guardar o progresso
+                    # verificar se já existe um registo para este erro específico (mesmo quiz, mesma questão, mesma resposta do aluno)
+                    progresso_existente = TutorProgress.query.filter_by(
+                        course_id=course_id,
+                        user_moodle_id=user_id,
+                        tipo=error.get('tipo'),
+                        quiz_id=question_data.quiz_id if question_data else None,
+                        topic_id=error.get('topic_id'),
+                        question=error.get('question'),
+                        student_answer=error.get('student_answer'),
+                        correct_answer=error.get('correct_answer'),
+                    ).first()
+                    
+                    if progresso_existente:
+                        app.logger.info(f"Progresso já existe para este erro específico, não criando duplicado. Detalhes: {progresso_existente}")
+                        continue
+                    
+                    progresso = TutorProgress(
+                        course_id=course_id,
+                        user_moodle_id=user_id,
+                        tipo=error.get('tipo'),
+                        quiz_id=question_data.quiz_id if question_data else None,
+                        topic_id=error.get('topic_id'),
+                        question=error.get('question'),
+                        student_answer=error.get('student_answer'),
+                        correct_answer=error.get('correct_answer'),
+                        state="pending"
+                    )
+                    db.session.add(progresso)
+
                 analise = MoodleQuizAnalysis(
                     user_moodle_id=user_id, 
                     quiz_id=quiz_id, 
                     last_attempt_id=attempt_id,
-                    course_id=course_id
+                    course_id=course_id,
+                    state="pending"
                 )
                 db.session.add(analise)
+                db.session.commit()
+
+            
+                temas_id = list(set([e['topic_id'] for e in novos_erros_encontrados]))
+                temas = []
+                for topic_id in temas_id:
+                    topic = Topics.query.filter_by(id=topic_id).first()
+                    if topic:
+                        temas.append("<strong>" + topic.name + "</strong>")
+                
+                msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}. Would you like to review these points with me?<br/>"
             else:
-                analise.last_attempt_id = attempt_id
-            
-            db.session.commit()
-
-    # 3. Preparar Resposta para o Aluno
-    if novos_erros_encontrados:
-        app.logger.info(f"Novos erros encontrados para user_id {user_id}: {novos_erros_encontrados}")
+                msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
+                return jsonify([{"text": msg}])
         
-        # Agora iteramos sobre a lista de objetos reais
-        for error in novos_erros_encontrados:
-            
-            error_question = error.get('question', 'N/A')
-            # get question topic from db
-            question_data = MoodleQuizData.query.filter_by(question=error_question).first()
-            topic_id = question_data.topic_id if question_data else None
-            # atualizar o erro com o topic_id encontrado
-            error['topic_id'] = topic_id
-
-            # 2. Guardar o progresso
-            # verificar se já existe um registo para este erro específico (mesmo quiz, mesma questão, mesma resposta do aluno)
-            progresso_existente = TutorProgress.query.filter_by(
-                course_id=course_id,
-                user_moodle_id=user_id,
-                tipo=error.get('tipo'),
-                topic_id=error.get('topic_id'),
-                question=error.get('question'),
-                student_answer=error.get('student_answer'),
-                correct_answer=error.get('correct_answer'),
-            ).first()
-            
-            if progresso_existente:
-                app.logger.info(f"Progresso já existe para este erro específico, não criando duplicado. Detalhes: {progresso_existente}")
-                continue
-            
-            progresso = TutorProgress(
-                course_id=course_id,
-                user_moodle_id=user_id,
-                tipo=error.get('tipo'),
-                topic_id=error.get('topic_id'),
-                question=error.get('question'),
-                student_answer=error.get('student_answer'),
-                correct_answer=error.get('correct_answer'),
-                state="pending"
-            )
-            db.session.add(progresso)
-
-        db.session.commit() # Commit final de tudo o que foi adicionado
-
+        else:
+            app.logger.info(f"Quiz_id: {quiz_id} para user_id: {user_id} já foi analisado anteriormente com estado '{analise.state}'.")
     
-        temas_id = list(set([e['topic_id'] for e in novos_erros_encontrados]))
-        temas = []
-        for topic_id in temas_id:
-            topic = Topics.query.filter_by(id=topic_id).first()
-            if topic:
-                temas.append("<strong>" + topic.name + "</strong>")
-        
-        msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}. Would you like to review these points with me?<br/>"
-    else:
-        msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
-        
-    
-    print(f"--> user email: {user_email}")
+            temas_id = list(set([p.topic_id for p in TutorProgress.query.filter_by(
+                                                        course_id=course_id, 
+                                                        user_moodle_id=user_id, 
+                                                        state="pending")
+                                                    .all()]))
+            temas = []
+            for topic_id in temas_id:
+                topic = Topics.query.filter_by(id=topic_id).first()
+                if topic:
+                    temas.append("<strong>" + topic.name + "</strong>")
+            
+            if temas:
+                msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}.  Would you like to review these points with me?<br/>"
+                    
+
+    app.logger.info(f"--> user email: {user_email}")
     payload = {
         "sender": user_email,
         "message": f'/show_topics{{}}', #/show_topics",
@@ -593,30 +607,54 @@ def tutor_toggle():
             if "buttons" in message:
                 buttons = message["buttons"]
         
-        print(f"\nResposta final para o frontend: {bot_reply.strip()} com botões: {buttons}")
+        app.logger.info(f"\nResposta final para o frontend: {bot_reply.strip()} com botões: {buttons}")
                 
         return jsonify([{"text": f"{msg}\n\n{bot_reply.strip()}"}, {"buttons": buttons}])
     
     except requests.RequestException as e:
-        print(f"⚠️ Error connecting to Rasa: {e}")
+        app.logger.error(f"⚠️ Error connecting to Rasa: {e}")
             
-    #return jsonify({"text": f"{msg}"})
 
 @app.route('/api/get_user_progress', methods=['GET'])
 def get_user_progress():
     user_id = request.args.get('user_id')
     course_id = request.args.get('course_id')
+    all_questions = request.args.get('all_questions', 'false').lower() == 'true' # Se for true, traz todas as questões, se for false, só as pendentes
     
     # Validação simples de segurança se os parâmetros não vierem
     if not user_id or not course_id:
         return jsonify({"error": "Missing parameters"}), 400
     
-    progress = TutorProgress.query.filter_by(
-        course_id=course_id,
-        user_moodle_id=user_id,
-        state="pending"
-    ).all()
-    return jsonify([{"question": p.question, "topic_id": p.topic_id, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
+    if all_questions:
+        progress = TutorProgress.query.filter_by(
+            course_id=course_id,
+            user_moodle_id=user_id
+        ).all()
+        
+        quiz_id = progress[0].quiz_id if progress else None
+        if quiz_id:
+            # update da analise
+            analise = MoodleQuizAnalysis.query.filter_by(
+                course_id=course_id,
+                user_moodle_id=user_id, 
+                quiz_id=quiz_id,
+                state="pending"
+            ).first()
+            if analise:
+                analise.state = "reviewed"
+                db.session.commit()
+                app.logger.info(f"Análise do quiz_id {quiz_id} atualizada para 'reviewed' para o usuário {user_id} no curso {course_id}.")
+        else:
+            app.logger.warning(f"Não foi possível encontrar o quiz_id para atualizar a análise do usuário {user_id} no curso {course_id}.")
+            
+    else:
+        progress = TutorProgress.query.filter_by(
+            course_id=course_id,
+            user_moodle_id=user_id,
+            state="pending"
+        ).all()
+        
+    return jsonify([{"quiz_id": p.quiz_id, "question": p.question, "topic_id": p.topic_id, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
 
 @app.route('/api/get_user_progress_by_topic', methods=['GET'])
 def get_user_progress_by_topic():
@@ -630,8 +668,10 @@ def get_user_progress_by_topic():
     progress = TutorProgress.query.filter_by(
         course_id=course_id,
         user_moodle_id=user_id,
-        topic_id=topic_id
+        topic_id=topic_id,
+        state="pending"
     ).all()
+        
     return jsonify([{"id": p.id, "state": p.state, "question": p.question, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
 
 @app.route('/api/update_progress_state', methods=['POST'])

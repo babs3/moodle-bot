@@ -999,7 +999,7 @@ class ActionAnalyzeProgress(Action):
 
         buttons = create_topics_buttons(user_id, course_id)
         if not buttons:
-            dispatcher.utter_message(text=f"You have reviewed all topics! Great job! 🎉")
+            dispatcher.utter_message(text=f"{html_feedback}<br/><br/>You have reviewed all topics! Great job! 🎉")
         else:
             dispatcher.utter_message(text=f"{html_feedback}<br/><br/>You can choose another topic to explore:<br/>", buttons=buttons)
         return []

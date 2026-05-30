@@ -790,14 +790,19 @@ def update_materials_location(selected_results):
     
 def create_topics_buttons(user_id, course_id):
     # get user progress
-    progress = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id})
+    progress = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id, "all_questions": False})
     if progress.status_code == 200:
         progress_data = progress.json()
         print(f"📊  User progress data retrieved: {progress_data}")
     else:
         print(f"❌  Failed to retrieve user progress. Status code: {progress.status_code}")
         progress_data = []
-
+        
+    if progress_data == []:
+        print(f"⚠️  all questions were already reviewd")
+        progress_data = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id, "all_questions": True})
+        return []
+    
     # A tua lista de tópicos (pode vir de uma BD, API ou slot)
     topics_ids = []
     for entry in progress_data:

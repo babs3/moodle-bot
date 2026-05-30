@@ -64,6 +64,7 @@ class TutorProgress(db.Model):
     user_moodle_id = db.Column(db.Integer, db.ForeignKey('moodle_users.moodle_id', ondelete="CASCADE"), nullable=False)
     tipo = db.Column(db.String(50), nullable=False)  # Ex: "TrueFalse", "MultipleChoice", "ShortAnswer"
     topic_id = db.Column(db.Integer, db.ForeignKey('topics.id', ondelete="SET NULL"), nullable=True)  # Relaciona com a tabela de tópicos
+    quiz_id = db.Column(db.Integer, nullable=False)  # ID do Quiz no Moodle
     question = db.Column(db.Text, nullable=False)
     student_answer = db.Column(db.Text, nullable=False)
     correct_answer = db.Column(db.Text, nullable=False)
