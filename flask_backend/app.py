@@ -438,8 +438,13 @@ def tutor_toggle():
     course_id = data.get('course_id')
     moodle_token = data.get('token')
     moodle_url = data.get('moodle_url')
+    is_teacher = data.get('is_teacher', False)
     if moodle_url == "http://localhost":
         moodle_url = "http://host.docker.internal"
+        
+    user_firstname = get_user_firstname(user_id, moodle_url, moodle_token)
+    print(f"Received message for {user_firstname} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
+    
 
     # 1. Atualizar o estado do utilizador na BD
     user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
@@ -586,6 +591,8 @@ def tutor_toggle():
                     
 
     app.logger.info(f"--> user email: {user_email}")
+    session_init_rasa(user_email, user_firstname, "teacher" if is_teacher else "student") # Define o papel do utilizador para personalizar as respostas do Rasa
+    
     payload = {
         "sender": user_email,
         "message": f'/show_topics{{}}', #/show_topics",

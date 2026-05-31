@@ -850,14 +850,12 @@ class ActionAnalyzeProgress(Action):
         
         if len(progress_data) > 1:
             print(f"⚠️  Multiple progress entries found for topic {topic_name}. IDs: {ids_list}.")
-            
             # choose one entry
             progress_data = progress_data[0]  # For example, we take the first one. You can implement a more complex logic here if needed.
         else:
             progress_data = progress_data[0]
         print(f"🔍  Selected progress entry for analysis: {progress_data}")
                     
-            
             
         # Conteúdo extraído da tua pesquisa de materiais do curso
         print(f"\n📖  --------- Getting Knowledge --------- 📖 ")
@@ -877,7 +875,6 @@ class ActionAnalyzeProgress(Action):
         
         context = " ".join(tokenize_and_clean_text(context)) if context else ""
         print(f"🔍  Tokenized context: {context}")
-        
         print(f"\n🔍  Final tokens to be used in search: \n    > Complex tokens: {complex_tokens} \n    > Simple tokens: {simple_tokens}")
         
         print(f"\n🔍  Starting search process in resources: {authorized_resources}")
@@ -885,60 +882,37 @@ class ActionAnalyzeProgress(Action):
         vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(intent, complex_tokens, simple_tokens, context, user_message, collection, authorized_resources)        
         bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id)
         
-        bot_response = None
+        content_found = True
         if bm25_docs == [] and bm25_meta == []:
             print(f"\n⚠️  BM25 search returned no results for user query: '{user_message}'")
-            bot_response = "no_access"
+            content_found = False
         elif normalized_bm25_scores == []:
             print(f"\n⚠️  Normalized BM25 scores is empty for user query: '{user_message}'")
-            bot_response = "no_response"
-        if bot_response:
-            return  [
-                SlotSet("user_query", user_message),  # Store the query
-                SlotSet("materials_location", ""), #gemini_results),  # Store selected materials
-                SlotSet("bot_response", bot_response),  # Store the bot response -> trigger
-                SlotSet("user_id", user_id),  # Store the user ID
-                SlotSet("concept", ""),
-                SlotSet("context", "")
-                ]
-
+            content_found = False
         
         if complex_tokens:
-            if intent == "definition of ":
-                alpha = 0.6 # Use a lower alpha for definitions
-                print(f"\n🔍  Found keywords: {complex_tokens} and {simple_tokens}. \n     Using hybrid search with alpha = {alpha} because of the 'DEFINE' intent ")
-            else:
-                # For other intents, use a slightly higher alpha
-                alpha = 0.75
-                print(f"\n🔍  Found keywords: {complex_tokens} and {simple_tokens}. \n     Using hybrid search with alpha = {alpha}")
+            alpha = 0.75
+            print(f"\n🔍  Found keywords: {complex_tokens} and {simple_tokens}. \n     Using hybrid search with alpha = {alpha}")
         else: # Use hybrid search with a higher weight for vector search
             alpha = 0.85
             print(f"\n🔍  Split case: found multiple keywords: {complex_tokens} and {simple_tokens}. Using hybrid search with alpha = {alpha}")
-
             
         selected_results = hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_docs, bm25_meta, normalized_bm25_scores, alpha)
         
         if len(selected_results) == 0:
             print("\n🚨  No relevant materials found!")
-            return  [
-                SlotSet("user_query", user_message),  # Store the query
-                SlotSet("materials_location", selected_results), #gemini_results),  # Store selected materials
-                SlotSet("bot_response", "I couldn't find relevant content in the course materials."),  # Store the bot response
-                SlotSet("user_id", user_id),  # Store the user ID
-                SlotSet("context", context),
-                SlotSet("complex_tokens", complex_tokens),
-                SlotSet("simple_tokens", simple_tokens)
-                ]
+            content_found = False
         else: 
             # Format results
             results_text = []
             for text_chunk, _, _ in selected_results:
                 results_text.append(text_chunk)
-
-            # === PREPARE CONTEXT AND RULES FOR SYSTEM === #
             raw_text = "\n".join(results_text)   
         
-        
+        if not content_found:
+            print("\n🚨  No relevant content found in course materials for the quiz question.")
+            dispatcher.utter_message(text="I couldn't find relevant content in the course materials to analyze your answer. Please try again later or check with your instructor.")
+            return []
 
         # === PREPARE THE PROMPTS === #
 
@@ -984,13 +958,29 @@ class ActionAnalyzeProgress(Action):
                 system_instruction=system_instruction,
                 generation_config=generation_config
             )
-            
             response = g_model.generate_content(user_prompt)
             html_feedback = response.text
+            
         except Exception as e:
             print(f"Error calling Gemini: {e}")
-                    
+            
+            
+        
+        print(f"\n🔖  --------- Getting class materials location --------- 🔖 ")
 
+        location_results, _ = get_materials_location(selected_results, complex_tokens, simple_tokens, course_id)
+        location_materials_text = "<span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>" + "</br>".join(location_results) + "</span></i>"
+        
+        if not location_results:
+            # no exact references found, so return related PDFs found in previous function
+            if selected_results:
+                location_results, _ = update_materials_location(selected_results)
+                location_materials_text = "<span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>" + "</br>".join(location_results) + "</span></i>"
+            else:                
+                print("\n ⚠️  No exact references found, but you might check related PDFs.")
+                location_materials_text = "<span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>I couldn't find specific page references for your question.</span></i>"
+
+                    
         update_response = requests.post(f"http://flask-server:8080/api/update_progress_state", params={"ids": ids_list, "new_state": "reviewed"})
         if update_response.status_code == 200:
             print(f"✅  Progress entries for topic {topic_name} updated successfully.")
@@ -999,7 +989,7 @@ class ActionAnalyzeProgress(Action):
 
         buttons = create_topics_buttons(user_id, course_id)
         if not buttons:
-            dispatcher.utter_message(text=f"{html_feedback}<br/><br/>You have reviewed all topics! Great job! 🎉")
+            dispatcher.utter_message(text=f"{html_feedback}<br/><br/>{location_materials_text}<br/><br/>You have reviewed all topics! Great job! 🎉")
         else:
-            dispatcher.utter_message(text=f"{html_feedback}<br/><br/>You can choose another topic to explore:<br/>", buttons=buttons)
+            dispatcher.utter_message(text=f"{html_feedback}<br/><br/>{location_materials_text}<br/><br/>You can choose another topic to explore:<br/>", buttons=buttons)
         return []
