@@ -471,6 +471,10 @@ def tutor_toggle():
     quizzes = get_user_quizzes_by_course(course_id, user_id, moodle_url, moodle_token) 
     #app.logger.info(f"Quizzes encontrados para user_id {user_id}: {[quiz['name'] for quiz in quizzes]}")
     
+    if not quizzes:
+        app.logger.warning(f"Nenhum quiz encontrado para o curso {course_id} e user_id {user_id}.")
+        return jsonify([{"text": "I have activated the tutor mode, but I couldn't find any quizzes to analyze. When you take a test, please let me know!"}])
+    
     novos_erros_encontrados = []
     
     for quiz in quizzes:
