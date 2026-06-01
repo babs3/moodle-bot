@@ -26,13 +26,17 @@ class ActionGetMetricsFromDB(Action):
         return "action_get_metrics_from_db"
 
     def run(self, dispatcher, tracker, domain):
+        print("\n📊  Generating bot 'action_get_metrics_from_db' response...")
         # 1. Verificar o slot
         role = tracker.get_slot("user_role")
 
         # 2. Lógica de decisão (Gatekeeper)
         if role == "teacher":
             
+            user_email = tracker.sender_id
+            user_id = tracker.latest_message.get("metadata", {}).get("user_id")
             course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+            input_time = tracker.latest_message.get("metadata", {}).get("input_time")
             teacher_question = tracker.latest_message.get("text")
             print(f"Teacher question: {teacher_question}")
 
@@ -86,13 +90,17 @@ class ActionGetMetricsFromDB(Action):
                 if hasattr(response, "text") and response.text:
                     print("\n🎯  Gemini Response Generated Successfully!")
                     formatted_response = format_gemini_response(response.text)
-                    print(formatted_response)
+                    #print(formatted_response)
+                    save_user_progress(course_id, user_email, teacher_question, formatted_response, [], input_time, user_id, False)
                     dispatcher.utter_message(text=formatted_response)
                 else:
                     print("\n ⚠️  Gemini Response is empty.")
                     dispatcher.utter_message(text="Sorry, I couldn't generate a response.")
+                    save_user_progress(course_id, user_email, teacher_question, "Sorry, I couldn't generate a response.", [], input_time, user_id, False)
+                    
             except Exception as e:
                 dispatcher.utter_message(text="Sorry, I couldn't process that request.")
+                save_user_progress(course_id, user_email, teacher_question, "Sorry, I couldn't process that request.", [], input_time, user_id, False)
                 print(f"\n❌  Error calling Gemini API: {e}")
         else:
             # Se for aluno ou estiver vazio, dispara a mensagem de erro
@@ -109,6 +117,9 @@ class ActionCallLLMWithContext(Action):
         # O prompt e a formatação da resposta podem ser adaptados conforme necessário
         print("\n📊  Generating bot 'action_call_llm_with_context' response...")
         
+        user_email = tracker.sender_id
+        user_id = tracker.latest_message.get("metadata", {}).get("user_id")
+        input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         teacher_question = tracker.latest_message.get("text")
         print(f"Teacher question: {teacher_question}")
@@ -182,12 +193,15 @@ class ActionCallLLMWithContext(Action):
             if hasattr(response, "text") and response.text:
                 print("\n🎯  Gemini Response Generated Successfully!")
                 formatted_response = format_gemini_response(response.text)
-                print(formatted_response)
+                #print(formatted_response)
+                save_user_progress(course_id, user_email, teacher_question, formatted_response, [], input_time, user_id, False)
                 dispatcher.utter_message(text=formatted_response)
             else:
                 print("\n ⚠️  Gemini Response is empty.")
+                save_user_progress(course_id, user_email, teacher_question, "Sorry, I couldn't generate a response.", [], input_time, user_id, False)
                 dispatcher.utter_message(text="Sorry, I couldn't generate a response.")
         except Exception as e:
+            save_user_progress(course_id, user_email, teacher_question, "Sorry, I couldn't process that request.", [], input_time, user_id, False)
             dispatcher.utter_message(text="Sorry, I couldn't process that request.")
             print(f"\n❌  Error calling Gemini API: {e}")
         
