@@ -308,7 +308,7 @@ def get_user_history(course_id):
     response = requests.get(f"http://flask-server:8080/api/get_user_history/{course_id}")
     if response.status_code == 200:
         progress_data = response.json()
-        print(f"📊  User progress data retrieved: {progress_data}")
+        #print(f"📊  User progress data retrieved: {progress_data}")
         return pd.DataFrame(progress_data)
     else:
         print("⚠️  Failed to retrieve user progress data.")

@@ -425,6 +425,9 @@ nlu:
     - Do we have a high volume of queries late at night?
     - Identify peak usage hours for this course.
     - traffic spikes during exam week?
+    - Can you give me a very quick summary of what the students are asking about?
+    - What are the main topics of interest for the students this week?
+    - Are students asking more about the course schedule, grading policy, or contact information?
 
 - intent: ask_course_info
   examples: |

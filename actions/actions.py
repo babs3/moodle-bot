@@ -52,8 +52,12 @@ class ActionGetMetricsFromDB(Action):
             1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
             2. **HTML ONLY:** Use <b>text</b> for bold, <ul><li></li></ul> for lists, and <br> for line breaks.
             3. **NO INTROS/OTHERS:** Start directly with the analysis. Do not say "Hello" or "Here is the report".
-            4. **MAX BREVITY:** Use individual paragraphs. Maximum 3-4 paragraphs in total. Keep the total word count under 100 words.
+            4. **MAX BREVITY:** Maximum 3-4 paragraphs in total. Keep the total word count under 120 words.
             5. **LANGUAGE:** Always respond in English (UK).
+            6. **VISUAL CHARTS:** If the data shows a clear trend over time, a comparison between 2-3 main categories, or metrics that benefit from visual aid, append a single Chart Image at the very end of your response using this exact HTML structure:
+            6. **VISUAL CHARTS:** If relevant, append a single Chart Image at the very end using this exact structure:
+            <br><br><a href="https://quickchart.io/chart?c={{chart_json}}" target="_blank"><img src="https://quickchart.io/chart?c={{chart_json}}" width="100%"></a>
+            Keep the chart design extremely simple, clean, and fit for a narrow sidebar (e.g., a small bar or line chart with minimal labels). If a chart is not relevant for the specific question, do not include the img tag.
 
             ### CONTEXT
             Data: {data_snippet}
