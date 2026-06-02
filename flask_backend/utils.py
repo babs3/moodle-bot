@@ -479,6 +479,29 @@ def marcar_quiz_como_processado(course_id, quiz_id, quiz_name, questions_hash):
     db.session.commit()
     print(f"Quiz ID {quiz_id} adicionado ao banco de dados.")
     
+def call_rasa(payload):
+    headers = {"Content-Type": "application/json"}
+
+    try:
+        response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", json=payload, headers=headers)
+        response.raise_for_status()
+        messages = response.json()
+        
+        bot_reply = ""
+        buttons = ""
+        for message in messages:
+            if "text" in message:
+                bot_reply += f"\n\n {message['text']}"
+            if "buttons" in message:
+                buttons = message["buttons"]
+        
+        print(f"\nResposta final para o frontend: {bot_reply.strip()} com botões: {buttons}")
+        return bot_reply.strip(), buttons
+    
+    except requests.RequestException as e:
+        print(f"⚠️ Error connecting to Rasa: {e}")
+        return "Sorry, I'm having trouble connecting to the assistant right now. Please try again later.", ""
+    
 def call_moodle(moodle_url, moodle_token, function, params={}, timeout=5):
     """Função genérica para chamar o Web Service do Moodle"""
     params.update({

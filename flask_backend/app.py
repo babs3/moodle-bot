@@ -78,18 +78,6 @@ def chat():
     if moodle_url == "http://localhost":
         moodle_url = "http://host.docker.internal"
         
-    if user_message == '': # Se a mensagem for vazia ou só espaços, não enviamos para o Rasa
-        app.logger.warning("Received empty message. Ignoring.")
-        return jsonify([{"text": "I didn't receive any message. Please try sending your message again."}])
-        
-    cleaned_message = clean_user_input(user_message) # Limpa a mensagem do utilizador para evitar problemas de formatação ou segurança
-    app.logger.info(f"Cleaned message to send to LLM: {cleaned_message}")
-    if cleaned_message == "":
-        # houve algum problema na limpeza da mensagem, ou seja, a mensagem era composta apenas por caracteres indesejados. Neste caso, respondemos ao utilizador pedindo para reformular a mensagem.
-        app.logger.warning("Cleaned message is empty after cleaning. Prompting user to reformulate.")
-        return jsonify([{"text": "I couldn't understand your message. Please try reformulating it."}])
-    user_message = cleaned_message
-    
     user_firstname = get_user_firstname(moodle_id, moodle_url, moodle_token)
     print(f"Received message for {user_firstname} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
     
@@ -100,6 +88,36 @@ def chat():
     check_moodle_user_in_db(moodle_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
     
     session_init_rasa(user_email, user_firstname, "teacher" if is_teacher else "student") # Define o papel do utilizador para personalizar as respostas do Rasa
+    
+        
+    if user_message == '': # Se a mensagem for vazia ou só espaços, não enviamos para o Rasa
+        app.logger.warning("Received empty message. Ignoring.")
+        return jsonify([{"text": "I didn't receive any message. Please try sending your message again."}])
+        
+    cleaned_message = clean_user_input(user_message) # Limpa a mensagem do utilizador para evitar problemas de formatação ou segurança
+    app.logger.info(f"Cleaned message to send to LLM: {cleaned_message}")
+    if cleaned_message == "":
+        # houve algum problema na limpeza da mensagem, ou seja, a mensagem era composta apenas por caracteres indesejados. Neste caso, respondemos ao utilizador pedindo para reformular a mensagem.
+        app.logger.warning("Cleaned message is empty after cleaning. Prompting user to reformulate.")
+    
+        if isTutorMode:
+            payload = {
+                "sender": user_email,
+                "message": f'/show_topics{{}}',
+                "metadata": {
+                    "user_id": moodle_id, 
+                    "course_id": course_id
+                }
+            }
+            bot_reply, buttons = call_rasa(payload)
+            if not buttons:
+                return jsonify([{"text": "Great job! 🎉 You have reviewed all topics!"}])
+            return jsonify([{"text": f"You are in tutor mode.</br>Please select a topic to review.</br>{bot_reply.strip()}"}, {"buttons": buttons}])
+        
+        else:
+            return jsonify([{"text": "I couldn't understand your message. Please try reformulating it."}])
+    
+    user_message = cleaned_message
     
     moodle_contents, moodle_contents_names = get_moodle_contents(course_id, moodle_url, moodle_token)
     if moodle_contents_names == None:
@@ -134,95 +152,46 @@ def chat():
             print(f"    > User message: {user_message}")
             
             current_time = datetime.now(timezone.utc).isoformat() 
+
             payload = {
                 "sender": user_email,
                 "message": f'/select_topic{{}}', #"/select_topic",
                 "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id, "is_teacher": is_teacher}
             }
-            headers = {"Content-Type": "application/json"}
+            bot_reply, buttons = call_rasa(payload)
+            
+            return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
 
-            try:
-                response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", json=payload, headers=headers)
-                response.raise_for_status()
-                messages = response.json()
-
-                bot_reply = ""
-                buttons = ""
-
-                for message in messages:
-                    if "text" in message:
-                        bot_reply += f"\n\n {message['text']}"
-                    if "buttons" in message:
-                        buttons = message["buttons"]
-                        
-                return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
-
-            except requests.RequestException as e:
-                print(f"⚠️ Error connecting to Rasa: {e}")
-                return None
         else:
             # do not send the message to Rasa, just reply that the user is in tutor mode and should select a topic by sending the corresponding number
             app.logger.info(f"User {moodle_id} is in tutor mode but sent a non-numeric message. Prompting to select a topic.")
             payload = {
                 "sender": user_email,
-                "message": f'/show_topics{{}}', #/show_topics",
-                "metadata": {
-                    "user_id": moodle_id, 
-                    "course_id": course_id
-                    }
+                "message": f'/show_topics{{}}',
+                "metadata": {"user_id": moodle_id, "course_id": course_id}
             }
-            headers = {"Content-Type": "application/json"}
 
-            try:
-                response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", json=payload, headers=headers)
-                response.raise_for_status()
-                messages = response.json()
-                app.logger.info(f"\n-Resposta do Rasa ao ativar tutor mode: {messages}")
-                
-                bot_reply = ""
-                buttons = ""
-
-                for message in messages:
-                    if "text" in message:
-                        bot_reply += f"\n\n {message['text']}"
-                    if "buttons" in message:
-                        buttons = message["buttons"]
-                
-                print(f"\nResposta final para o frontend: {bot_reply.strip()} com botões: {buttons}")
-                if not buttons:
-                    return jsonify([{"text": " Great job! 🎉 You have reviewed all topics!"}])
-                        
-                return jsonify([{"text": f"You are in tutor mode. Please select a topic to review.\n\n{bot_reply.strip()}"}, {"buttons": buttons}])
+            bot_reply, buttons = call_rasa(payload)
             
-            except requests.RequestException as e:
-                print(f"⚠️ Error connecting to Rasa: {e}")
+            print(f"\nResposta final para o frontend: {bot_reply.strip()} com botões: {buttons}")
+            if not buttons:
+                return jsonify([{"text": " Great job! 🎉 You have reviewed all topics!"}])
+                    
+            return jsonify([{"text": f"You are in tutor mode.</br>Please select a topic to review.</br>{bot_reply.strip()}"}, {"buttons": buttons}])
+            
     else:
         app.logger.info(f"User {moodle_id} is in normal mode.")
         
         current_time = datetime.now(timezone.utc).isoformat()
         payload = {
             "sender": user_email,
-            "message": user_message, #user_input,
+            "message": user_message,
             "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": False, "course_id": course_id, "is_teacher": is_teacher}
         }
-        headers = {"Content-Type": "application/json"}
 
-        try:
-            response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", json=payload, headers=headers)
-            response.raise_for_status()
-            messages = response.json()
+        bot_reply, buttons = call_rasa(payload)            
+        return jsonify([{"text": f"{bot_reply.strip()}"}])
 
-            bot_reply = ""
-
-            for message in messages:
-                if "text" in message:
-                    bot_reply += f"\n\n {message['text']}"
-                    
-            return jsonify([{"text": f"{bot_reply.strip()}"}])
-
-        except requests.RequestException as e:
-            print(f"⚠️ Error connecting to Rasa: {e}")
-            return None
 
 @app.route('/process_knowledge', methods=['POST'])
 def process_knowledge():
@@ -607,35 +576,15 @@ def tutor_toggle():
     
     payload = {
         "sender": user_email,
-        "message": f'/show_topics{{}}', #/show_topics",
+        "message": f'/show_topics{{}}',
         "metadata": {
             "user_id": user_id, 
             "course_id": course_id
             }
     }
-    headers = {"Content-Type": "application/json"}
-
-    try:
-        response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", json=payload, headers=headers)
-        response.raise_for_status()
-        messages = response.json()
-        app.logger.info(f"\nResposta do Rasa ao ativar tutor mode: {messages}")
-        
-        bot_reply = ""
-        buttons = ""
-
-        for message in messages:
-            if "text" in message:
-                bot_reply += f"\n\n {message['text']}"
-            if "buttons" in message:
-                buttons = message["buttons"]
-        
-        app.logger.info(f"\nResposta final para o frontend: {bot_reply.strip()} com botões: {buttons}")
-                
-        return jsonify([{"text": f"{msg}\n\n{bot_reply.strip()}"}, {"buttons": buttons}])
+    bot_reply, buttons = call_rasa(payload)
     
-    except requests.RequestException as e:
-        app.logger.error(f"⚠️ Error connecting to Rasa: {e}")
+    return jsonify([{"text": f"{msg}\n\n{bot_reply.strip()}"}, {"buttons": buttons}])
             
 
 @app.route('/api/get_user_progress', methods=['GET'])
