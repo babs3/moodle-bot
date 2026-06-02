@@ -552,7 +552,7 @@ def criar_topicos_para_perguntas(pergunta_id_texto):
             
     payload = {
         "sender": "doesnt_matter", #user_email
-        "message": "create topic trigger",
+        "message": "/create_topics", # Intent que o Rasa vai usar para identificar a ação
         "metadata": {"perguntas": pergunta_id_texto}
     }
     headers = {"Content-Type": "application/json"}

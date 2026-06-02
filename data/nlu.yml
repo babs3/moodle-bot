@@ -363,10 +363,6 @@ nlu:
     - how does [predictive maintenance](concept) differ from [preventive maintenance](concept)?
     - Compare [CoAP](concept) and [MQTT](concept) in terms of [architecture design choices](context).
 
-- intent: create_topic
-  examples: |
-    - create topic trigger
-
 - intent: view_metrics
   examples: |
     - What are today's metrics?

@@ -93,10 +93,10 @@ rules:
     - intent: select_topic
     - action: action_analyze_progress
 
-- rule: Create Topic
+- rule: Create Topics
   steps:
-  - intent: create_topic
-  - action: action_create_topic
+  - intent: create_topics
+  - action: action_create_topics
 
 - rule: Teacher asks for metrics
   condition:

@@ -523,13 +523,13 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
         SlotSet("simple_tokens", simple_tokens)
         ]
 
-class ActionCreateTopic(Action):
+class ActionCreateTopics(Action):
     def name(self):
-        return "action_create_topic"
+        return "action_create_topics"
 
     def run(self, dispatcher, tracker, domain):
         
-        print("\n📊  Generating bot 'action_create_topic' response...")
+        print("\n📊  Generating bot 'action_create_topics' response...")
 
         perguntas = tracker.latest_message.get("metadata", {}).get("perguntas", [])
         print(f"\n🔍  Original perguntas from metadata: {perguntas}")

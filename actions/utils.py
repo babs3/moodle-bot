@@ -23,39 +23,53 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 #for m in genai.list_models():
 #    print(m.name)
 
-def get_first_gemini_pro_model():
-    """
-    Return the first model name that matches pattern:
-      models/gemini-<version>-pro
-    Raises RuntimeError if none found.
-    """
-    pattern = re.compile(r"^models/gemini-(\d+(?:\.\d+)*)-pro$")
+# Criamos uma variável de cache para não bater na API sem necessidade
+_CACHED_MODEL_NAME = None
 
-    for m in genai.list_models():
-        # m is typically an object with attribute `name`
-        name = getattr(m, "name", None)
-        if not name:
-            # fallback if the returned item is the string itself
-            name = m
-
-        if isinstance(name, bytes):
-            name = name.decode()
-
-        if isinstance(name, str) and pattern.match(name):
-            return name
-
-    raise RuntimeError("No 'models/gemini-*-pro' model found")
-
-MODEL_NAME = get_first_gemini_pro_model()
-print(f"✅  Using model: {MODEL_NAME}")
-
-#g_model = genai.GenerativeModel(MODEL_NAME)
+def get_latest_gemini_pro_model():
+    global _CACHED_MODEL_NAME
     
+    # Se já descobrimos o modelo antes, usamos o valor em cache
+    if _CACHED_MODEL_NAME:
+        return _CACHED_MODEL_NAME
+
+    pattern = re.compile(r"^models/gemini-(\d+(?:\.\d+)*)-flash$")
+    available_models = []
+
+    try:
+        for m in genai.list_models():
+            name = getattr(m, "name", m)
+            if isinstance(name, bytes):
+                name = name.decode()
+            
+            match = pattern.match(name)
+            if match:
+                # Guardamos o nome e a versão (convertida em tuplo de inteiros para ordenar corretamente)
+                # Ex: "2.5" -> (2, 5)
+                version_str = match.group(1)
+                version_tuple = tuple(map(int, version_str.split('.')))
+                available_models.append((version_tuple, name))
+    except Exception as e:
+        print(f"⚠️ Erro ao listar modelos: {e}. Usando fallback seguro.")
+        return "models/gemini-2.5-flash" # Fallback caso a API dê 429 logo no início
+
+    if not available_models:
+        raise RuntimeError("No 'models/gemini-*-flash' model found")
+
+    # Ordena pelo tuplo da versão (da maior para a menor) e pega o nome do mais recente
+    available_models.sort(key=lambda x: x[0], reverse=True)
+    
+    _CACHED_MODEL_NAME = available_models[0][1]
+    return _CACHED_MODEL_NAME
+
+# Uso no teu código:
+MODEL_NAME = get_latest_gemini_pro_model()
+print(f"✅  Using latest model found: {MODEL_NAME}")
+
 # Load Spacy model for NLP tasks
 nlp = spacy.load("en_core_web_sm")
 
 # Load sentence transformer model
-#model = SentenceTransformer("all-MiniLM-L6-v2")
 model_path = "/app/models/all-MiniLM-L6-v2"
 embedding_model = SentenceTransformer(model_path)
 

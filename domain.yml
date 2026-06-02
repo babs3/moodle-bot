@@ -12,7 +12,7 @@ intents:
   - ask_for_summary
   - ask_for_comparison
   - generate_menu_buttons
-  - create_topic
+  - create_topics
   - view_metrics
   - ask_course_info
   - show_topics
@@ -134,9 +134,6 @@ responses:
   - text: "My name is Engi-Bot, I can help you with your class materials. Do you have any questions?"
   - text: "I am Engi-Bot, I'm here to help with class materials and learning support. Let me know what you need!"
 
-  utter_create_topic:
-  - text: "Creating topic..."
-
   utter_generate_menu_buttons:
   - text: "creating menu..."
     buttons:
@@ -160,7 +157,7 @@ actions:
 - action_get_comparison
 - action_get_class_material_location
 - action_generate_initial_menu_buttons
-- action_create_topic
+- action_create_topics
 - action_setup_user_role
 - action_get_metrics_from_db
 - action_call_llm_with_context
