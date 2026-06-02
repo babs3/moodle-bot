@@ -70,7 +70,7 @@ def chat():
     app.logger.info(f"---------> Received chat request with data: {data}")
     moodle_id = data.get('user_id')    
     course_id = data.get('course_id')
-    user_message = data.get('message')
+    user_message = data.get('message', '')
     moodle_token = data.get('token')
     moodle_url = data.get('moodle_url')
     isTutorMode = data.get('tutor_mode', False)
@@ -78,6 +78,18 @@ def chat():
     if moodle_url == "http://localhost":
         moodle_url = "http://host.docker.internal"
         
+    if user_message == '': # Se a mensagem for vazia ou só espaços, não enviamos para o Rasa
+        app.logger.warning("Received empty message. Ignoring.")
+        return jsonify([{"text": "I didn't receive any message. Please try sending your message again."}])
+        
+    cleaned_message = clean_user_input(user_message) # Limpa a mensagem do utilizador para evitar problemas de formatação ou segurança
+    app.logger.info(f"Cleaned message to send to LLM: {cleaned_message}")
+    if cleaned_message == "":
+        # houve algum problema na limpeza da mensagem, ou seja, a mensagem era composta apenas por caracteres indesejados. Neste caso, respondemos ao utilizador pedindo para reformular a mensagem.
+        app.logger.warning("Cleaned message is empty after cleaning. Prompting user to reformulate.")
+        return jsonify([{"text": "I couldn't understand your message. Please try reformulating it."}])
+    user_message = cleaned_message
+    
     user_firstname = get_user_firstname(moodle_id, moodle_url, moodle_token)
     print(f"Received message for {user_firstname} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
     
