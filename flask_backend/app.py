@@ -9,13 +9,22 @@ import threading
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
-from google.oauth2 import service_account
+from flask_caching import Cache
 from utils import *
 from models import *
 from knowledge_engine import *
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
+# Configuração adaptada para o Docker
+config = {
+    "CACHE_TYPE": "RedisCache",
+    "CACHE_REDIS_HOST": os.environ.get("REDIS_HOST", "localhost"),
+    "CACHE_REDIS_PORT": 6379,
+    "CACHE_DEFAULT_TIMEOUT": 300 # 5 minutos por defeito
+}
+app.config.from_mapping(config)
+cache = Cache(app)
 CORS(app) # Isto permite que o Moodle aceda à API
 scheduler = APScheduler() # Para agendar tarefas periódicas, como verificar quizzes novos
 
@@ -67,8 +76,7 @@ def session_init_rasa(user_email, user_firstname, user_role):
 @app.route('/chat', methods=['POST'])
 def chat():    
     data = request.json
-    app.logger.info(f"---------> Received chat request with data: {data}")
-    moodle_id = data.get('user_id')    
+    user_id = data.get('user_id')    
     course_id = data.get('course_id')
     user_message = data.get('message', '')
     moodle_token = data.get('token')
@@ -78,22 +86,32 @@ def chat():
     if moodle_url == "http://localhost":
         moodle_url = "http://host.docker.internal"
         
-    user_firstname = get_user_firstname(moodle_id, moodle_url, moodle_token)
-    print(f"Received message for {user_firstname} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
-    
-    # Busca os dados reais no Moodle
-    info_utilizador = get_moodle_user_data(moodle_id, moodle_token, moodle_url)
-    user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
-    username = info_utilizador.get("nome") if info_utilizador else "NOME_"
-    check_moodle_user_in_db(moodle_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
-    
-    session_init_rasa(user_email, user_firstname, "teacher" if is_teacher else "student") # Define o papel do utilizador para personalizar as respostas do Rasa
-    
-        
     if user_message == '': # Se a mensagem for vazia ou só espaços, não enviamos para o Rasa
         app.logger.warning("Received empty message. Ignoring.")
         return jsonify([{"text": "I didn't receive any message. Please try sending your message again."}])
-        
+    
+    # 💡 A MAGIA ACONTECE AQUI: Cria uma chave única para a cache baseada no curso e ID do utilizador
+    cache_key = f"moodle_user_{course_id}_{user_id}"
+    info_utilizador = cache.get(cache_key)
+
+    if not info_utilizador:
+        # Se não estiver na cache, vai buscar ao Moodle e guarda na cache
+        app.logger.info(f"Cache MISS para o utilizador {user_id}. Chamando API do Moodle.")
+        info_utilizador = get_moodle_user_data(user_id, moodle_token, moodle_url)
+        if info_utilizador:
+            cache.set(cache_key, info_utilizador, timeout=600) # Guarda por 10 minutos
+    else:
+        app.logger.info(f"Cache HIT para o utilizador {user_id}. Dados carregados da memória.")
+    
+    user_firstname = info_utilizador.get("name") if info_utilizador else f"user_{user_id}"     
+    print(f"--> Received message for {user_firstname} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
+    
+    # Busca os dados reais no Moodle
+    user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
+    username = info_utilizador.get("name") if info_utilizador else "NOME_"
+    
+    session_init_rasa(user_email, user_firstname, "teacher" if is_teacher else "student") # Define o papel do utilizador para personalizar as respostas do Rasa
+    
     cleaned_message = clean_user_input(user_message) # Limpa a mensagem do utilizador para evitar problemas de formatação ou segurança
     app.logger.info(f"Cleaned message to send to LLM: {cleaned_message}")
     if cleaned_message == "":
@@ -105,7 +123,7 @@ def chat():
                 "sender": user_email,
                 "message": f'/show_topics{{}}',
                 "metadata": {
-                    "user_id": moodle_id, 
+                    "user_id": user_id, 
                     "course_id": course_id
                 }
             }
@@ -137,18 +155,18 @@ def chat():
             #return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
         
     # check if user is in tutor mode
-    user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
+    user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
 
-    tutor = TutorModeState.query.filter_by(user_moodle_id=moodle_id, course_id=course_id).first()
+    tutor = TutorModeState.query.filter_by(user_moodle_id=user_id, course_id=course_id).first()
     if not tutor:
-        tutor = TutorModeState(user_moodle_id=moodle_id, course_id=course_id, is_active=False)
+        tutor = TutorModeState(user_moodle_id=user_id, course_id=course_id, is_active=False)
         db.session.add(tutor)
         db.session.commit()
     
     is_message_a_number = user_message.strip().isdigit()
     if user and isTutorMode:#tutor.is_active:
         if is_message_a_number:
-            app.logger.info(f"CHAT: User {moodle_id} is in tutor mode.")
+            app.logger.info(f"CHAT: User {user_id} is in tutor mode.")
             print(f"    > User message: {user_message}")
             
             current_time = datetime.now(timezone.utc).isoformat() 
@@ -156,7 +174,7 @@ def chat():
             payload = {
                 "sender": user_email,
                 "message": f'/select_topic{{}}', #"/select_topic",
-                "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id, "is_teacher": is_teacher}
+                "metadata": {"username": username, "input_time":current_time, "user_id": user_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id, "is_teacher": is_teacher}
             }
             bot_reply, buttons = call_rasa(payload)
             
@@ -164,11 +182,11 @@ def chat():
 
         else:
             # do not send the message to Rasa, just reply that the user is in tutor mode and should select a topic by sending the corresponding number
-            app.logger.info(f"User {moodle_id} is in tutor mode but sent a non-numeric message. Prompting to select a topic.")
+            app.logger.info(f"User {user_id} is in tutor mode but sent a non-numeric message. Prompting to select a topic.")
             payload = {
                 "sender": user_email,
                 "message": f'/show_topics{{}}',
-                "metadata": {"user_id": moodle_id, "course_id": course_id}
+                "metadata": {"user_id": user_id, "course_id": course_id}
             }
 
             bot_reply, buttons = call_rasa(payload)
@@ -180,13 +198,13 @@ def chat():
             return jsonify([{"text": f"You are in tutor mode.</br>Please select a topic to review.</br>{bot_reply.strip()}"}, {"buttons": buttons}])
             
     else:
-        app.logger.info(f"User {moodle_id} is in normal mode.")
+        app.logger.info(f"User {user_id} is in normal mode.")
         
         current_time = datetime.now(timezone.utc).isoformat()
         payload = {
             "sender": user_email,
             "message": user_message,
-            "metadata": {"username": username, "input_time":current_time, "user_id": moodle_id, "authorized_resources": authorized_resources, "tutor_mode": False, "course_id": course_id, "is_teacher": is_teacher}
+            "metadata": {"username": username, "input_time":current_time, "user_id": user_id, "authorized_resources": authorized_resources, "tutor_mode": False, "course_id": course_id, "is_teacher": is_teacher}
         }
 
         bot_reply, buttons = call_rasa(payload)            
@@ -423,22 +441,20 @@ def tutor_toggle():
     if moodle_url == "http://localhost":
         moodle_url = "http://host.docker.internal"
         
-    user_firstname = get_user_firstname(user_id, moodle_url, moodle_token)
-    print(f"Received message for {user_firstname} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
-    
+    cache_key = f"moodle_user_{course_id}_{user_id}"
+    info_utilizador = cache.get(cache_key)
 
-    # 1. Atualizar o estado do utilizador na BD
-    user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
-    app.logger.info(f"Received tutor toggle for user_id: {user_id} with is_active: {is_active}")
-    app.logger.info(f"Current user in DB before toggle: {user}")
-    if not user:
-        # Se o user não existir na nossa BD, criamos
+    if not info_utilizador:
+        # Se não estiver na cache, vai buscar ao Moodle e guarda na cache
+        app.logger.info(f"Cache MISS para o utilizador {user_id}. Chamando API do Moodle.")
         info_utilizador = get_moodle_user_data(user_id, moodle_token, moodle_url)
-        user_email = info_utilizador.get("email") if info_utilizador else f"user_{user_id}@example.com"
-        check_moodle_user_in_db(user_id, user_email) # Garante que o utilizador existe na BD, se não existir, cria um novo registo
-        user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
-    else: 
-        user_email = user.email
+        if info_utilizador:
+            cache.set(cache_key, info_utilizador, timeout=600) # Guarda por 10 minutos
+    else:
+        app.logger.info(f"Cache HIT para o utilizador {user_id}. Dados carregados da memória.")
+    
+    user_firstname = info_utilizador.get("name") if info_utilizador else f"user_{user_id}"     
+    print(f"--> Received message for {user_firstname} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
 
     tutor = TutorModeState.query.filter_by(user_moodle_id=user_id, course_id=course_id).first()
     if not tutor:

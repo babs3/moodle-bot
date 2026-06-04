@@ -295,9 +295,12 @@ def get_moodle_user_data(user_id, moodle_token, moodle_url):
 
         if 'users' in response_data and len(response_data['users']) > 0:
             user = response_data['users'][0]
+            # garante que o utilizador existe na BD, se não existir, cria um novo registo:
+            check_moodle_user_in_db(user_id, user['email'])
+        
             return {
-                "nome": user['firstname'],
-                "apelido": user['lastname'],
+                "name": user['firstname'],
+                "lastname": user['lastname'],
                 "email": user['email'],
             }
         
@@ -561,15 +564,6 @@ def obter_perguntas_do_quiz(quiz_id, moodle_url, moodle_token):
 
     return perguntas_extraidas
 
-def get_user_firstname(user_id, moodle_url, moodle_token):
-    
-    response = call_moodle(moodle_url, moodle_token, 'core_user_get_users', {
-        'criteria[0][key]': 'id',
-        'criteria[0][value]': user_id
-    })
-    if response and 'users' in response and response['users']:
-        return response['users'][0].get('firstname', 'Unknown')
-    return 'Unknown'
 
 def extrair_conteudo_pergunta(html_raw):
     # 1. Carregar o HTML no BeautifulSoup

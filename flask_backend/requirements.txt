@@ -23,3 +23,5 @@ Pillow
 spacy
 nltk
 bleach
+Flask-Caching
+redis

@@ -31,7 +31,7 @@ services:
     environment:
       PYTHONUNBUFFERED: "1" # Para ver os logs em tempo real
       GOOGLE_API_KEY: "${GOOGLE_API_KEY}"
-      DB_HOST: db # Gafe: Adicionado para o código saber onde está a BD
+      DB_HOST: db
       POSTGRES_USER: ${APP_DATABASE_USER}
       POSTGRES_PASSWORD: ${APP_DATABASE_PASS}
       POSTGRES_DB: ${APP_DATABASE_NAME}
@@ -56,6 +56,15 @@ services:
     networks:
       - my-project
 
+  # 💡 SERVIÇO NOVO: Adicionado o Redis para Cache
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - my-project
+
   flask-server:
     build:
       context: .
@@ -64,6 +73,7 @@ services:
     depends_on:
       - db
       - chroma
+      - redis # 💡 Adicionado aqui para o Flask esperar pelo Redis
     volumes:
       # MAPEAMENTO CORRETO: A pasta local vai para dentro da pasta /app inteira
       - ./flask_backend:/app
@@ -79,6 +89,7 @@ services:
       FLASK_APP: "app.py"  # Forçamos o Flask a focar-se no ficheiro certo
       FLASK_ENV: "development"
       DB_HOST: db 
+      REDIS_HOST: redis # 💡 Passamos o nome do serviço Redis como Host
       POSTGRES_USER: ${APP_DATABASE_USER}
       POSTGRES_PASSWORD: ${APP_DATABASE_PASS}
       POSTGRES_DB: ${APP_DATABASE_NAME}
