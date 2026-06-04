@@ -61,7 +61,7 @@ def session_init_rasa(user_email, user_firstname, user_role):
     # 2. "Injetar" o papel do utilizador no Rasa via Tracker API
     try:
         payload = {
-            "sender": user_email, # O Rasa precisa de um email para identificar o sender, mas como isto é só para definir o slot, podemos usar um placeholder
+            "sender": user_email, 
             "message": f'/set_username{{"username": "{user_firstname}", "user_role": "{user_role}"}}',
             "metadata": {"user_name": user_firstname, "user_role": user_role}
         }
@@ -110,7 +110,7 @@ def chat():
     user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
     username = info_utilizador.get("name") if info_utilizador else "NOME_"
     
-    session_init_rasa(user_email, user_firstname, "teacher" if is_teacher else "student") # Define o papel do utilizador para personalizar as respostas do Rasa
+    session_init_rasa(user_email, username, "teacher" if is_teacher else "student") # Define o papel do utilizador para personalizar as respostas do Rasa
     
     cleaned_message = clean_user_input(user_message) # Limpa a mensagem do utilizador para evitar problemas de formatação ou segurança
     app.logger.info(f"Cleaned message to send to LLM: {cleaned_message}")
@@ -119,15 +119,31 @@ def chat():
         app.logger.warning("Cleaned message is empty after cleaning. Prompting user to reformulate.")
     
         if isTutorMode:
-            payload = {
-                "sender": user_email,
-                "message": f'/show_topics{{}}',
-                "metadata": {
-                    "user_id": user_id, 
-                    "course_id": course_id
+            # 1. Criar uma chave única combinando o ID do utilizador e o ID do curso
+            # (Nota: certifica-te se estás a usar a variável 'moodle_id' ou 'user_id' no teu código)
+            cache_key_rasa = f"rasa_topics_{user_id}_{course_id}"
+            cached_rasa = cache.get(cache_key_rasa)
+
+            if cached_rasa:
+                app.logger.info(f"Cache HIT para Rasa (Tópicos) - User: {user_id}, Course: {course_id}")
+                # Desempacota o tuplo guardado na cache
+                bot_reply, buttons = cached_rasa
+            else:
+                app.logger.info(f"Cache MISS para Rasa (Tópicos). A chamar o Rasa...")
+                
+                # Se não estiver na cache, faz a chamada normal ao Rasa
+                payload = {
+                    "sender": user_email,
+                    "message": f'/show_topics{{}}',
+                    "metadata": {
+                        "user_id": user_id, 
+                        "course_id": course_id
+                    }
                 }
-            }
-            bot_reply, buttons = call_rasa(payload)
+                bot_reply, buttons = call_rasa(payload)
+                
+                cache.set(cache_key_rasa, (bot_reply, buttons), timeout=300)
+            
             if not buttons:
                 return jsonify([{"text": "Great job! 🎉 You have reviewed all topics!"}])
             return jsonify([{"text": f"You are in tutor mode.</br>Please select a topic to review.</br>{bot_reply.strip()}"}, {"buttons": buttons}])
@@ -164,7 +180,7 @@ def chat():
         db.session.commit()
     
     is_message_a_number = user_message.strip().isdigit()
-    if user and isTutorMode:#tutor.is_active:
+    if user and isTutorMode:
         if is_message_a_number:
             app.logger.info(f"CHAT: User {user_id} is in tutor mode.")
             print(f"    > User message: {user_message}")
@@ -183,13 +199,28 @@ def chat():
         else:
             # do not send the message to Rasa, just reply that the user is in tutor mode and should select a topic by sending the corresponding number
             app.logger.info(f"User {user_id} is in tutor mode but sent a non-numeric message. Prompting to select a topic.")
-            payload = {
-                "sender": user_email,
-                "message": f'/show_topics{{}}',
-                "metadata": {"user_id": user_id, "course_id": course_id}
-            }
+            cache_key_rasa = f"rasa_topics_{user_id}_{course_id}"
+            cached_rasa = cache.get(cache_key_rasa)
 
-            bot_reply, buttons = call_rasa(payload)
+            if cached_rasa:
+                app.logger.info(f"Cache HIT para Rasa (Tópicos) - User: {user_id}, Course: {course_id}")
+                # Desempacota o tuplo guardado na cache
+                bot_reply, buttons = cached_rasa
+            else:
+                app.logger.info(f"Cache MISS para Rasa (Tópicos). A chamar o Rasa...")
+                
+                # Se não estiver na cache, faz a chamada normal ao Rasa
+                payload = {
+                    "sender": user_email,
+                    "message": f'/show_topics{{}}',
+                    "metadata": {
+                        "user_id": user_id, 
+                        "course_id": course_id
+                    }
+                }
+                bot_reply, buttons = call_rasa(payload)
+                
+                cache.set(cache_key_rasa, (bot_reply, buttons), timeout=300)
             
             print(f"\nResposta final para o frontend: {bot_reply.strip()} com botões: {buttons}")
             if not buttons:
@@ -452,10 +483,15 @@ def tutor_toggle():
             cache.set(cache_key, info_utilizador, timeout=600) # Guarda por 10 minutos
     else:
         app.logger.info(f"Cache HIT para o utilizador {user_id}. Dados carregados da memória.")
-    
-    user_firstname = info_utilizador.get("name") if info_utilizador else f"user_{user_id}"     
-    print(f"--> Received message for {user_firstname} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
 
+    # Busca os dados reais no Moodle
+    user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
+    username = info_utilizador.get("name") if info_utilizador else "NOME_"
+    print(f"--> Received message for {username} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
+    
+    session_init_rasa(user_email, username, "teacher" if is_teacher else "student") # Define o papel do utilizador para personalizar as respostas do Rasa
+    
+    
     tutor = TutorModeState.query.filter_by(user_moodle_id=user_id, course_id=course_id).first()
     if not tutor:
         tutor = TutorModeState(user_moodle_id=user_id, course_id=course_id, is_active=is_active)
@@ -586,9 +622,7 @@ def tutor_toggle():
             if temas:
                 msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}.  Would you like to review these points with me?<br/>"
                     
-
-    app.logger.info(f"--> user email: {user_email}")
-    session_init_rasa(user_email, user_firstname, "teacher" if is_teacher else "student") # Define o papel do utilizador para personalizar as respostas do Rasa
+    cache_key_rasa = f"rasa_topics_{user_id}_{course_id}"
     
     payload = {
         "sender": user_email,
@@ -599,6 +633,7 @@ def tutor_toggle():
             }
     }
     bot_reply, buttons = call_rasa(payload)
+    cache.set(cache_key_rasa, (bot_reply, buttons), timeout=300)
     
     return jsonify([{"text": f"{msg}\n\n{bot_reply.strip()}"}, {"buttons": buttons}])
             
