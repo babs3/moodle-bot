@@ -7,14 +7,8 @@ class MoodleUsers(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     moodle_id = db.Column(db.Integer, unique=True, nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
+    full_name = db.Column(db.String(255), nullable=True)
     
-class TutorModeState(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_moodle_id = db.Column(db.Integer, db.ForeignKey('moodle_users.moodle_id', ondelete="CASCADE"), nullable=False)
-    course_id = db.Column(db.Integer, nullable=False)
-    is_active = db.Column(db.Boolean, default=False)
-    last_updated = db.Column(db.DateTime, default=datetime.now)
-
 class MoodleQuizAnalysis(db.Model):
     """
     Regista a última análise feita a um quiz específico para evitar repetições.

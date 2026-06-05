@@ -17,8 +17,7 @@ import bleach
 from models import *
 from seed_db import qa_bank
 
-#RASA_URL = "http://rasa:5005/webhooks/rest/webhook"
-RASA_BASE_URL = "http://rasa:5005"
+RASA_URL = "http://rasa:5005/webhooks/rest/webhook"
 
 # --- SCRIPT DE POPULAÇÃO ---
 def populate_database(course_id=2):
@@ -132,6 +131,21 @@ def populate_database(course_id=2):
         db.session.rollback()
         print(f"Erro ao commitar transação: {e}")
 
+def session_init_rasa(user_email, user_firstname, user_role):
+    # 2. "Injetar" o papel do utilizador no Rasa via Tracker API
+    try:
+        payload = {
+            "sender": user_email, 
+            "message": f'/set_username{{"username": "{user_firstname}", "user_role": "{user_role}"}}',
+            "metadata": {"user_name": user_firstname, "user_role": user_role}
+        }
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(RASA_URL, json=payload, headers=headers)
+        print(f"Rasa session init response: {response.status_code} - {response.text}")
+            
+    except Exception as e:
+        print(f"Erro ao definir slot: {e}")
+        
 def clean_user_input(user_message):
     # 1. Validação de tamanho (Evita estouro de tokens/custos altos)
     # 1000 caracteres costuma ser mais que suficiente para uma dúvida
@@ -206,16 +220,16 @@ def obter_quiz_local(course_id, quiz_id):
     else:
         return None
 
-def check_moodle_user_in_db(moodle_id, email):
+def check_moodle_user_in_db(moodle_id, email, full_name):
     # Ver se o utilizador já existe na nossa BD, se não existir, criar
     moodle_user = MoodleUsers.query.filter_by(moodle_id=moodle_id).first()
     if not moodle_user:
-        moodle_user = MoodleUsers(moodle_id=moodle_id, email=email)
+        moodle_user = MoodleUsers(moodle_id=moodle_id, email=email, full_name=full_name)
         db.session.add(moodle_user)
         db.session.commit()
-        print(f"Created new Moodle user in DB: {email} (ID: {moodle_id})")
+        print(f"Created new Moodle user in DB: {full_name} ({email}) (ID: {moodle_id})")
     else:
-        print(f"Moodle user already exists in DB: {email} (ID: {moodle_id})")
+        print(f"Moodle user already exists in DB: {full_name} ({email}) (ID: {moodle_id})")
 
 def analisar_desempenho_aluno(quiz_data):
     erros = []
@@ -296,7 +310,7 @@ def get_moodle_user_data(user_id, moodle_token, moodle_url):
         if 'users' in response_data and len(response_data['users']) > 0:
             user = response_data['users'][0]
             # garante que o utilizador existe na BD, se não existir, cria um novo registo:
-            check_moodle_user_in_db(user_id, user['email'])
+            check_moodle_user_in_db(user_id, user['email'], user['firstname'] + " " + user['lastname'])
         
             return {
                 "name": user['firstname'],
@@ -486,7 +500,7 @@ def call_rasa(payload):
     headers = {"Content-Type": "application/json"}
 
     try:
-        response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", json=payload, headers=headers)
+        response = requests.post(RASA_URL, json=payload, headers=headers)
         response.raise_for_status()
         messages = response.json()
         
@@ -595,7 +609,7 @@ def criar_topicos_para_perguntas(pergunta_id_texto):
 
     lista_perguntas_final = []
     try:
-        response = requests.post(RASA_BASE_URL + "/webhooks/rest/webhook", data=json.dumps(payload), headers=headers)
+        response = requests.post(RASA_URL, data=json.dumps(payload), headers=headers)
         response.raise_for_status()
         messages = response.json() 
         print(f">> DEBUG COMPLETO RASA: {json.dumps(messages, indent=2)}")

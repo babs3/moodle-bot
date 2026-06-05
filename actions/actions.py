@@ -849,6 +849,9 @@ class ActionAnalyzeProgress(Action):
         if not user_message:
             dispatcher.utter_message(text="I couldn't identify the topic.")
             return []
+        else:
+            # clean '#' from the beginning of the topic ID
+            user_message = user_message[1:]
         
         topic = requests.get(f"http://flask-server:8080/api/get_topics_from_ids", json={"topics_ids": [user_message]})
         topic_name = topic.json()[0].get("name", "the selected topic") if topic.status_code == 200 else "the selected topic"
@@ -902,10 +905,10 @@ class ActionAnalyzeProgress(Action):
         
         content_found = True
         if bm25_docs == [] and bm25_meta == []:
-            print(f"\n⚠️  BM25 search returned no results for user query: '{user_message}'")
+            print(f"\n⚠️  BM25 search returned no results for question: '{progress_data['question']}'")
             content_found = False
         elif normalized_bm25_scores == []:
-            print(f"\n⚠️  Normalized BM25 scores is empty for user query: '{user_message}'")
+            print(f"\n⚠️  Normalized BM25 scores is empty for question: '{progress_data['question']}'")
             content_found = False
         
         if complex_tokens:
