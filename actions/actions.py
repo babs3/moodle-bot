@@ -228,6 +228,7 @@ class ActionSetUsername(Action):
             return [SlotSet("username", user_name), SlotSet("user_role", user_role)]
         else:
             return []
+        
 
 def keywords_to_tokens(keywords, query, context):
     """
@@ -844,8 +845,7 @@ class ActionAnalyzeProgress(Action):
         
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
-        #user_message = tracker.latest_message.get("metadata", {}).get("user_message", None)
-        topic_id = tracker.get_slot("selected_topic")
+        topic_id = tracker.latest_message.get("metadata", {}).get("topic_id", None)
         print(f"🎓  User {user_id} from course {course_id} selected topic ID: {topic_id}")
         
         if not topic_id:

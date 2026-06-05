@@ -16,18 +16,13 @@ intents:
   - view_metrics
   - ask_course_info
   - show_topics
-  - select_topic
+  - analyze_progress
 
 entities:
   - concept
   - context
 
 slots:
-
-  selected_topic:
-    type: text
-    mappings:
-      - type: custom
 
   concept:
     type: text
@@ -148,6 +143,7 @@ responses:
 
 actions:
 - action_set_username
+- action_set_topic_id
 - action_show_topics_for_selection
 - action_analyze_progress
 - action_get_definition

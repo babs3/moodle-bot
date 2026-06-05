@@ -27,6 +27,11 @@ rules:
   - intent: set_username
   - action: action_set_username
 
+- rule: Set topic id
+  steps:
+  - intent: set_topic_id
+  - action: action_set_topic_id
+
 - rule: Handle definition request
   condition:
   - slot_was_set:
@@ -90,7 +95,7 @@ rules:
 
 - rule: Analisar progresso após clique no botão
   steps:
-    - intent: select_topic
+    - intent: analyze_progress
     - action: action_analyze_progress
 
 - rule: Create Topics

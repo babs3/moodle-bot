@@ -175,14 +175,14 @@ def chat():
             app.logger.info(f"\nCHAT: User {user_id} is in tutor mode and clicked a button.")
             print(f"button payload received: {user_message}")
             current_time = datetime.now(timezone.utc).isoformat() 
-
+            
             payload = {
                 "sender": user_email,
-                "message": user_message,
-                "metadata": {"username": username, "input_time":current_time, "user_id": user_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id, "is_teacher": is_teacher}
+                "message": "/analyze_progress",
+                "metadata": {"username": username, "input_time":current_time, "user_id": user_id, "authorized_resources": authorized_resources, "tutor_mode": True, "topic_id": user_message, "course_id": course_id, "is_teacher": is_teacher}
             }
             bot_reply, buttons = call_rasa(payload)
-            
+
             return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
 
         else:            
@@ -208,10 +208,8 @@ def chat():
                     }
                 }
                 bot_reply, buttons = call_rasa(payload)
-                
                 cache.set(cache_key_rasa, (bot_reply, buttons), timeout=300)
             
-            print(f"\nResposta final para o frontend: {bot_reply.strip()} com botões: {buttons}")
             if not buttons:
                 return jsonify([{"text": " Great job! 🎉 You have reviewed all topics!"}])
                     
