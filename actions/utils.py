@@ -837,7 +837,7 @@ def create_topics_buttons(user_id, course_id):
     for topic in topics_list:
         buttons.append({
             "title": topic.get("name"),
-            "payload": '#' + topic.get("id")
+            "payload": "/select_topic{'selected_topic':" + f"'{topic.get('id')}'" + "}"
         })
         
     return buttons

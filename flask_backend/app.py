@@ -66,6 +66,8 @@ def chat():
     moodle_token = data.get('token')
     moodle_url = data.get('moodle_url')
     isTutorMode = data.get('tutor_mode', False)
+    is_button = data.get('is_button', False)
+    print(f"Received chat request: message='{user_message}', tutor_mode={isTutorMode}, is_button={is_button}")
     is_teacher = data.get('is_teacher', False)
     if moodle_url == "http://localhost":
         moodle_url = "http://host.docker.internal"
@@ -99,7 +101,7 @@ def chat():
     
     # Limpa a mensagem do utilizador para evitar problemas de formatação ou segurança
     cleaned_message = clean_user_input(user_message)
-    app.logger.info(f"Cleaned message to send to LLM: {cleaned_message}")
+    #app.logger.info(f"Cleaned message to send to LLM: {cleaned_message}")
     
     if cleaned_message == "":
         # houve algum problema na limpeza da mensagem, ou seja, a mensagem era composta apenas por caracteres indesejados. Neste caso, respondemos ao utilizador pedindo para reformular a mensagem.
@@ -168,24 +170,22 @@ def chat():
     # check if user is in tutor mode
     user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
 
-    is_message_a_number = user_message[1:].strip().isdigit()
     if user and isTutorMode:
-        if is_message_a_number:
-            app.logger.info(f"\nCHAT: User {user_id} is in tutor mode.")
-            print(f"    > User message: {user_message}")
-            
+        if is_button:
+            app.logger.info(f"\nCHAT: User {user_id} is in tutor mode and clicked a button.")
+            print(f"button payload received: {user_message}")
             current_time = datetime.now(timezone.utc).isoformat() 
 
             payload = {
                 "sender": user_email,
-                "message": f'/select_topic{{}}',
+                "message": user_message,
                 "metadata": {"username": username, "input_time":current_time, "user_id": user_id, "authorized_resources": authorized_resources, "tutor_mode": True, "user_message": user_message, "course_id": course_id, "is_teacher": is_teacher}
             }
             bot_reply, buttons = call_rasa(payload)
             
             return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
 
-        else:
+        else:            
             # do not send the message to Rasa, just reply that the user is in tutor mode and should select a topic by sending the corresponding number
             app.logger.info(f"User {user_id} is in tutor mode but sent a non-numeric message. Prompting to select a topic.")
             cache_key_rasa = f"rasa_topics_{user_id}_{course_id}"
@@ -219,6 +219,7 @@ def chat():
             
     else:
         app.logger.info(f"User {user_id} is in normal mode.")
+        app.logger.info(f"Cleaned message to send to LLM: {user_message}")
         
         current_time = datetime.now(timezone.utc).isoformat()
         payload = {

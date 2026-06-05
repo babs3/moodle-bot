@@ -844,20 +844,19 @@ class ActionAnalyzeProgress(Action):
         
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
-        user_message = tracker.latest_message.get("metadata", {}).get("user_message", None)
-
-        if not user_message:
+        #user_message = tracker.latest_message.get("metadata", {}).get("user_message", None)
+        topic_id = tracker.get_slot("selected_topic")
+        print(f"🎓  User {user_id} from course {course_id} selected topic ID: {topic_id}")
+        
+        if not topic_id:
             dispatcher.utter_message(text="I couldn't identify the topic.")
             return []
-        else:
-            # clean '#' from the beginning of the topic ID
-            user_message = user_message[1:]
         
-        topic = requests.get(f"http://flask-server:8080/api/get_topics_from_ids", json={"topics_ids": [user_message]})
+        topic = requests.get(f"http://flask-server:8080/api/get_topics_from_ids", json={"topics_ids": [topic_id]})
         topic_name = topic.json()[0].get("name", "the selected topic") if topic.status_code == 200 else "the selected topic"
-        print(f"📚  User selected topic ID: {user_message}, name: {topic_name}")
+        print(f"📚  User selected topic ID: {topic_id}, name: {topic_name}")
         
-        progress = requests.get(f"http://flask-server:8080/api/get_user_progress_by_topic", params={"user_id": user_id, "course_id": course_id, "topic_id": user_message})
+        progress = requests.get(f"http://flask-server:8080/api/get_user_progress_by_topic", params={"user_id": user_id, "course_id": course_id, "topic_id": topic_id})
         if progress.status_code == 200:
             progress_data = progress.json()
             print(f"📊  User progress data for topic {topic_name} retrieved: {progress_data}")
@@ -900,7 +899,7 @@ class ActionAnalyzeProgress(Action):
         
         print(f"\n🔍  Starting search process in resources: {authorized_resources}")
         # Hybrid Search Process    
-        vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(intent, complex_tokens, simple_tokens, context, user_message, collection, authorized_resources)        
+        vector_docs, vector_metadata, normalized_vector_scores = dense_vector_search(intent, complex_tokens, simple_tokens, context, topic_id, collection, authorized_resources)        
         bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id)
         
         content_found = True
