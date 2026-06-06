@@ -825,9 +825,11 @@ class ActionShowTopicsForSelection(Action):
         
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
+        moodle_url = tracker.latest_message.get("metadata", {}).get("moodle_url")
+        moodle_token = tracker.latest_message.get("metadata", {}).get("moodle_token")
         print(f"🎓  User {user_id} from course {course_id}.")
         
-        buttons = create_topics_buttons(user_id, course_id)
+        buttons = create_topics_buttons(user_id, course_id, moodle_url, moodle_token)
             
         dispatcher.utter_message(text="", buttons=buttons)
         return []
@@ -843,6 +845,8 @@ class ActionAnalyzeProgress(Action):
         
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+        moodle_url = tracker.latest_message.get("metadata", {}).get("moodle_url")
+        moodle_token = tracker.latest_message.get("metadata", {}).get("moodle_token")
         topic_id = tracker.latest_message.get("metadata", {}).get("topic_id", None)
         print(f"🎓  User {user_id} from course {course_id} selected topic ID: {topic_id}")
         
@@ -1005,7 +1009,7 @@ class ActionAnalyzeProgress(Action):
         else:
             print(f"❌  Failed to update progress entries for topic. Status code: {update_response.status_code}")
 
-        buttons = create_topics_buttons(user_id, course_id)
+        buttons = create_topics_buttons(user_id, course_id, moodle_url, moodle_token)
         if not buttons:
             dispatcher.utter_message(text=f"{html_feedback}<br/><br/>{location_materials_text}<br/><br/>You have reviewed all topics! Great job! 🎉")
         else:

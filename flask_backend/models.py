@@ -54,6 +54,7 @@ class MoodleUserHistory(db.Model):
     
 class TutorProgress(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    last_attempt_id = db.Column(db.Integer, nullable=True)  # ID da última tentativa do quiz analisada
     course_id = db.Column(db.Integer, nullable=False)
     user_moodle_id = db.Column(db.Integer, db.ForeignKey('moodle_users.moodle_id', ondelete="CASCADE"), nullable=False)
     tipo = db.Column(db.String(50), nullable=False)  # Ex: "TrueFalse", "MultipleChoice", "ShortAnswer"

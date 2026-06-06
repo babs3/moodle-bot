@@ -126,7 +126,9 @@ def chat():
                     "message": '/show_topics',
                     "metadata": {
                         "user_id": user_id, 
-                        "course_id": course_id
+                        "course_id": course_id,
+                        "moodle_url": moodle_url,
+                        "moodle_token": moodle_token
                     }
                 }
                 bot_reply, buttons = call_rasa(payload)
@@ -179,7 +181,18 @@ def chat():
             payload = {
                 "sender": user_email,
                 "message": "/analyze_progress",
-                "metadata": {"username": username, "input_time":current_time, "user_id": user_id, "authorized_resources": authorized_resources, "tutor_mode": True, "topic_id": user_message, "course_id": course_id, "is_teacher": is_teacher}
+                "metadata": {
+                    "username": username,
+                    "input_time":current_time,
+                    "user_id": user_id,
+                    "authorized_resources": authorized_resources,
+                    "tutor_mode": True,
+                    "topic_id": user_message,
+                    "course_id": course_id,
+                    "is_teacher": is_teacher,
+                    "moodle_url": moodle_url,
+                    "moodle_token": moodle_token
+                }
             }
             bot_reply, buttons = call_rasa(payload)
             
@@ -189,8 +202,10 @@ def chat():
                 "message": '/show_topics',
                 "metadata": {
                     "user_id": user_id, 
-                    "course_id": course_id
-                    }
+                    "course_id": course_id,
+                    "moodle_url": moodle_url,
+                    "moodle_token": moodle_token
+                }
             }
             cache_bot_reply, cache_buttons = call_rasa(payload)
             cache.set(cache_key_rasa, (cache_bot_reply, cache_buttons), timeout=300)
@@ -216,7 +231,9 @@ def chat():
                     "message": '/show_topics',
                     "metadata": {
                         "user_id": user_id, 
-                        "course_id": course_id
+                        "course_id": course_id,
+                        "moodle_url": moodle_url,
+                        "moodle_token": moodle_token
                     }
                 }
                 bot_reply, buttons = call_rasa(payload)
@@ -521,6 +538,7 @@ def tutor_toggle():
             user_moodle_id=user_id, 
             quiz_id=quiz_id
         ).first()
+        print(f"Análise existente para quiz_id {quiz_id} e user_id {user_id}: {analise}")
 
         msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
         if not analise: # not pending and not reviewed, ou seja, nunca analisámos este quiz para este aluno
@@ -595,8 +613,16 @@ def tutor_toggle():
                 msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}. Would you like to review these points with me?<br/>"
             else:
                 return jsonify([{"text": msg}])
-        
         else:
+            if analise.last_attempt_id != attempt_id:
+                # Houve uma nova tentativa desde a última análise, atualizar o registo para permitir nova análise
+                app.logger.info(f"Nova tentativa detectada para quiz_id {quiz_id} e user_id {user_id}. Atualizando análise para permitir nova revisão.")
+                analise.state = "pending"
+                analise.last_attempt_id = attempt_id
+                db.session.commit()
+                
+                
+                
             app.logger.info(f"Quiz_id: {quiz_id} para user_id: {user_id} já foi analisado anteriormente com estado '{analise.state}'.")
     
             temas_id = list(set([p.topic_id for p in TutorProgress.query.filter_by(
@@ -620,8 +646,10 @@ def tutor_toggle():
         "message": '/show_topics',
         "metadata": {
             "user_id": user_id, 
-            "course_id": course_id
-            }
+            "course_id": course_id,
+            "moodle_url": moodle_url,
+            "moodle_token": moodle_token
+        }
     }
     bot_reply, buttons = call_rasa(payload)
     cache.set(cache_key_rasa, (bot_reply, buttons), timeout=300)
@@ -633,6 +661,8 @@ def tutor_toggle():
 def get_user_progress():
     user_id = request.args.get('user_id')
     course_id = request.args.get('course_id')
+    moodle_url = request.args.get('moodle_url')
+    moodle_token = request.args.get('moodle_token')
     all_questions = request.args.get('all_questions', 'false').lower() == 'true' # Se for true, traz todas as questões, se for false, só as pendentes
     
     # Validação simples de segurança se os parâmetros não vierem
@@ -656,6 +686,9 @@ def get_user_progress():
             ).first()
             if analise:
                 analise.state = "reviewed"
+                attempt_id = get_last_attempt_id(quiz_id, user_id, moodle_url, moodle_token)
+                analise.last_attempt_id = attempt_id
+                
                 db.session.commit()
                 app.logger.info(f"Análise do quiz_id {quiz_id} atualizada para 'reviewed' para o usuário {user_id} no curso {course_id}.")
         else:

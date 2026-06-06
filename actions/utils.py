@@ -802,9 +802,9 @@ def update_materials_location(selected_results):
     
     return location_results, pdfs_insights  # Return both the formatted results and the list of PDFs
     
-def create_topics_buttons(user_id, course_id):
+def create_topics_buttons(user_id, course_id, moodle_url, moodle_token):
     # get user progress
-    progress = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id, "all_questions": False})
+    progress = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id, "all_questions": False, "moodle_url": moodle_url, "moodle_token": moodle_token})
     if progress.status_code == 200:
         progress_data = progress.json()
         print(f"📊  User progress data retrieved: {progress_data}")
@@ -814,7 +814,7 @@ def create_topics_buttons(user_id, course_id):
         
     if progress_data == []:
         print(f"⚠️  all questions were already reviewd")
-        progress_data = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id, "all_questions": True})
+        progress_data = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id, "all_questions": True, "moodle_url": moodle_url, "moodle_token": moodle_token})
         return []
     
     # A tua lista de tópicos (pode vir de uma BD, API ou slot)
