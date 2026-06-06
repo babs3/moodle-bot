@@ -215,8 +215,6 @@ class ActionSetUsername(Action):
             tracker: Tracker,
             domain: dict):
         
-        #print(f"DEBUG TRACKER SLOTS: {tracker.current_slot_values()}")
-        
         sender_id = tracker.sender_id
         # Extract metadata
         metadata = tracker.latest_message.get("metadata", {})

@@ -123,7 +123,7 @@ def chat():
                 # Se não estiver na cache, faz a chamada normal ao Rasa
                 payload = {
                     "sender": user_email,
-                    "message": f'/show_topics{{}}',
+                    "message": '/show_topics',
                     "metadata": {
                         "user_id": user_id, 
                         "course_id": course_id
@@ -182,6 +182,18 @@ def chat():
                 "metadata": {"username": username, "input_time":current_time, "user_id": user_id, "authorized_resources": authorized_resources, "tutor_mode": True, "topic_id": user_message, "course_id": course_id, "is_teacher": is_teacher}
             }
             bot_reply, buttons = call_rasa(payload)
+            
+            cache_key_rasa = f"rasa_topics_{user_id}_{course_id}"
+            payload = {
+                "sender": user_email,
+                "message": '/show_topics',
+                "metadata": {
+                    "user_id": user_id, 
+                    "course_id": course_id
+                    }
+            }
+            cache_bot_reply, cache_buttons = call_rasa(payload)
+            cache.set(cache_key_rasa, (cache_bot_reply, cache_buttons), timeout=300)
 
             return jsonify([{"text": f"{bot_reply.strip()}"}, {"buttons": buttons}])
 
@@ -201,7 +213,7 @@ def chat():
                 # Se não estiver na cache, faz a chamada normal ao Rasa
                 payload = {
                     "sender": user_email,
-                    "message": f'/show_topics{{}}',
+                    "message": '/show_topics',
                     "metadata": {
                         "user_id": user_id, 
                         "course_id": course_id
@@ -510,6 +522,7 @@ def tutor_toggle():
             quiz_id=quiz_id
         ).first()
 
+        msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
         if not analise: # not pending and not reviewed, ou seja, nunca analisámos este quiz para este aluno
             # Temos uma tentativa nova! Analisar...
             review_data = get_quiz_attempt_review(attempt_id, moodle_url, moodle_token)
@@ -581,7 +594,6 @@ def tutor_toggle():
                 
                 msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}. Would you like to review these points with me?<br/>"
             else:
-                msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
                 return jsonify([{"text": msg}])
         
         else:
@@ -605,7 +617,7 @@ def tutor_toggle():
     
     payload = {
         "sender": user_email,
-        "message": f'/show_topics{{}}',
+        "message": '/show_topics',
         "metadata": {
             "user_id": user_id, 
             "course_id": course_id

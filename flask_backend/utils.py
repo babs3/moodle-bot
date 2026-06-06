@@ -136,7 +136,7 @@ def session_init_rasa(user_email, user_firstname, user_role):
     try:
         payload = {
             "sender": user_email, 
-            "message": f'/set_username{{"username": "{user_firstname}", "user_role": "{user_role}"}}',
+            "message": f'/set_username', #{{"username": "{user_firstname}", "user_role": "{user_role}"}}
             "metadata": {"user_name": user_firstname, "user_role": user_role}
         }
         headers = {"Content-Type": "application/json"}
