@@ -545,29 +545,6 @@ def obter_perguntas_do_quiz(quiz_id, moodle_url, moodle_token):
         return []
 
     attempt_id = tentativa['attempt']['id']
-    perguntas_extraidas = []
-
-    # --- 4. Ler as perguntas (incluindo múltiplas páginas) ---
-    perguntas_extraidas = []
-    pagina = 0
-    while True:
-        dados = call_moodle(moodle_url, moodle_token, 'mod_quiz_get_attempt_data', {'attemptid': attempt_id, 'page': pagina})
-        if 'questions' not in dados or not dados['questions']:
-            break
-        print(f"...dados['questions']: {dados['questions']}")
-            
-        for q in dados['questions']:
-            texto = extrair_conteudo_pergunta(q['html'])
-            perguntas_extraidas.append({
-                'moodle_question_id': q['slot'],
-                'type': q['type'],
-                'texto_pergunta': texto
-            })
-        
-        if 'nextpage' in dados and dados['nextpage'] != -1:
-            pagina = dados['nextpage']
-        else:
-            break
 
     # --- 5. FECHAR A TENTATIVA (Obrigatório para a próxima execução funcionar) ---
     print(f"Finalizando tentativa {attempt_id}...")
@@ -575,8 +552,38 @@ def obter_perguntas_do_quiz(quiz_id, moodle_url, moodle_token):
         'attemptid': attempt_id,
         'finishattempt': 1
     })
+    
+    # --- 6. IR BUSCAR O FEEDBACK (Agora que já está fechada) ---
+    # Nota: passas a página -1 para ir buscar TODAS as perguntas e feedbacks de uma vez
+    dados_revisao = call_moodle(moodle_url, moodle_token, 'mod_quiz_get_attempt_review', {
+        'attemptid': attempt_id,
+        'page': -1 
+    })
 
-    return perguntas_extraidas
+    # Vamos atualizar a lista com o feedback do professor
+    perguntas_com_feedback = []
+    if 'questions' in dados_revisao:
+        for q in dados_revisao['questions']:
+            texto_pergunta = extrair_conteudo_pergunta(q['html'])
+            feedback_geral = extrair_feedback_geral(q['html']) 
+
+            perguntas_com_feedback.append({
+                'moodle_question_id': q['slot'],
+                'type': q['type'],
+                'texto_pergunta': texto_pergunta,
+                'feedback_geral': feedback_geral
+            })
+            
+    return perguntas_com_feedback
+
+def extrair_feedback_geral(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+    # O Moodle standard usa a classe 'generalfeedback' para o texto do professor
+    div_feedback = soup.find('div', class_='generalfeedback')
+    
+    if div_feedback:
+        return div_feedback.get_text(strip=True)
+    return ""
 
 
 def extrair_conteudo_pergunta(html_raw):
@@ -657,7 +664,8 @@ def popular_db(course_id, quiz_id, perguntas):
             course_id=course_id,
             quiz_id=quiz_id,
             question=p.get('question'),
-            topic_id=topic_id
+            topic_id=topic_id,
+            question_feedback=p.get('feedback', "")
         )
         db.session.add(nova_questao)
     db.session.commit()

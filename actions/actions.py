@@ -548,6 +548,7 @@ class ActionCreateTopics(Action):
         {
             "id": "original_moodle_question_id",
             "question": "original_question_text",
+            "feedback": "original_feedback_text_if_available_or_empty_string",
             "topic": "generated_topic_in_english_or_empty_string"
         }
         ]
@@ -558,7 +559,8 @@ class ActionCreateTopics(Action):
         for pergunta in perguntas:
             moodle_id = str(pergunta.get("moodle_question_id", ""))
             texto_pergunta = pergunta.get("texto_pergunta", "")
-            user_prompt += f"- ID: {moodle_id}, question: {texto_pergunta}\n"
+            feedback = pergunta.get("feedback_geral", "")
+            user_prompt += f"- ID: {moodle_id}, question: {texto_pergunta}, feedback: {feedback}\n"
             
         try:
             # 3. INICIALIZAÇÃO DO MODELO
