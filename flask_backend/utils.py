@@ -459,7 +459,6 @@ def get_last_attempt_id(quiz_id, user_id, moodle_url, moodle_token):
             return None
 
         # Ordenar tentativas pelo ID (a mais recente terá o ID maior)
-        # Ou podes filtrar apenas as que têm o state 'finished'
         attempts.sort(key=lambda x: x['id'], reverse=True)
         
         last_attempt = attempts[0]
@@ -555,6 +554,7 @@ def obter_perguntas_do_quiz(quiz_id, moodle_url, moodle_token):
         dados = call_moodle(moodle_url, moodle_token, 'mod_quiz_get_attempt_data', {'attemptid': attempt_id, 'page': pagina})
         if 'questions' not in dados or not dados['questions']:
             break
+        print(f"...dados['questions']: {dados['questions']}")
             
         for q in dados['questions']:
             texto = extrair_conteudo_pergunta(q['html'])

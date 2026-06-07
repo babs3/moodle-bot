@@ -576,11 +576,13 @@ def tutor_toggle():
                     ).first()
                     
                     if progresso_existente:
-                        app.logger.info(f"Progresso já existe para este erro específico, não criando duplicado. Detalhes: {progresso_existente}")
+                        progresso_existente.last_attempt_id = attempt_id
+                        #app.logger.info(f"Progresso já existe para este erro específico, não criando duplicado. Detalhes: {progresso_existente}")
                         continue
                     
                     progresso = TutorProgress(
                         course_id=course_id,
+                        last_attempt_id=attempt_id,
                         user_moodle_id=user_id,
                         tipo=error.get('tipo'),
                         quiz_id=question_data.quiz_id if question_data else None,
@@ -621,8 +623,64 @@ def tutor_toggle():
                 analise.last_attempt_id = attempt_id
                 db.session.commit()
                 
+                # eliminar registos de progresso pendentes relacionados a esta tentativa antiga, para evitar confusão com os novos erros que vamos analisar agora
+                progresso_existente = TutorProgress.query.filter_by(
+                            last_attempt_id=attempt_id,
+                            course_id=course_id,
+                            user_moodle_id=user_id,
+                        ).first()
+                if progresso_existente:
+                    db.session.delete(progresso_existente)
+                    db.session.commit()
                 
+                # Temos uma tentativa nova! Analisar...
+                review_data = get_quiz_attempt_review(attempt_id, moodle_url, moodle_token)
+                erros = analisar_desempenho_aluno(review_data) # A tua função BS4
+                if erros:
+                    novos_erros_encontrados.extend(erros)
                 
+                # Preparar Resposta para o Aluno
+                if novos_erros_encontrados:
+                    app.logger.info(f"Novos erros encontrados para user_id {user_id}: {novos_erros_encontrados}")
+                    
+                    # Agora iteramos sobre a lista de objetos reais
+                    for error in novos_erros_encontrados:
+                        
+                        error_question = error.get('question', 'N/A')
+                        # get question topic from db
+                        question_data = MoodleQuizData.query.filter_by(question=error_question).first()
+                        topic_id = question_data.topic_id if question_data else None
+                        # atualizar o erro com o topic_id encontrado
+                        error['topic_id'] = topic_id
+
+                        # Guardar o progresso                                                
+                        progresso = TutorProgress(
+                            course_id=course_id,
+                            last_attempt_id=attempt_id,
+                            user_moodle_id=user_id,
+                            tipo=error.get('tipo'),
+                            quiz_id=question_data.quiz_id if question_data else None,
+                            topic_id=error.get('topic_id'),
+                            question=error.get('question'),
+                            student_answer=error.get('student_answer'),
+                            correct_answer=error.get('correct_answer'),
+                            state="pending"
+                        )
+                        db.session.add(progresso)
+
+                    db.session.commit()
+
+                
+                    temas_id = list(set([e['topic_id'] for e in novos_erros_encontrados]))
+                    temas = []
+                    for topic_id in temas_id:
+                        topic = Topics.query.filter_by(id=topic_id).first()
+                        if topic:
+                            temas.append("<strong>" + topic.name + "</strong>")
+                    
+                    msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}. Would you like to review these points with me?<br/>"
+                    
+                    
             app.logger.info(f"Quiz_id: {quiz_id} para user_id: {user_id} já foi analisado anteriormente com estado '{analise.state}'.")
     
             temas_id = list(set([p.topic_id for p in TutorProgress.query.filter_by(
