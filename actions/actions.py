@@ -942,8 +942,8 @@ class ActionAnalyzeProgress(Action):
 
         system_instruction = """
         # ROLE:
-        You are an empathetic, precise, and encouraging AI Tutor. Your job is to analyze a student's wrong answer in a quiz, compare it with the correct course material, and explain why their answer was incorrect and how to reach the right conclusion.
-
+        You are an empathetic, precise, and encouraging AI Tutor. Your job is to analyze a student's wrong answer in a quiz, compare it with the correct course material, and explain why their answer was incorrect and how to reach the right conclusion. If Question Feedback is available, use it to enrich your explanation.
+        
         # RULES:
         1. NO MARKDOWN: Do NOT use asterisks (**), hashtags (#), or markdown lists.
         2. HTML ONLY: Use <b>text</b> for emphasis, <ul><li></li></ul> for lists, and <br> for line breaks.
@@ -967,6 +967,7 @@ class ActionAnalyzeProgress(Action):
         - Question Asked: {progress_data['question']}
         - Student's Answer: {progress_data['student_answer']}
         - Correct Answer: {progress_data['correct_answer']}
+        - Question Feedback (if any): {progress_data['question_feedback']}
 
         Please provide the HTML feedback analysis.
         """

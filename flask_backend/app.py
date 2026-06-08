@@ -590,6 +590,7 @@ def tutor_toggle():
                         question=error.get('question'),
                         student_answer=error.get('student_answer'),
                         correct_answer=error.get('correct_answer'),
+                        question_feedback=error.get('question_feedback'),
                         state="pending"
                     )
                     db.session.add(progresso)
@@ -664,6 +665,7 @@ def tutor_toggle():
                             question=error.get('question'),
                             student_answer=error.get('student_answer'),
                             correct_answer=error.get('correct_answer'),
+                            question_feedback=error.get('question_feedback'),
                             state="pending"
                         )
                         db.session.add(progresso)
