@@ -946,7 +946,7 @@ class ActionAnalyzeProgress(Action):
         moodle_token = tracker.latest_message.get("metadata", {}).get("moodle_token")
         length_preference = tracker.latest_message.get("metadata", {}).get("length_preference")
         tone_preference = tracker.latest_message.get("metadata", {}).get("tone_preference")
-        print(f"\n🚀  Processing user query with intent '{intent}' and preferences (length: {length_preference}, tone: {tone_preference})")
+        print(f"\n🚀  Processing user query with preferences (length: {length_preference}, tone: {tone_preference})")
         topic_id = tracker.latest_message.get("metadata", {}).get("topic_id", None)
         print(f"🎓  User {user_id} from course {course_id} selected topic ID: {topic_id}")
         
@@ -1086,7 +1086,7 @@ Quiz Interaction:
 - Question Asked: {progress_data['question']}
 - Student's Answer: {progress_data['student_answer']}
 - Correct Answer: {progress_data['correct_answer']}
-- Question Feedback (if any): {progress_data['question_feedback']}
+- Question Feedback (if any): {progress_data.get('question_feedback', 'No feedback provided.')}
 
 Please provide the HTML feedback analysis adhering strictly to the requested tone, depth, and structure.
 """

@@ -37,7 +37,7 @@ class MoodleQuizData(db.Model):
     course_id = db.Column(db.Integer, nullable=False)
     quiz_id = db.Column(db.Integer, nullable=False)  # ID do Quiz no Moodle
     question = db.Column(db.Text, nullable=False)
-    topic_id = db.Column(db.Integer, db.ForeignKey('topics.id', ondelete="SET NULL"), nullable=True),
+    topic_id = db.Column(db.Integer, db.ForeignKey('topics.id', ondelete="SET NULL"), nullable=True)
     question_feedback = db.Column(db.Text, nullable=True)
     last_updated = db.Column(db.DateTime, default=datetime.now)
     
