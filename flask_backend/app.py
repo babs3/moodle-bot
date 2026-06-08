@@ -63,6 +63,8 @@ def chat():
     user_id = data.get('user_id')    
     course_id = data.get('course_id')
     user_message = data.get('message', '')
+    length_preference = data.get('length_preference', 'detailed') # Pode ser "detailed" ou "concise"
+    tone_preference = data.get('tone_preference', 'empathetic') # Pode ser "encouraging" ou "neutral"
     moodle_token = data.get('token')
     moodle_url = data.get('moodle_url')
     isTutorMode = data.get('tutor_mode', False)
@@ -94,7 +96,7 @@ def chat():
     
     # Busca os dados reais no Moodle
     user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
-    username = info_utilizador.get("name") if info_utilizador else "NOME_"
+    username = info_utilizador.get("name") if info_utilizador else "there"
     
     # Define o papel do utilizador para personalizar as respostas do Rasa
     session_init_rasa(user_email, username, "teacher" if is_teacher else "student")
@@ -191,7 +193,9 @@ def chat():
                     "course_id": course_id,
                     "is_teacher": is_teacher,
                     "moodle_url": moodle_url,
-                    "moodle_token": moodle_token
+                    "moodle_token": moodle_token,
+                    "length_preference": length_preference,
+                    "tone_preference": tone_preference
                 }
             }
             bot_reply, buttons = call_rasa(payload)
@@ -252,7 +256,17 @@ def chat():
         payload = {
             "sender": user_email,
             "message": user_message,
-            "metadata": {"username": username, "input_time":current_time, "user_id": user_id, "authorized_resources": authorized_resources, "tutor_mode": False, "course_id": course_id, "is_teacher": is_teacher}
+            "metadata": {
+                "username": username, 
+                "input_time":current_time, 
+                "user_id": user_id, 
+                "authorized_resources": authorized_resources, 
+                "tutor_mode": False, 
+                "course_id": course_id, 
+                "is_teacher": is_teacher,
+                "length_preference": length_preference,
+                "tone_preference": tone_preference
+            }
         }
 
         bot_reply, buttons = call_rasa(payload)            
@@ -503,7 +517,7 @@ def tutor_toggle():
 
     # Busca os dados reais no Moodle
     user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
-    username = info_utilizador.get("name") if info_utilizador else "NOME_"
+    username = info_utilizador.get("name") if info_utilizador else "there"
     print(f"📮  --> Received message for {username} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
     
     session_init_rasa(user_email, username, "teacher" if is_teacher else "student") # Define o papel do utilizador para personalizar as respostas do Rasa

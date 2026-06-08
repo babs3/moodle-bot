@@ -64,6 +64,7 @@ class TutorProgress(db.Model):
     question = db.Column(db.Text, nullable=False)
     student_answer = db.Column(db.Text, nullable=False)
     correct_answer = db.Column(db.Text, nullable=False)
+    question_feedback = db.Column(db.Text, nullable=True)  # Feedback específico da questão, se disponível
     state=db.Column(db.String(20), default="pending", nullable=False)  # Ex: "pending", "reviewed", "mastered"
     timestamp = db.Column(db.DateTime, default=datetime.now)
     

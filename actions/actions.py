@@ -49,30 +49,30 @@ class ActionGetMetricsFromDB(Action):
             data_snippet = df.tail(50).to_string(index=False)
 
             system_instruction = f"""
-            ### ROLE
-            You are a Concise Educational Data Analyst. Your output is displayed in a narrow LMS sidebar.
+### ROLE
+You are a Concise Educational Data Analyst. Your output is displayed in a narrow LMS sidebar.
 
-            ### RULES
-            1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
-            2. **HTML ONLY:** Use <b>text</b> for bold, <ul><li></li></ul> for lists, and <br> for line breaks.
-            3. **NO INTROS/OTHERS:** Start directly with the analysis. Do not say "Hello" or "Here is the report".
-            4. **MAX BREVITY:** Maximum 3-4 paragraphs in total. Keep the total word count under 120 words.
-            5. **LANGUAGE:** Always respond in English (UK).
-            6. **VISUAL CHARTS:** If the data shows a clear trend over time, a comparison between 2-3 main categories, or metrics that benefit from visual aid, append a single Chart Image at the very end of your response using this exact HTML structure:
-            6. **VISUAL CHARTS:** If relevant, append a single Chart Image at the very end using this exact structure:
-            <br><br><a href="https://quickchart.io/chart?c={{chart_json}}" target="_blank"><img src="https://quickchart.io/chart?c={{chart_json}}" width="100%"></a>
-            Keep the chart design extremely simple, clean, and fit for a narrow sidebar (e.g., a small bar or line chart with minimal labels). If a chart is not relevant for the specific question, do not include the img tag.
+### RULES
+1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
+2. **HTML ONLY:** Use <b>text</b> for bold, <ul><li></li></ul> for lists, and <br> for line breaks.
+3. **NO INTROS/OTHERS:** Start directly with the analysis. Do not say "Hello" or "Here is the report".
+4. **MAX BREVITY:** Maximum 3-4 paragraphs in total. Keep the total word count under 120 words.
+5. **LANGUAGE:** Always respond in English (UK).
+6. **VISUAL CHARTS:** If the data shows a clear trend over time, a comparison between 2-3 main categories, or metrics that benefit from visual aid, append a single Chart Image at the very end of your response using this exact HTML structure:
+6. **VISUAL CHARTS:** If relevant, append a single Chart Image at the very end using this exact structure:
+<br><br><a href="https://quickchart.io/chart?c={{chart_json}}" target="_blank"><img src="https://quickchart.io/chart?c={{chart_json}}" width="100%"></a>
+Keep the chart design extremely simple, clean, and fit for a narrow sidebar (e.g., a small bar or line chart with minimal labels). If a chart is not relevant for the specific question, do not include the img tag.
 
-            ### CONTEXT
-            Data: {data_snippet}
+### CONTEXT
+Data: {data_snippet}
 
-            ### INSTRUCTIONS
-            - If the question is generic, provide a "Quick Snapshot".
-            - Use 'user_id' to distinguish if a problem is global or isolated.
-            - Identify the most critical PDF/Topic and provide one brief action.
+### INSTRUCTIONS
+- If the question is generic, provide a "Quick Snapshot".
+- Use 'user_id' to distinguish if a problem is global or isolated.
+- Identify the most critical PDF/Topic and provide one brief action.
 
-            ### RESPONSE (HTML format)
-            """
+### RESPONSE (HTML format)
+"""
             
             generation_config = {
                 "temperature": 0.2,
@@ -161,23 +161,22 @@ class ActionCallLLMWithContext(Action):
         # 3. Criar a diretriz do sistema (Persona + Dados dos Alunos + Regras)
         # Injetamos o data_snippet diretamente no papel de sistema para o LLM ter como base de conhecimento.
         system_instruction = f"""
-        You are an advanced analytics assistant for professors and academic administrators.
-        Your goal is to help professors analyze student behavior, questions, and challenges based on the data provided.
+You are an advanced analytics assistant for professors and academic administrators.
+Your goal is to help professors analyze student behavior, questions, and challenges based on the data provided.
 
-        [STUDENT DATA (Last 50 records in the system)]
-        {data_snippet}
+[STUDENT DATA (Last 50 records in the system)]
+{data_snippet}
 
-        [BEHAVIORAL INSTRUCTIONS]
-        1. HISTORY AND FOLLOW-UP: Use the conversation history to answer follow-up or ambiguous questions. If the professor asks "Who?", "Why?" or "What did he say?", analyze the previous messages to identify the student or concept they are referring to.
-        2. ACCURACY: Base your responses strictly on the provided student data. If the information is not available and it's not a contextual follow-up question, kindly indicate that you do not have those details.
-        3. FORMAT OF THE RESPONSE: You must structure your response using simple HTML tags so that it is rendered correctly in the interface (use tags like <b>, <br>, <ul>, <li>). Do not use Markdown (like ** or ###).
-        """
+[BEHAVIORAL INSTRUCTIONS]
+1. HISTORY AND FOLLOW-UP: Use the conversation history to answer follow-up or ambiguous questions. If the professor asks "Who?", "Why?" or "What did he say?", analyze the previous messages to identify the student or concept they are referring to.
+2. ACCURACY: Base your responses strictly on the provided student data. If the information is not available and it's not a contextual follow-up question, kindly indicate that you do not have those details.
+3. FORMAT OF THE RESPONSE: You must structure your response using simple HTML tags so that it is rendered correctly in the interface (use tags like <b>, <br>, <ul>, <li>). Do not use Markdown (like ** or ###).
+"""
 
         print(f"\n📜  Complete messages payload for LLM:\n{chat_history}\n")
         
         generation_config = {
             "temperature": 0.2,          # 🛡️ Mantém isto baixo para o bot ser factual e não inventar dados
-            #"max_output_tokens": 400,    # 💸 Mantém isto para controlar o tamanho da resposta e custos
             # top_p e top_k omitidos -> O Gemini assume os dele (0.95 e 40)
         }
         
@@ -299,7 +298,18 @@ def keywords_to_tokens(keywords, query, context):
     
     return complex_tokens, simple_tokens, False # Return complex tokens, simple tokens, and split_keywords flag
 
-def action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id):
+def action_process(dispatcher, tracker, payload):
+    user_message = payload.get("user_message")
+    user_email = payload.get("user_email")
+    input_time = payload.get("input_time")
+    authorized_resources = payload.get("authorized_resources")
+    intent = payload.get("intent")
+    user_id = payload.get("user_id")
+    course_id = payload.get("course_id")
+    length_preference = payload.get("length_preference")
+    tone_preference = payload.get("tone_preference")
+    print(f"\n🚀  Processing user query with intent '{intent}' and preferences (length: {length_preference}, tone: {tone_preference})")
+
     if authorized_resources == []:
         print(f"\n❌  No authorized resources found for user: {user_email}")
         return  [
@@ -430,48 +440,62 @@ def action_process(dispatcher, tracker, user_message, user_email, input_time, au
         # === PREPARE CONTEXT AND RULES FOR SYSTEM === #
         raw_text = "\n".join(results_text)
         
+        
+        # 1. Mapeamento das preferências de TOM
+        tone_instructions = {
+            "encouraging": "Supportive, highly motivational, and encouraging. Use tutor-like phrasing that builds confidence while delivering the facts.",
+            "neutral": "Objective, formal, direct, and strictly academic. Deliver the facts without emotional or motivational language."
+        }
+        # 2. Mapeamento das preferências de TAMANHO (Ajustando também o limite de palavras)
+        length_instructions = {
+            "concise": "EXTREMELY CONCISE. Go straight to the point. Do NOT exceed 80-100 words in your answer.",
+            "detailed": "DETAILED AND THOROUGH. Elaborate on the concept, explain the context or steps if necessary. Do NOT exceed 300 words in your answer."
+        }
+
         if intent != "course info":
+            # 3. Montagem da System Instruction Dinâmica
             system_instruction = f"""
-            ### ROLE
-            You are a precise **academic tutor assistant**. Your task is to answer the student's query based strictly on the provided educational course material.
+### ROLE
+You are a precise **academic tutor assistant**. Your task is to answer the student's query based strictly on the provided educational course material, adapting your response style to their preferences.
 
-            ### COURSE MATERIAL CONTEXT
-            {raw_text}
+### COURSE MATERIAL CONTEXT
+{raw_text}
 
-            ### CRITICAL RULES
-            1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
-            2. **HTML ONLY:** Use <b>text</b> for bold and <br> for line breaks.
-            3. **CONCISENESS:** Be extremely precise and direct. Do NOT exceed 100 words in your answer.
-            4. **STRICTNESS:** Base your answer ONLY on the provided course material above. Do not extrapolate or use outside knowledge.
-            5. **FALLBACK:** If you cannot find the relevant information to answer the query within the provided course material, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials."
-            6. **LANGUAGE:** Always respond in English (UK).
-            
-            ### RESPONSE (HTML format)
-            """
+### CRITICAL RULES
+1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
+2. **HTML ONLY:** Use <b>text</b> for bold, <ul><li></li></ul> for lists, and <br> for line breaks.
+3. **LENGTH CONTROL:** {length_instructions[length_preference]}
+4. **TONE CONTROL:** {tone_instructions[tone_preference]}
+5. **STRICTNESS:** Base your answer ONLY on the provided course material above. Do not extrapolate or use outside knowledge.
+6. **FALLBACK:** If you cannot find the relevant information to answer the query within the provided course material, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials." (Do not apply tone or length rules to this fallback phrase).
+7. **LANGUAGE:** Always respond in English (UK).
+
+### RESPONSE (HTML format)
+"""
         else:
             print(f"\n🔍  Intent is 'course info'. Using a different system instruction focused on administrative and logistical information.")
             system_instruction = f"""
-            ### ROLE
-            You are a precise **academic assistant and course coordinator**. Your task is to answer the student's query regarding course logistics, administration, or syllabus details based strictly on the provided course documentation (such as the course syllabus, grading policy, or official announcements).
+### ROLE
+You are a precise **academic assistant and course coordinator**. Your task is to answer the student's query regarding course logistics, administration, or syllabus details based strictly on the provided course documentation (such as the course syllabus, grading policy, or official announcements), adapting your response style to their preferences.
 
-            ### COURSE DOCUMENTATION CONTEXT
-            {raw_text}
+### COURSE DOCUMENTATION CONTEXT
+{raw_text}
 
-            ### CRITICAL RULES
-            1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
-            2. **HTML ONLY:** Use <b>text</b> for bold and <br> for line breaks.
-            3. **CONCISENESS & CLARITY:** Be precise and direct. Do NOT exceed 100 words in your answer, but ensure all administrative details requested (dates, percentages, names) are clearly stated.
-            4. **STRICTNESS:** Base your answer ONLY on the provided course documentation above. Do not extrapolate, assume, or use outside knowledge about university policies.
-            5. **FALLBACK:** If the specific administrative info (e.g., a specific deadline or professor's email) is not explicitly mentioned in the provided text, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials."
-            6. **LANGUAGE:** Always respond in English (UK).
-            
-            ### RESPONSE (HTML format)
-            """
+### CRITICAL RULES
+1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
+2. **HTML ONLY:** Use <b>text</b> for bold and <br> for line breaks.
+3. **LENGTH CONTROL:** {length_instructions[length_preference]}
+4. **TONE CONTROL:** {tone_instructions[tone_preference]}
+5. **STRICTNESS:** Base your answer ONLY on the provided course documentation above. Do not extrapolate, assume, or use outside knowledge about university policies.
+6. **FALLBACK:** If the specific administrative info (e.g., a specific deadline or professor's email) is not explicitly mentioned in the provided text, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials."
+7. **LANGUAGE:** Always respond in English (UK).
 
+### RESPONSE (HTML format)
+"""
+        
         # === PREPARE PARAMETERS === #
         generation_config = {
             "temperature": 0.1,           # Baixamos para 0.1 para máxima precisão factual
-            #"max_output_tokens": 120,     # Um teto seguro (50 palavras dão cerca de 70 tokens)
         }
         
         formatted_response = "Sorry, I couldn't generate a response..."
@@ -535,24 +559,24 @@ class ActionCreateTopics(Action):
         
         # 1. DEFINIÇÃO DA SYSTEM INSTRUCTION (Regras, Contexto e Schema em Inglês)
         system_instruction = """
-        You are an expert academic data categorization assistant.
-        Your task is to analyze a provided list of student questions and generate a concise topic (in English) for each one.
+You are an expert academic data categorization assistant.
+Your task is to analyze a provided list of student questions and generate a concise topic (in English) for each one.
 
-        CRITICAL RULES:
-        1. CONSISTENCY: Group related or similar questions under the exact same topic name to maintain categorization consistency.
-        2. FALLBACK: If you cannot determine a clear topic for a specific question, leave the "topic" field as an empty string ("").
-        3. OUTPUT FORMAT: You must respond strictly with a valid JSON array of objects matching the schema provided below. Do not include any introductory text, explanations, or markdown code block wrappers (like ```json).
+CRITICAL RULES:
+1. CONSISTENCY: Group related or similar questions under the exact same topic name to maintain categorization consistency.
+2. FALLBACK: If you cannot determine a clear topic for a specific question, leave the "topic" field as an empty string ("").
+3. OUTPUT FORMAT: You must respond strictly with a valid JSON array of objects matching the schema provided below. Do not include any introductory text, explanations, or markdown code block wrappers (like ```json).
 
-        EXPECTED JSON SCHEMA:
-        [
-        {
-            "id": "original_moodle_question_id",
-            "question": "original_question_text",
-            "feedback": "original_feedback_text_if_available_or_empty_string",
-            "topic": "generated_topic_in_english_or_empty_string"
-        }
-        ]
-        """
+EXPECTED JSON SCHEMA:
+[
+{
+    "id": "original_moodle_question_id",
+    "question": "original_question_text",
+    "feedback": "original_feedback_text_if_available_or_empty_string",
+    "topic": "generated_topic_in_english_or_empty_string"
+}
+]
+"""
 
         # 2. CONSTRUÇÃO DOS DADOS DO UTILIZADOR (Apenas a lista crua)
         user_prompt = "Categorize the following questions:\n"
@@ -623,18 +647,25 @@ class ActionGetDefinition(Action):
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
-        print(f"🕓  latest_message INPUT TIME: {input_time}")
+        length_preference = tracker.latest_message.get("metadata", {}).get("length_preference")
+        tone_preference = tracker.latest_message.get("metadata", {}).get("tone_preference")
+        #print(f"🕓  latest_message INPUT TIME: {input_time}")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
-        print(f"📚  Authorized resources from metadata: {authorized_resources}")
-        #tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
-        #print(f"🎓  Tutor mode from metadata: {tutor_mode}")
+        #print(f"📚  Authorized resources from metadata: {authorized_resources}")
         
-        is_teacher = tracker.latest_message.get("metadata", {}).get("is_teacher", False)
-        #print(f"👩‍🏫  Is teacher ({user_email}) from metadata: {is_teacher}")
+        payload = {
+            "user_message": user_message,
+            "user_email": user_email,
+            "input_time": input_time,
+            "authorized_resources": authorized_resources,
+            "intent": "definition of",
+            "user_id": user_id,
+            "course_id": course_id,
+            "length_preference": length_preference,
+            "tone_preference": tone_preference
+        }
         
-        intent = "definition of"      
-        
-        return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
+        return action_process(dispatcher, tracker, payload)
     
 # === ACTION 2: GET EXPLANATION === #
 class ActionGetExplanation(Action):
@@ -651,10 +682,22 @@ class ActionGetExplanation(Action):
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+        length_preference = tracker.latest_message.get("metadata", {}).get("length_preference")
+        tone_preference = tracker.latest_message.get("metadata", {}).get("tone_preference")
 
-        intent = "explanation of"
+        payload = {
+            "user_message": user_message,
+            "user_email": user_email,
+            "input_time": input_time,
+            "authorized_resources": authorized_resources,
+            "intent": "explanation of",
+            "user_id": user_id,
+            "course_id": course_id,
+            "length_preference": length_preference,
+            "tone_preference": tone_preference
+        }
 
-        return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
+        return action_process(dispatcher, tracker, payload)
 
 # === ACTION 3: GET EXAMPLES === #
 class ActionGetExamples(Action):
@@ -671,10 +714,23 @@ class ActionGetExamples(Action):
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
+        length_preference = tracker.latest_message.get("metadata", {}).get("length_preference")
+        tone_preference = tracker.latest_message.get("metadata", {}).get("tone_preference")
 
-        intent = "examples of"
-        return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
+        payload = {
+            "user_message": user_message,
+            "user_email": user_email,
+            "input_time": input_time,
+            "authorized_resources": authorized_resources,
+            "intent": "examples of",
+            "user_id": user_id,
+            "course_id": course_id,
+            "length_preference": length_preference,
+            "tone_preference": tone_preference
+        }
 
+        return action_process(dispatcher, tracker, payload)
+    
 # === ACTION 4: SUMMARIZE === #
 class ActionGetSummary(Action):
     def name(self):
@@ -690,10 +746,23 @@ class ActionGetSummary(Action):
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+        length_preference = tracker.latest_message.get("metadata", {}).get("length_preference")
+        tone_preference = tracker.latest_message.get("metadata", {}).get("tone_preference")
 
-        intent = "summary of"
-        return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
+        payload = {
+            "user_message": user_message,
+            "user_email": user_email,
+            "input_time": input_time,
+            "authorized_resources": authorized_resources,
+            "intent": "summary of",
+            "user_id": user_id,
+            "course_id": course_id,
+            "length_preference": length_preference,
+            "tone_preference": tone_preference
+        }
 
+        return action_process(dispatcher, tracker, payload)
+        
 # === ACTION 4: COMPARE === #
 class ActionGetComparison(Action):
     def name(self):
@@ -709,10 +778,22 @@ class ActionGetComparison(Action):
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+        length_preference = tracker.latest_message.get("metadata", {}).get("length_preference")
+        tone_preference = tracker.latest_message.get("metadata", {}).get("tone_preference")
 
-        intent = "comparison of"
-        return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
+        payload = {
+            "user_message": user_message,
+            "user_email": user_email,
+            "input_time": input_time,
+            "authorized_resources": authorized_resources,
+            "intent": "comparison of",
+            "user_id": user_id,
+            "course_id": course_id,
+            "length_preference": length_preference,
+            "tone_preference": tone_preference
+        }
 
+        return action_process(dispatcher, tracker, payload)
 
 class ActionGetCourseInfo(Action):
     def name(self):
@@ -728,12 +809,26 @@ class ActionGetCourseInfo(Action):
         user_id = tracker.latest_message.get("metadata", {}).get("user_id")
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
-        print(f"🕓  latest_message INPUT TIME: {input_time}")
+        #print(f"🕓  latest_message INPUT TIME: {input_time}")
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
-        print(f"📚  Authorized resources from metadata: {authorized_resources}")
-        intent = "course info"      
-        
-        return action_process(dispatcher, tracker, user_message, user_email, input_time, authorized_resources, intent, user_id, course_id)
+        #print(f"📚  Authorized resources from metadata: {authorized_resources}")
+        length_preference = tracker.latest_message.get("metadata", {}).get("length_preference")
+        tone_preference = tracker.latest_message.get("metadata", {}).get("tone_preference")
+
+        payload = {
+            "user_message": user_message,
+            "user_email": user_email,
+            "input_time": input_time,
+            "authorized_resources": authorized_resources,
+            "intent": "course info" ,
+            "user_id": user_id,
+            "course_id": course_id,
+            "length_preference": length_preference,
+            "tone_preference": tone_preference
+        }
+
+        return action_process(dispatcher, tracker, payload)
+    
     
 # === FINAL ACTION: GET PDF NAMES & PAGE LOCATIONS === #
 class ActionGetClassMaterialLocation(Action):
@@ -849,6 +944,9 @@ class ActionAnalyzeProgress(Action):
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         moodle_url = tracker.latest_message.get("metadata", {}).get("moodle_url")
         moodle_token = tracker.latest_message.get("metadata", {}).get("moodle_token")
+        length_preference = tracker.latest_message.get("metadata", {}).get("length_preference")
+        tone_preference = tracker.latest_message.get("metadata", {}).get("tone_preference")
+        print(f"\n🚀  Processing user query with intent '{intent}' and preferences (length: {length_preference}, tone: {tone_preference})")
         topic_id = tracker.latest_message.get("metadata", {}).get("topic_id", None)
         print(f"🎓  User {user_id} from course {course_id} selected topic ID: {topic_id}")
         
@@ -940,38 +1038,59 @@ class ActionAnalyzeProgress(Action):
 
         # === PREPARE THE PROMPTS === #
 
-        system_instruction = """
-        # ROLE:
-        You are an empathetic, precise, and encouraging AI Tutor. Your job is to analyze a student's wrong answer in a quiz, compare it with the correct course material, and explain why their answer was incorrect and how to reach the right conclusion. If Question Feedback is available, use it to enrich your explanation.
-        
-        # RULES:
-        1. NO MARKDOWN: Do NOT use asterisks (**), hashtags (#), or markdown lists.
-        2. HTML ONLY: Use <b>text</b> for emphasis, <ul><li></li></ul> for lists, and <br> for line breaks.
-        3. LANGUAGE: Always respond in English.
-        4. TONE: Supportive, constructive, and educational. Do not say "You are wrong". Instead, use "Your answer 'X' differs because...".
-        5. BREVITY: Keep it concise. The student is in a sidebar; they need a quick, clear explanation.
+        # 1. Mapeamento das preferências recebidas do HTML/JS para instruções claras ao bot
+        tone_instructions = {
+            "encouraging": "Supportive, highly motivational, celebration-oriented, and educational. Cheer the student up and validate their effort.",
+            "neutral": "Objective, formal, direct, and professional. Focus purely on facts and logic without emotional or motivational language."
+        }
 
-        # STRUCTURE FOR THE OUTPUT:
-        - <b>Question:</b> Restate the quiz question for clarity.
-        - <b>Concept Check:</b> Briefly explain the core concept from the course material.
+        length_instructions = {
+            "concise": "EXTREMELY CONCISE. Keep the entire response under 3-4 sentences total. Go straight to the point.",
+            "detailed": "DETAILED AND DEEP. Provide a thorough breakdown of the concept, thoroughly explaining the 'why' behind the correct and incorrect options."
+        }
+
+        # 2. Definição das regras de estrutura dinâmica
+        structure_instructions = {
+            "concise": """- <b>Quick Fix:</b> Combine the concept and why the student missed the mark in 2 short sentences.
+        - <b>Key Takeaway:</b> A 1-sentence tip to secure the correct answer next time.""",
+            
+            "detailed": """- <b>Question:</b> Restate the quiz question for clarity.
+        - <b>Concept Check:</b> Thoroughly explain the core concept from the course material.
         - <b>Why it missed the mark:</b> Address the student's specific answer (or if it was 'Sem resposta', encourage them).
-        - <b>How to remember:</b> Give a 1-sentence tip or explanation to secure the correct answer.
-        """
+        - <b>How to remember:</b> Give a detailed tip, mnemonic, or explanation to secure the correct answer."""
+        }
 
-        # No user_prompt passamos as variáveis dinâmicas desta pergunta específica
+        # 3. Montagem da System Instruction Dinâmica
+        system_instruction = f"""
+# ROLE:
+You are an AI Tutor whose behavior adapts to the student's learning preferences. Your job is to analyze a student's wrong answer in a quiz, compare it with the correct course material, and explain why their answer was incorrect and how to reach the right conclusion. If Question Feedback is available, use it to enrich your explanation.
+
+# RULES:
+1. NO MARKDOWN: Do NOT use asterisks (**), hashtags (#), or markdown lists.
+2. HTML ONLY: Use <b>text</b> for emphasis, <ul><li></li></ul> for lists, and <br> for line breaks.
+3. LANGUAGE: Always respond in English.
+4. TONE: {tone_instructions[tone_preference]} Do not say "You are wrong". Instead, use "Your answer 'X' differs because...".
+5. BREVITY & DEPTH: {length_instructions[length_preference]}
+
+# STRUCTURE FOR THE OUTPUT:
+Follow this strict layout depending on the formatting rules:
+{structure_instructions[length_preference]}
+"""
+
+        # 4. O User Prompt mantém-se limpo, focado nos dados do quiz
         user_prompt = f"""
-        Course Material Context:
-        {raw_text}
+Course Material Context:
+{raw_text}
 
-        Quiz Interaction:
-        - Question Asked: {progress_data['question']}
-        - Student's Answer: {progress_data['student_answer']}
-        - Correct Answer: {progress_data['correct_answer']}
-        - Question Feedback (if any): {progress_data['question_feedback']}
+Quiz Interaction:
+- Question Asked: {progress_data['question']}
+- Student's Answer: {progress_data['student_answer']}
+- Correct Answer: {progress_data['correct_answer']}
+- Question Feedback (if any): {progress_data['question_feedback']}
 
-        Please provide the HTML feedback analysis.
-        """
-
+Please provide the HTML feedback analysis adhering strictly to the requested tone, depth, and structure.
+"""
+                
         # === CALL GEMINI API === #
         generation_config = {
             "temperature": 0.1, # Ótimo para manter a precisão e evitar alucinações sobre a matéria
