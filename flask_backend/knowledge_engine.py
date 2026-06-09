@@ -43,10 +43,10 @@ def extract_text_with_ocr(page):
     # Perform OCR using pytesseract
     text = pytesseract.image_to_string(image, config='--psm 3') # 3: Fully automatic page segmentation
     
-    print(f"    🖼️  Extracted OCR text (before cleaning):\n{text}")
+    #print(f"    🖼️  Extracted OCR text (before cleaning):\n{text}")
     # Clean up the text
     text = clean_ocr_and_image_garbage(text)
-    print(f"    🧹  Extracted OCR text (after cleaning):\n{text}")
+    #print(f"    🧹  Extracted OCR text (after cleaning):\n{text}")
 
     return text
 
@@ -247,10 +247,10 @@ def clean_using_blacklist(doc_text, blacklist):
             # Atualizamos a nossa variável de trabalho com o texto limpo
             current_text = text_after_sub
     
-    if removed_lines:
-        print(f"\n🧹  Removed from blacklist: '{removed_lines}'")
-        print(f"        Before: {doc_text}")
-        print(f"        After: {current_text}")
+    #if removed_lines:
+    #    print(f"\n🧹  Removed from blacklist: '{removed_lines}'")
+        #print(f"        Before: {doc_text}")
+        #print(f"        After: {current_text}")
             
     # SÓ DEVOLVE O TEXTO DEPOIS DE CORRER A BLACKLIST TODA (Fora do loop for)
     return current_text
@@ -540,7 +540,11 @@ def create_blacklist(pdf, threshold_pct=0.15):
     pages = []
     for page in doc:
         text = page.get_text("text")
-        lines = text.splitlines()
+        ocr_text = extract_text_with_ocr(page)
+        if ocr_text.split() != []:
+            #print(f"    🖼️  OCR text for blacklist creation:\n{ocr_text}")
+            ocr_text = text + "\n" + ocr_text
+        lines = ocr_text.splitlines()
         pages.append(lines)
         
     total_pages = len(pages)
@@ -569,6 +573,8 @@ def create_blacklist(pdf, threshold_pct=0.15):
         line for line in blacklist 
         if not re.match(numeric_pattern, line.strip())
     }
+    # ordenar para que as linhas com mais palavras apareçam primeiro, para uma limpeza mais eficaz
+    blacklist = sorted(blacklist, key=lambda x: len(x.split()), reverse=True)
     
     return blacklist
             
