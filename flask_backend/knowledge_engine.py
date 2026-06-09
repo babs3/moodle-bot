@@ -1,5 +1,4 @@
 import time
-
 from dotenv import load_dotenv
 import os
 import fitz  # PyMuPDF
@@ -16,6 +15,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from nltk import ngrams
 import spacy
 import uuid
+from collections import Counter
+import re
 
 # Load Spacy model for NLP tasks
 nlp = spacy.load("en_core_web_sm")
@@ -42,48 +43,72 @@ def extract_text_with_ocr(page):
     # Perform OCR using pytesseract
     text = pytesseract.image_to_string(image, config='--psm 3') # 3: Fully automatic page segmentation
     
+    print(f"    🖼️  Extracted OCR text (before cleaning):\n{text}")
     # Clean up the text
-    text = clean_ocr_text(text)
+    text = clean_ocr_and_image_garbage(text)
+    print(f"    🧹  Extracted OCR text (after cleaning):\n{text}")
 
     return text
 
-def clean_ocr_text(text):
-    # Normalize line endings and remove leading/trailing whitespace
+def clean_ocr_and_image_garbage(text):
+    # 1. Normalizar espaços iniciais e finais
     text = text.strip()
     
-    # Remove excess empty lines (more than 1 in a row)
-    text = re.sub(r'\n\s*\n+', '\n\n', text)
+    # 2. Padrões conhecidos de erros de imagem e marcas (Abordagem Genérica)
+    image_error_patterns = [
+        r"the\s+picture\s+can", 
+        r"be\s+displayed", 
+        r"picture\s+nant",
+        r"made\s+with\s+gamma"
+    ]
     
-    # Remove bullet characters or random artifacts often inserted by OCR
-    text = re.sub(r'[\u2022\u00a9¢•™®“”‘’\"*v©®→→←→▪️]+', '', text)
-
-    # Remove OCR garbage lines (non-word content lines)
-    text = "\n".join([line for line in text.splitlines() 
-                      if re.search(r'\w', line)])  # keep lines with words
-
-    # Remove random floating characters or garbage words
-    text = re.sub(r'\b(?:ree|Sex|F 7|Pre-t)\b', '', text, flags=re.IGNORECASE)
-
-    # Remove unwanted punctuation and fix spaces
-    text = re.sub(r'\s{2,}', ' ', text)                 # multiple spaces
-    text = re.sub(r'\.\s*', '. ', text)                 # dot spacing
-    text = re.sub(r'\s+([?.!,])', r'\1', text)          # space before punctuation
-    
-    # Remove low-quality lines
     lines = text.splitlines()
     cleaned_lines = []
-    for line in lines:
-        line = line.strip()
-        if len(line) < 3 and not re.search(r'\w', line): continue
-        if re.match(r'^[^a-zA-Z0-9]*$', line): continue
-        cleaned_lines.append(line)
-
-    text = '\n'.join(cleaned_lines)
-
-    # Final trimming
-    text = text.strip()
     
-    return text
+    for line in lines:
+        line_stripped = line.strip()
+        
+        # Ignorar linhas vazias imediatamente
+        if not line_stripped:
+            continue
+            
+        # [Aproveitado da tua]: Ignorar se a linha não tiver conteúdo alfanumérico legítimo
+        if re.match(r'^[^a-zA-Z0-9]*$', line_stripped): 
+            continue
+            
+        # [Melhoria]: Remover palavras isoladas de logos/erros (linhas muito curtas de texto solto)
+        # Se tiver 3 ou menos caracteres (ex: "The", "BCE", "v", "F 7"), salta a linha
+        if len(line_stripped) <= 3:
+            continue
+            
+        # [Novo]: Filtrar mensagens de erro de imagens fragmentadas
+        if any(re.search(pattern, line_stripped, re.IGNORECASE) for pattern in image_error_patterns):
+            continue
+            
+        # [Novo]: Rácio de caracteres especiais (apanha "DE| DEPARTAMENTO DE" ou tabelas partidas)
+        special_chars = len(re.findall(r'[|()\[\]{}#@_*–➔•]', line_stripped))
+        if (special_chars / len(line_stripped)) > 0.15: 
+            continue
+            
+        cleaned_lines.append(line_stripped)
+        
+    # Juntar as linhas válidas para fazer a formatação global
+    text = '\n'.join(cleaned_lines)
+    
+    # 3. [Aproveitado da tua - FORMATAÇÃO GLOBAL]
+    # Remove bullet characters residuais que possam ter ficado a meio de frases
+    text = re.sub(r'[\u2022\u00a9¢•™®“”‘’\"*v©®→←▪️]+', '', text)
+    
+    # Remove strings manuais específicas que aches críticas (como tinhas)
+    text = re.sub(r'\b(?:ree|Sex|F 7|Pre-t)\b', '', text, flags=re.IGNORECASE)
+    
+    # [Aproveitado da tua]: Limpeza estética de espaçamento e pontuação
+    text = re.sub(r'\s{2,}', ' ', text)                  # Remove espaços múltiplos
+    text = re.sub(r'\.\s*', '. ', text)                  # Garante espaço após ponto
+    text = re.sub(r'\s+([?.!,])', r'\1', text)           # Remove espaço antes de pontuação
+    text = re.sub(r'\n\s*\n+', '\n\n', text)             # Normaliza quebras de linha duplas
+    
+    return text.strip()
  
 def get_ngrams(text, n=2):
     doc = nlp(text)
@@ -266,7 +291,7 @@ def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_thre
                     current_text = '__OCR__' + clean_using_blacklist(image_text, blacklist)
                     print(f"    🖼️  current_text is OCR text from page {i + 1}")
                 else:
-                    print(f"     ⚠️  Skipping empty page {i + 1}")
+                    print(f"    ⚠️  Skipping empty page {i + 1}")
                     i += 1
                     continue
             #else:
@@ -506,9 +531,6 @@ def initialize_chroma():
     client = chromadb.HttpClient(host='chroma', port=8000)
     return client
 
-from collections import Counter
-import re
-
 def create_blacklist(pdf, threshold_pct=0.15):
     """
     Identifica automaticamente linhas repetidas que parecem headers/footers.
@@ -534,9 +556,19 @@ def create_blacklist(pdf, threshold_pct=0.15):
     # Se a linha aparece em mais de X% das páginas, vai para a blacklist
     blacklist = {line for line, count in line_counts.items() if (count / total_pages) > threshold_pct}
     # remove símbolos comuns da blacklist, pois podem aparecer em conteúdos legítimos
+    # 1. Filtro que já tinhas para os símbolos especiais
     symbols = ["➔", "►", "¢", "●", "•", "–", "‣", "▪", "◦", "·", "‧", "", "", "Ø", "ü"]
     for sym in symbols:
         blacklist = {line for line in blacklist if sym not in line}
+
+    # 2. FILTRO DE NUMERAÇÕES (O que precisas acrescentar)
+    # Este padrão deteta linhas que contêm APENAS números, ou números seguidos de pontos/hífens/parênteses (ex: "1.", "2 -", "(3)")
+    numeric_pattern = r"^\(?\d+[\.\-\)\s]*$"
+
+    blacklist = {
+        line for line in blacklist 
+        if not re.match(numeric_pattern, line.strip())
+    }
     
     return blacklist
             
