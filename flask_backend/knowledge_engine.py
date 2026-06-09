@@ -87,7 +87,7 @@ def clean_ocr_text(text):
  
 def get_ngrams(text, n=2):
     doc = nlp(text)
-    print(f"\n🔍  Doc text for n-grams: {doc}")
+    #print(f"\n🔍  Doc text for n-grams: {doc}")
     
     # 1. Primeiro geramos os tokens limpos seguindo a mesma regra dos hifens
     tokens_limpos = []
@@ -111,7 +111,7 @@ def get_ngrams(text, n=2):
         else:
             if token.text == "-":
                 if i > 0 and i < len(doc) - 1:
-                    print(f"⚠️  Token '-' is hyphenated between '{tokens_text[i-1]}' and '{tokens_text[i+1]}'. Keeping them as a single token.")
+                    #print(f"⚠️  Token '-' is hyphenated between '{tokens_text[i-1]}' and '{tokens_text[i+1]}'. Keeping them as a single token.")
                     new_token = tokens_text[i-1] + "-" + tokens_text[i+1]
                     tokens_limpos.append(new_token.lower())
                     continue  # Skip the next token since it's already merged        
@@ -191,29 +191,56 @@ LINES_TO_REMOVE = [
     "FEUP UNIVERSIDADE DO PORTO"
 ]
     
-def clean_by_line(text):
-    text_lines = text.split('\n')
+def clean_using_blacklist(doc_text, blacklist):
+    # Criamos uma variável de trabalho que vai acumulando as limpezas
+    current_text = doc_text
+    removed_lines = []
     
-    cleaned_lines = []
-    for line in text_lines:
-        line = line.strip()
-        if not line:
-            continue
-        if line in LINES_TO_REMOVE:
-            #print(f"⚠️  Skipping line: {line}")
-            continue
-        cleaned_lines.append(line)
-    
-    cleaned_text = '\n'.join(cleaned_lines)
-    
-    return cleaned_text.strip()
+    for line in blacklist:
+        # 1. Limpar espaços nas pontas e fazer o escape de caracteres especiais
+        flexible_pattern = re.escape(line.strip())
         
+        # 2. SEPARAR PONTUAÇÃO: Forçar que após um ponto (\.) ou barra (\/) possa existir um espaço opcional (\s*)
+        flexible_pattern = re.sub(r'(\\\.|\\\/)', r'\1\\s*', flexible_pattern)
+        
+        # 3. ESPAÇOS FLEXÍVEIS: Onde já existiam espaços na blacklist, aceitar qualquer quantidade deles
+        flexible_pattern = re.sub(r'\\ ', r'\\s*', flexible_pattern)
+        
+        # 4. HÍFENS FLEXÍVEIS: Permitir hífens opcionais entre letras
+        flexible_pattern = flexible_pattern.replace('-', r'\-?')
+        flexible_pattern = re.sub(r'([A-Z])([A-Z])', r'\1\-?\2', flexible_pattern, flags=re.IGNORECASE)
+        
+        # 5. O MILAGRE DO OCR (Zero vs Ó): Substitui qualquer 0 ou O por um grupo [0O]
+        flexible_pattern = re.sub(r'(0|O)', r'[0O]', flexible_pattern, flags=re.IGNORECASE)
+
+        # 6. Executar a substituição NO TEXTO QUE JÁ VEM A SER LIMPO (current_text)
+        text_after_sub = re.sub(flexible_pattern + r'\s*', '', current_text, flags=re.IGNORECASE)
+        
+        # Verificação de log baseada na mudança desta iteração específica
+        if current_text != text_after_sub:
+            removed_lines.append(line)            
+            # Atualizamos a nossa variável de trabalho com o texto limpo
+            current_text = text_after_sub
+    
+    if removed_lines:
+        print(f"\n🧹  Removed from blacklist: '{removed_lines}'")
+        print(f"        Before: {doc_text}")
+        print(f"        After: {current_text}")
+            
+    # SÓ DEVOLVE O TEXTO DEPOIS DE CORRER A BLACKLIST TODA (Fora do loop for)
+    return current_text
+
 def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_threshold=20, sim_threshold=0.65):
     """Extracts text from each page of a PDF, merging short pages and sequential numbered sections."""
     doc = fitz.open(pdf_path)
     page_chunks = []
     total_pages = len(doc)
     title = None
+    
+    blacklist = create_blacklist(pdf_path)
+    print("\nBlacklist de linhas repetidas (headers/footers):")
+    for line in blacklist:
+        print(f"- {line}")
     
     print(f"\n\n📄  Processing {pdf_path} with {total_pages} pages...\n")
 
@@ -230,15 +257,13 @@ def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_thre
             print(f"📄  - Page {i + 1} of {total_pages}")
             
             current_text = doc[i].get_text("text").strip()
-            current_text = re.sub(r'/\*\*|\*/|LGP\[\]', "", current_text) # for LGP slides style
-            
-            current_text = clean_by_line(current_text)  # Clean the text by lines
+            current_text = clean_using_blacklist(current_text, blacklist)  # Clean the text by lines
             
             # Only use OCR if the page has no normal text 
             if len(current_text.split()) == 0 and i != 0:
                 image_text = extract_text_with_ocr(doc[i])
                 if image_text.split() != []:
-                    current_text = '__OCR__' + clean_by_line(image_text)
+                    current_text = '__OCR__' + clean_using_blacklist(image_text, blacklist)
                     print(f"    🖼️  current_text is OCR text from page {i + 1}")
                 else:
                     print(f"     ⚠️  Skipping empty page {i + 1}")
@@ -317,7 +342,7 @@ def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_thre
                 # check title of next page
                 if i < total_pages:
                     next_text = doc[i].get_text("text").strip()
-                    next_text = clean_by_line(next_text)  # Clean the text by lines
+                    next_text = clean_using_blacklist(next_text, blacklist)
                     next_title = next_text.split("\n")[0]
                             
                     # merge with next page if is like the introdutory slide of the next numbered sections
@@ -379,7 +404,7 @@ def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_thre
                 if edited:
                     continue # Merge with next page
                 next_text = doc[i].get_text("text").strip()
-                next_text = clean_by_line(next_text)
+                next_text = clean_using_blacklist(next_text, blacklist)
                 
                 emb_j = get_text_embedding(next_text)
                 sim = cosine_similarity([emb_i], [emb_j])[0][0]
@@ -398,7 +423,7 @@ def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_thre
                     # try OCR
                     current_image_text = extract_text_with_ocr(doc[i-1])
                     if current_image_text.split() != []:
-                        current_image_text = clean_by_line(current_image_text)
+                        current_image_text = clean_using_blacklist(current_image_text, blacklist)
                         print(f"       🖼️  Page {i} has images!")
                         # Stop if it has sufficient OCR text
                         image_word_count = len(current_image_text.split())
@@ -480,6 +505,40 @@ def initialize_chroma():
     # O host é o nome do serviço no docker-compose
     client = chromadb.HttpClient(host='chroma', port=8000)
     return client
+
+from collections import Counter
+import re
+
+def create_blacklist(pdf, threshold_pct=0.15):
+    """
+    Identifica automaticamente linhas repetidas que parecem headers/footers.
+    pages: Lista de listas de strings (cada sublista é o texto de uma página)
+    """
+    doc = fitz.open(pdf)
+    pages = []
+    for page in doc:
+        text = page.get_text("text")
+        lines = text.splitlines()
+        pages.append(lines)
+        
+    total_pages = len(pages)
+    all_lines = []
+    
+    for page in pages:
+        # Usamos set() por página para contar apenas uma ocorrência por página
+        unique_lines_in_page = set([line.strip() for line in page if line.strip()])
+        all_lines.extend(unique_lines_in_page)
+        
+    line_counts = Counter(all_lines)
+    
+    # Se a linha aparece em mais de X% das páginas, vai para a blacklist
+    blacklist = {line for line, count in line_counts.items() if (count / total_pages) > threshold_pct}
+    # remove símbolos comuns da blacklist, pois podem aparecer em conteúdos legítimos
+    symbols = ["➔", "►", "¢", "●", "•", "–", "‣", "▪", "◦", "·", "‧", "", "", "Ø", "ü"]
+    for sym in symbols:
+        blacklist = {line for line in blacklist if sym not in line}
+    
+    return blacklist
             
 def process_pdfs(pdf_folder, course_id):
     """Processa PDFs de um curso específico e atualiza a base de conhecimento."""
@@ -501,16 +560,17 @@ def process_pdfs(pdf_folder, course_id):
     for file in os.listdir(pdf_folder):
         if file.endswith(".pdf"):
             pdf_path = os.path.join(pdf_folder, file)
-            
+
             if file.startswith("BOOK_"):
                 page_chunks = extract_text_by_context(pdf_path, is_book=True, edited=False, min_word_threshold=50, sim_threshold=0.90)
             elif file.startswith("EDITED_"):
                 page_chunks = extract_text_by_context(pdf_path, is_book=False, edited=True)
             else:
                 page_chunks = extract_text_by_context(pdf_path)
-
+                
             for chunk in page_chunks:
-                doc_text = chunk["text"]
+                doc_text = chunk["text"]           
+                
                 documents.append(doc_text)
                 #print(f"> text from {file} (page {chunk['page']}):\n{doc_text}\n\n")
                 
@@ -597,7 +657,7 @@ def clean_text(text):
     
     # Step 3: Clean up bullet points
     # Replace bullet points with a newline and a dash
-    final_text = re.sub(r"\s*[►¢●•–‣▪◦·‧Øü]\s*", r"\n- ", final_text)
+    final_text = re.sub(r"\s*[➔►¢●•–‣▪◦·‧Øü]\s*", r"\n- ", final_text)
     final_text = re.sub(r"\s*[○]\s*", r"\n    - ", final_text)
     # relace numbered lists with a newline and a dash
     final_text = re.sub(r"\s*(\d+\.\s)", r"\n\1", final_text)  # forces numbered items to a new line
@@ -694,7 +754,3 @@ def delete_pdf_from_knowledge(filename, course_id):
             pickle.dump((new_bm25_simple, new_bm25_2gram, new_bm25_3gram, new_metadata, new_documents), f)
     
     return True
-
-
-if __name__ == "__main__":
-    process_pdfs()
