@@ -445,9 +445,9 @@ def dense_vector_search(intent, complex_tokens, simple_tokens, context, query, c
     
     normalized_vector_scores = normalize_score(vector_scores, True)
     
-    #print(f"\n📖  2. Vector scores Normalized:")
-    #for doc, meta, score in zip(vector_docs, vector_metadata, normalized_vector_scores):
-    #    print(f"📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
+    print(f"\n📖  2. Vector scores Normalized:")
+    for doc, meta, score in zip(vector_docs, vector_metadata, normalized_vector_scores):
+        print(f"📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
         
     return vector_docs, vector_metadata, normalized_vector_scores
 
@@ -584,9 +584,9 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
     
     if bm25_scores:            
         normalized_bm25_scores = normalize_score(bm25_scores, False)
-        #print(f"\n📖  BM25 scores Normalized:")
-        #for doc, meta, score in zip(bm25_docs, bm25_meta, normalized_bm25_scores):
-        #    print(f"📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
+        print(f"\n📖  BM25 scores Normalized:")
+        for doc, meta, score in zip(bm25_docs, bm25_meta, normalized_bm25_scores):
+            print(f"📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
             
         return bm25_docs, bm25_meta, normalized_bm25_scores
     else:

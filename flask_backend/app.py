@@ -164,6 +164,8 @@ def chat():
         app.logger.warning("No contents found for this course.")
         return jsonify([{"text": "There is no content available for this course. Please check back later or contact your instructor."}])
     else:
+        print(f"📂  Moodle contents for course {course_id}: {moodle_contents_names}")
+        print(f"   moodle_contents: {moodle_contents}")
         resources = extract_visible_resources(moodle_contents)
         # Se resources já são os autorizados, basta extrair os nomes:
         authorized_resources = [res.get("filename") for res in resources if res.get("filename")]
@@ -171,7 +173,8 @@ def chat():
         if not authorized_resources:
             app.logger.warning("No authorized resources found for this course.")
             #return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
-        
+        else:
+            print(f"🔑  Authorized resources for user {user_id} in course {course_id}: {authorized_resources}")
     
     # check if user is in tutor mode
     user = MoodleUsers.query.filter_by(moodle_id=user_id).first()

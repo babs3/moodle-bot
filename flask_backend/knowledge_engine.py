@@ -489,6 +489,63 @@ def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_thre
 
     return page_chunks
 
+def process_video_transcription(raw_text, chunk_size=200, chunk_overlap=40):
+    """
+    Lê a transcrição de um vídeo, limpa-a e divide-a em chunks de texto 
+    com sobreposição (overlap) para não perder contexto semântico.
+    
+    :param txt_path: Caminho para o ficheiro .txt gerado pelo Whisper.
+    :param chunk_size: Número aproximado de palavras por chunk.
+    :param chunk_overlap: Número de palavras a repetir entre chunks vizinhos.
+    :return: Lista de dicionários estruturados prontos para a Vector Store.
+    """
+    print(f"\n🎬 Processing video transcription...")
+
+    cleaned_text = re.sub(r'\[\d{2}:\d{2}\]', '', raw_text) # Remove [00:00] se existir
+    
+    # Limpeza básica de espaços e quebras de linha múltiplas
+    cleaned_text = " ".join(cleaned_text.split())
+
+    # Tokenização simplificada por palavras (funciona perfeitamente para inglês)
+    words = cleaned_text.split()
+    total_words = len(words)
+    
+    video_chunks = []
+    chunk_index = 1
+    
+    # Algoritmo de Janela Deslizante (Sliding Window)
+    start_idx = 0
+    while start_idx < total_words:
+        # Define o fim do bloco atual
+        end_idx = min(start_idx + chunk_size, total_words)
+        
+        # Extrai as palavras e junta-as de volta num bloco de texto
+        chunk_words = words[start_idx:end_idx]
+        chunk_text = " ".join(chunk_words)
+        
+        # Validar tamanho mínimo (evitar chunks residuais vazios no fim do ficheiro)
+        if len(chunk_words) < 15 and video_chunks:
+            # Se for muito pequeno, junta-o ao chunk anterior em vez de criar um novo
+            video_chunks[-1]["text"] += " " + chunk_text
+            break
+            
+        # Estrutura o output exatamente igual ao que o teu processamento de PDF já espera
+        video_chunks.append({
+            "text": chunk_text,
+            "page": f"video_chunk_{chunk_index}", # Identificador no lugar da página
+            "is_ocr": False,
+            #"word_count": len(chunk_words)
+        })
+        
+        print(f"  🔹  Created chunk {chunk_index}: {len(chunk_words)} words.")
+        print(f"     Sample text: '{chunk_text}'\n")
+        
+        # Avança o ponteiro considerando a sobreposição (overlap)
+        start_idx += (chunk_size - chunk_overlap)
+        chunk_index += 1
+
+    print(f"🎬 Video processing concluded. Total chunks created: {len(video_chunks)}\n")
+    return video_chunks
 
 def clean_doc_text(text):
     text = text.replace("\n", " ")
@@ -659,19 +716,24 @@ def process_pdfs(pdf_folder, youtube_ids, course_id):
                     
                     # Juntar os segmentos em texto corrido
                     full_text = "\n".join([segment.text for segment in segments])
-                    print(f"-> Transcrição completa do vídeo {video_id}:\n{full_text[:900]}...")  # Mostra apenas os primeiros 900 caracteres 
+                    video_chunks = process_video_transcription(full_text)
                     
-                    documents.append(full_text)
-                    metadata.append({
-                        "file": f"YouTube Video {video_id}", 
-                        "page": "N/A", 
-                        "course_id": str(course_id),
-                        "is_ocr": False
-                    })
-                    cleaned_text = tokenize_and_clean_text(clean_doc_text(full_text))
-                    simple_tokens.append(cleaned_text)
-                    ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
-                    ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
+                    for chunk in video_chunks:
+                        documents.append(chunk["text"])
+                        metadata.append({
+                            "file": f"YouTube Video {video_id}", 
+                            "page": "N/A", 
+                            "course_id": str(course_id),
+                            "is_ocr": False
+                        })
+                        
+                        cleaned_text = tokenize_and_clean_text(clean_doc_text(chunk["text"]))
+                        simple_tokens.append(cleaned_text)
+                        ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
+                        ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
+                        #print(f"    Simple tokens: {cleaned_text}")
+                        #print(f"    2-grams: {ngram_docs_2[-1]}")
+                        #print(f"    3-grams: {ngram_docs_3[-1]}\n")
                 
             except Exception as e:
                 print(f"Erro ao processar o vídeo {video_id}: {e}")
