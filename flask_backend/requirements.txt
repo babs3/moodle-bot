@@ -25,3 +25,6 @@ nltk
 bleach
 Flask-Caching
 redis
+ffmpeg-python
+faster-whisper
+yt-dlp

@@ -81,6 +81,14 @@ class KnowledgeFiles(db.Model):
     def __repr__(self):
         return f'<File {self.filename}>'
     
+class KnowledgeVideos(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    course_id = db.Column(db.Integer, nullable=False)
+    video_id = db.Column(db.String(255), nullable=False)
+    last_updated = db.Column(db.DateTime, default=datetime.now)
+
+    def __repr__(self):
+        return f'<Video {self.video_id}>'
 class ClientConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     moodle_url = db.Column(db.String(255), nullable=False)

@@ -8,16 +8,21 @@ from googleapiclient.discovery import build
 import requests
 import hashlib
 import json
-import os
 import random
 from datetime import datetime, timedelta
 from flask_apscheduler import APScheduler
 from bs4 import BeautifulSoup
 import bleach
+import re
+import shutil
+from yt_dlp import YoutubeDL
+from faster_whisper import WhisperModel
 from models import *
 from seed_db import qa_bank
 
 RASA_URL = "http://rasa:5005/webhooks/rest/webhook"
+# Expressão regular global para capturar IDs do YouTube
+YOUTUBE_REGEX = r'(?:youtube\.com\/embed\/|youtu\.be\/|youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})'
 
 # --- SCRIPT DE POPULAÇÃO ---
 def populate_database(course_id=2):
@@ -326,37 +331,57 @@ def get_moodle_user_data(user_id, moodle_token, moodle_url):
         print(f"ERRO: ERRO CRÍTICO ao ligar ao Moodle: {str(e)}")
         return None
     
-def get_moodle_contents(course_id, moodle_url, moodle_token):
+def get_moodle_contents_and_videos(course_id, moodle_url, moodle_token):
     function = "core_course_get_contents"
-    print(f"--- INÍCIO DA BUSCA DE CONTEÚDOS MOODLE --- | Course ID: {course_id}")
-    params = {
-        'courseid': course_id
-    }
+    print(f"--- INÍCIO DA BUSCA DE CONTEÚDOS E VÍDEOS --- | Course ID: {course_id}")
+    params = {'courseid': course_id}
     
-    filenames = []  # Lista para armazenar os nomes dos ficheiros encontrados
+    filenames = []
+    youtube_ids = set()  # Usamos um set para evitar IDs duplicados
+    
     try:
         contents = call_moodle(moodle_url, moodle_token, function, params, timeout=5)
-        #print(f"Resposta bruta do Moodle para conteúdos: {contents}")
-        # print dos nomes dos ficheiros encontrados
+        
         if isinstance(contents, list):
             for section in contents:
                 for module in section.get('modules', []):
+                    
+                    # 1. Mapeia PDFs e ficheiros normais (como já tinhas)
                     if 'contents' in module:
                         for content in module['contents']:
-                            #print(f"Encontrado conteúdo: {content.get('filename', 'sem nome')} (Moodle ID: {module['id']})")
                             filenames.append(content.get('filename', 'sem nome'))
-                                                        
-        # Se o Moodle retornar um erro no JSON (ex: token inválido)
+                    
+                    # 2. PROCURA VÍDEOS DO YOUTUBE
+                    # O HTML pode estar no 'intro' (descrição) ou no 'description' do módulo
+                    html_text = ""
+                    if 'intro' in module:
+                        html_text += module['intro']
+                    if 'description' in module:
+                        html_text += module['description']
+                    
+                    # Se for uma página de conteúdo dinâmico, inspeciona os conteúdos de texto
+                    if 'contents' in module:
+                        for content in module['contents']:
+                            if 'content' in content: # Texto corrido dentro da página
+                                html_text += content['content']
+
+                    # Se encontrarmos texto, procuramos por links/iframes do YouTube
+                    if html_text:
+                        found_ids = re.findall(YOUTUBE_REGEX, html_text)
+                        for yt_id in found_ids:
+                            print(f"[VÍDEO DETETADO] Encontrado vídeo do YouTube com ID: {yt_id}")
+                            youtube_ids.add(yt_id)
+                                                                        
         if isinstance(contents, dict) and "exception" in contents:
             print(f"ERRO: Erro na API Moodle: {contents['message']}")
-            return None, None
+            return None, None, None
 
-        print(f"Conteúdos obtidos com sucesso para o curso {course_id}")
-        return contents, filenames
+        print(f"Conteúdos e {len(youtube_ids)} vídeos processados com sucesso.")
+        return contents, filenames, list(youtube_ids)
 
     except requests.exceptions.RequestException as e:
         print(f"ERRO: Erro na requisição ao Moodle: {e}")
-        return None, None
+        return None, None, None
     
 def extract_visible_resources(moodle_json):
     allowed_materials = []

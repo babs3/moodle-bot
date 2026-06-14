@@ -39,6 +39,7 @@ jwt = JWTManager(app)
 # No topo do ficheiro, cria um set para guardar os cursos em processamento
 active_syncs = set()
 
+
 def wait_for_rasa():
     app.logger.info("A aguardar que o Rasa fique disponível...")
     while True:
@@ -150,12 +151,12 @@ def chat():
     cached_rasa = cache.get(cache_key)
     if not cached_rasa:
         app.logger.info(f"Cache MISS para Moodle contents - User: {user_id}, Course: {course_id}. Fetching from Moodle...")
-        moodle_contents, moodle_contents_names = get_moodle_contents(course_id, moodle_url, moodle_token)
-        cache.set(cache_key, (moodle_contents, moodle_contents_names), timeout=1800) # Guarda por 30 minutos
+        moodle_contents, moodle_contents_names, youtube_ids = get_moodle_contents_and_videos(course_id, moodle_url, moodle_token)
+        cache.set(cache_key, (moodle_contents, moodle_contents_names, youtube_ids), timeout=1800) # Guarda por 30 minutos
     else:
         app.logger.info(f"Cache HIT para Moodle contents - User: {user_id}, Course: {course_id}. Loaded from cache.")
-        moodle_contents, moodle_contents_names = cached_rasa
-    
+        moodle_contents, moodle_contents_names, youtube_ids = cached_rasa
+
     if moodle_contents_names == None:
         app.logger.error("Failed to fetch Moodle contents.")
         return jsonify([{"text": "There is no content available for this course or an error occurred while fetching the content. Please try again later."}])
@@ -171,6 +172,7 @@ def chat():
             app.logger.warning("No authorized resources found for this course.")
             #return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
         
+    
     # check if user is in tutor mode
     user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
 
@@ -276,6 +278,7 @@ def chat():
 @app.route('/process_knowledge', methods=['POST'])
 def process_knowledge():
     files = request.files.getlist('files[]')
+    video_files = request.files.getlist('video_files[]')
     course_id = request.form.get('course_id')
     api_key = request.form.get('api_key')
 
@@ -306,7 +309,7 @@ def process_knowledge():
                 db.session.commit()
 
         # 3. Correr a pipeline
-        success = process_pdfs(pdf_folder=temp_dir, course_id=course_id)
+        success = process_pdfs(pdf_folder=temp_dir, youtube_ids=[], course_id=course_id)
 
         # 4. Limpar ficheiros temporários após processar
         shutil.rmtree(temp_dir)
@@ -323,9 +326,8 @@ def process_knowledge():
         return jsonify({"status": "error", "message": str(e)}), 500
     
 def background_sync(app, course_id, pdf_folder, moodle_token, moodle_url):
-    """Função que corre em paralelo para não travar o Moodle."""
-    print(f"--- Iniciando sincronização para o curso {course_id} ---")
-    success = False
+    """Função que corre em paralelo para sincronizar PDFs e transcrever vídeos do YouTube."""
+    print(f"--- Iniciando sincronização completa para o curso {course_id} ---")
     
     with app.app_context():
         try:
@@ -345,84 +347,98 @@ def background_sync(app, course_id, pdf_folder, moodle_token, moodle_url):
                 print(f"Erro ao obter conteúdos do curso {course_id}: {sections}")
                 return
 
-            # Criar pasta temporária
+            # Criar pasta temporária para PDFs e Áudios
             os.makedirs(pdf_folder, exist_ok=True)
 
             found_files = 0
+            youtube_ids = set() # Usamos set para evitar IDs duplicados na mesma secção
+
             for section in sections:
                 for module in section.get('modules', []):
+                    
+                    # ==========================================
+                    # FLUXO A: DETEÇÃO DE PDFs (O teu código original)
+                    # ==========================================
                     if module.get('modname') == 'resource':
                         for content in module.get('contents', []):
                             if content.get('mimetype') == 'application/pdf':
                                 file_url = content.get('fileurl')
                                 file_name = content.get('filename')
                                 
-                                # CORREÇÃO DO URL: Verifica se já existe um '?' no URL
                                 separator = '&' if '?' in file_url else '?'
                                 download_url = f"{file_url}{separator}token={moodle_token}"
-                                
-                                # Download com validação
                                 file_path = os.path.join(pdf_folder, file_name)
-                                r = requests.get(download_url, stream=True)
                                 
+                                r = requests.get(download_url, stream=True)
                                 if r.status_code == 200:
-                                    # VERIFICAÇÃO CRÍTICA: O Moodle devolveu um PDF ou um erro em HTML/JSON?
                                     content_type = r.headers.get('Content-Type', '')
                                     if 'application/pdf' in content_type:
                                         with open(file_path, 'wb') as f:
                                             for chunk in r.iter_content(chunk_size=8192):
                                                 f.write(chunk)
                                         found_files += 1
-                                        # check if file already exists in the database for this course, if not, create a new record
+                                        
                                         file_record = KnowledgeFiles.query.filter_by(course_id=course_id, filename=file_name).first()
-                                        if file_record:
-                                            print(f"Ficheiro {file_name} já existe na base de dados para o curso {course_id}, não criando duplicado.")
-                                            continue
-                                        else:
-                                            new_file = KnowledgeFiles(
-                                                course_id=course_id,
-                                                filename=file_name
-                                            )
+                                        if not file_record:
+                                            new_file = KnowledgeFiles(course_id=course_id, filename=file_name)
                                             db.session.add(new_file)
                                             db.session.commit()
-                                            print(f"Ficheiro guardado: {file_name}")
-                                    else:
-                                        print(f"Aviso: O ficheiro {file_name} não é um PDF válido. Recebido: {content_type}")
-                                        print(f"Resposta do Moodle: {r.text[:200]}") # Log para debug
-                                else:
-                                    print(f"Erro HTTP {r.status_code} no ficheiro {file_name}")
+                                            print(f"PDF guardado na DB: {file_name}")
+                    
+                    # ==========================================
+                    # FLUXO B: DETEÇÃO DE VÍDEOS DO YOUTUBE
+                    # ==========================================
+                    html_text = ""
+                    if 'intro' in module:
+                        html_text += module['intro']
+                    if 'description' in module:
+                        html_text += module['description']
+                    
+                    # Se for uma página nativa do moodle, o texto rico está dentro de contents
+                    if 'contents' in module:
+                        for content in module['contents']:
+                            if 'content' in content:
+                                html_text += content['content']
+                    
+                    # Se encontrarmos texto HTML, corremos o Regex à procura do YouTube
+                    if html_text:
+                        found_ids = re.findall(YOUTUBE_REGEX, html_text)
+                        for yt_id in found_ids:
+                            video_record = KnowledgeVideos.query.filter_by(course_id=course_id, video_id=yt_id).first()
+                            if video_record:
+                                print(f"Vídeo {yt_id} já foi transcrito anteriormente. A ignorar.")
+                                continue
+                                
+                            print(f"-> Novo vídeo detetado [{yt_id}]. A iniciar extração de áudio...")
+                            youtube_ids.add(yt_id)
+                            # Guardar na BD que o vídeo já está feito
+                            new_video = KnowledgeVideos(course_id=course_id, video_id=yt_id)
+                            db.session.add(new_video)
+                            db.session.commit()
+                            print(f"✓ Transcrição do vídeo {yt_id} concluída e guardada.")
 
-            print(f"Download concluído. PDFs válidos: {found_files}")
+            print(f"Varrimento concluído. PDFs novos: {found_files} | IDs de Vídeo detetados: {len(youtube_ids)}")
 
-            # 2. Chamar a tua função de processamento se houver ficheiros
+            # Processamento dos PDFs na Knowledge Base
+            # Processamento e Transcrição dos Vídeos detetados
             if found_files > 0:
                 print(f"A processar {found_files} PDFs na Knowledge Base...")
-                success = process_pdfs(pdf_folder=pdf_folder, course_id=course_id)
-                if success:
-                    print(f"Sucesso: Knowledge Base do curso {course_id} populada.")
-                else:
-                    print(f"Erro: A função process_pdfs falhou para o curso {course_id}.")
-            else:
-                print("Nenhum PDF novo encontrado para processar.")
+                process_pdfs(pdf_folder=pdf_folder, youtube_ids=youtube_ids, course_id=course_id)
 
         except Exception as e:
             print(f"Erro crítico durante a sincronização: {str(e)}")
-        
+            
         finally:
-            # 1. Libertar o lock do curso
-            if course_id in active_syncs:
+            # Libertar o lock do curso
+            if 'active_syncs' in globals() and course_id in active_syncs:
                 active_syncs.remove(course_id)
             
-            # 2. Limpeza à prova de erro
+            # Limpeza da pasta temporária
             if os.path.exists(pdf_folder):
-                try:
-                    # ignore_errors=True faz com que o shutil ignore ficheiros 
-                    # que já desapareceram ou que estão bloqueados
-                    shutil.rmtree(pdf_folder, ignore_errors=True)
-                    print(f"Pasta temporária {pdf_folder} limpa com sucesso.")
-                except Exception as e:
-                    print(f"Não foi possível apagar a pasta {pdf_folder}, mas ignoramos: {e}")
-                
+                shutil.rmtree(pdf_folder, ignore_errors=True)
+                print(f"Pasta temporária {pdf_folder} limpa com sucesso.")
+
+         
 @app.route('/populate_with_moodle_contents/<int:course_id>', methods=['POST'])
 def populate_with_moodle_contents(course_id):
     # 1. Trancar imediatamente se já houver um sync ativo (Prevenção de concorrência)

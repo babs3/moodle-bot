@@ -11,3 +11,5 @@ documents
 all-MiniLM-L6-v2
 cleaned_output.sql
 whisper_models
+migrations
+__pycache__

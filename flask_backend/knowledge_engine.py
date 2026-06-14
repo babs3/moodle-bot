@@ -17,6 +17,8 @@ import spacy
 import uuid
 from collections import Counter
 import re
+from yt_dlp import YoutubeDL
+from faster_whisper import WhisperModel
 
 # Load Spacy model for NLP tasks
 nlp = spacy.load("en_core_web_sm")
@@ -578,7 +580,7 @@ def create_blacklist(pdf, threshold_pct=0.15):
     
     return blacklist
             
-def process_pdfs(pdf_folder, course_id):
+def process_pdfs(pdf_folder, youtube_ids, course_id):
     """Processa PDFs de um curso específico e atualiza a base de conhecimento."""
     
     # 1. Definir o caminho da subpasta do curso
@@ -624,7 +626,57 @@ def process_pdfs(pdf_folder, course_id):
                 ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
                 ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
                 
-
+    if not youtube_ids:
+        print("-> Nenhum vídeo do YouTube para processar.")
+    else: 
+        print(f"-> Processando {len(youtube_ids)} vídeos do YouTube...")
+        for video_id in youtube_ids:
+            print(f"-> Novo vídeo detetado [{video_id}]. A iniciar extração de áudio...")
+            
+            audio_output_mp3 = os.path.join(pdf_folder, f"{video_id}.mp3")
+            
+            # Configuração do yt-dlp para extrair apenas áudio leve
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'outtmpl': os.path.join(pdf_folder, f"{video_id}.%(ext)s"),
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '96',
+                }],
+                'quiet': True
+            }
+            
+            try:
+                # Download do áudio do YT
+                with YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
+                    
+                if os.path.exists(audio_output_mp3):
+                    print(f"-> A transcrever áudio do vídeo {video_id} com Whisper local (CPU)...")
+                    model = WhisperModel("base", device="cpu", compute_type="int8", download_root=pdf_folder)
+                    segments, info = model.transcribe(audio_output_mp3, language="en", beam_size=5)
+                    
+                    # Juntar os segmentos em texto corrido
+                    full_text = "\n".join([segment.text for segment in segments])
+                    print(f"-> Transcrição completa do vídeo {video_id}:\n{full_text[:900]}...")  # Mostra apenas os primeiros 900 caracteres 
+                    
+                    documents.append(full_text)
+                    metadata.append({
+                        "file": f"YouTube Video {video_id}", 
+                        "page": "N/A", 
+                        "course_id": str(course_id),
+                        "is_ocr": False
+                    })
+                    cleaned_text = tokenize_and_clean_text(clean_doc_text(full_text))
+                    simple_tokens.append(cleaned_text)
+                    ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
+                    ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
+                
+            except Exception as e:
+                print(f"Erro ao processar o vídeo {video_id}: {e}")
+                continue
+        
     if not documents:
         return False
 

@@ -5,6 +5,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     libtesseract-dev \
+    ffmpeg \
     build-essential \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
