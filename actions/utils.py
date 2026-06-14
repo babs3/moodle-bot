@@ -412,6 +412,25 @@ def dense_vector_search(intent, complex_tokens, simple_tokens, context, query, c
     if context and context.strip() != "":
         query += " in " + context  # Add context to the query if it exists
 
+    # 1. Buscar todos os metadados da coleção
+    # (Pedimos apenas os metadados para não sobrecarregar a memória com textos gigantes)
+    all_data = collection.get(include=["metadatas"])
+
+    # 2. Extrair e listar os nomes únicos dos ficheiros guardados
+    if all_data and "metadatas" in all_data:
+        # Mapeia o campo "file" de cada chunk na coleção
+        files_in_chroma = set(
+            meta.get("file") for meta in all_data["metadatas"] if meta and "file" in meta
+        )
+        
+        print("\n--- 📁  FICHEIROS ATUALMENTE NO CHROMADB ---")
+        for f in files_in_chroma:
+            print(f"- {f}")
+        print(f"Total de ficheiros únicos: {len(files_in_chroma)}\n")
+        
+    else:
+        print("A coleção está completamente vazia ou não tem metadados.")
+    
     # === DENSE (Vector) SEARCH === #
     print(f"\n🔛  Getting query embeddings for query: '{query}'\n...")
     

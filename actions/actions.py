@@ -15,7 +15,7 @@ try:
     chroma_client = chromadb.HttpClient(host='chroma', port=8000)
     print("📡  Cliente ChromaDB instanciado...")
     
-    collection = chroma_client.get_collection(name="class_materials")
+    collection = chroma_client.get_or_create_collection(name="class_materials")
     print("✅  Collection reloaded successfully.")
 except Exception as e:
     print(f"❌  ERRO CRÍTICO NO CHROMA: {str(e)}")

@@ -489,7 +489,7 @@ def extract_text_by_context(pdf_path, is_book=False, edited=False, min_word_thre
 
     return page_chunks
 
-def process_video_transcription(raw_text, chunk_size=200, chunk_overlap=40):
+def process_video_transcription(raw_text, chunk_size=100, chunk_overlap=20):
     """
     Lê a transcrição de um vídeo, limpa-a e divide-a em chunks de texto 
     com sobreposição (overlap) para não perder contexto semântico.
@@ -499,7 +499,7 @@ def process_video_transcription(raw_text, chunk_size=200, chunk_overlap=40):
     :param chunk_overlap: Número de palavras a repetir entre chunks vizinhos.
     :return: Lista de dicionários estruturados prontos para a Vector Store.
     """
-    print(f"\n🎬 Processing video transcription...")
+    print(f"\n🎬  Processing video transcription...")
 
     cleaned_text = re.sub(r'\[\d{2}:\d{2}\]', '', raw_text) # Remove [00:00] se existir
     
@@ -544,7 +544,7 @@ def process_video_transcription(raw_text, chunk_size=200, chunk_overlap=40):
         start_idx += (chunk_size - chunk_overlap)
         chunk_index += 1
 
-    print(f"🎬 Video processing concluded. Total chunks created: {len(video_chunks)}\n")
+    print(f"🎬  Video processing concluded. Total chunks created: {len(video_chunks)}\n")
     return video_chunks
 
 def clean_doc_text(text):
@@ -718,14 +718,16 @@ def process_pdfs(pdf_folder, youtube_ids, course_id):
                     full_text = "\n".join([segment.text for segment in segments])
                     video_chunks = process_video_transcription(full_text)
                     
+                    inc = 1
                     for chunk in video_chunks:
                         documents.append(chunk["text"])
                         metadata.append({
-                            "file": f"YouTube Video {video_id}", 
-                            "page": "N/A", 
+                            "file": video_id, 
+                            "page": str(inc), 
                             "course_id": str(course_id),
                             "is_ocr": False
                         })
+                        inc += 1
                         
                         cleaned_text = tokenize_and_clean_text(clean_doc_text(chunk["text"]))
                         simple_tokens.append(cleaned_text)

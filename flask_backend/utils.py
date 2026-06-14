@@ -403,6 +403,28 @@ def extract_visible_resources(moodle_json):
                     'filename': module['contents'][0]['filename'] if 'contents' in module else module['name']
                 }
                 allowed_materials.append(resource_info)
+            
+            # Filtro 1: É um video (dentro de um label)?
+            # Filtro 2: Está visível para o aluno?
+            elif module['modname'] == 'label' and module['visible'] == 1:
+                
+                if 'description' in module and module['description']:
+                    # Procura todas as ocorrências do padrão no HTML da descrição
+                    found_youtube_ids = re.findall(YOUTUBE_REGEX, module['description'])
+                    
+                    # Se encontrou pelo menos um ID
+                    if found_youtube_ids:
+                        # Usamos o set() para o caso de o mesmo ID aparecer duplicado no HTML
+                        for yt_id in set(found_youtube_ids):
+                            print(f"Vídeo detetado! ID extraído: {yt_id}")
+                            
+                            # Aqui geras o dicionário para a tua lista de materiais autorizados
+                            video_info = {
+                                'moodle_id': module['id'],
+                                'display_name': f"Video Lecture - {module['name']}",
+                                'filename': yt_id  # Guardará 'bhzEkTQTgsY'
+                            }
+                            allowed_materials.append(video_info)
                 
     return allowed_materials
 

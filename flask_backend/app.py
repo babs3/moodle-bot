@@ -164,7 +164,7 @@ def chat():
         app.logger.warning("No contents found for this course.")
         return jsonify([{"text": "There is no content available for this course. Please check back later or contact your instructor."}])
     else:
-        print(f"📂  Moodle contents for course {course_id}: {moodle_contents_names}")
+        print(f"📂  Moodle contents for course {course_id}: {moodle_contents_names}, {youtube_ids}")
         print(f"   moodle_contents: {moodle_contents}")
         resources = extract_visible_resources(moodle_contents)
         # Se resources já são os autorizados, basta extrair os nomes:
