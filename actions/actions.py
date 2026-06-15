@@ -845,6 +845,7 @@ class ActionGetClassMaterialLocation(Action):
         user_email = tracker.get_slot("user_email")
         user_message = tracker.get_slot("user_query")
         tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
+        content_mappings = tracker.latest_message.get("metadata", {}).get("content_mappings", {})
         #print(f"tutor_mode in ActionGetClassMaterialLocation: {tutor_mode}")
         
         print(f"\n📊  Generating bot 'action_get_class_material_location' response..."
@@ -882,7 +883,7 @@ class ActionGetClassMaterialLocation(Action):
         else: # get materials location:
             complex_tokens = tracker.get_slot("complex_tokens") or []
             simple_tokens = tracker.get_slot("simple_tokens") or []
-            location_results, pdfs_insights = get_materials_location(selected_results, complex_tokens, simple_tokens, course_id)
+            location_results, pdfs_insights = get_materials_location(selected_results, complex_tokens, simple_tokens, course_id, content_mappings)
 
             if location_results:
                 response = save_user_progress(course_id, user_email, user_message, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)
@@ -895,7 +896,7 @@ class ActionGetClassMaterialLocation(Action):
             else:
                 # no exact references found, so return related PDFs found in previous function
                 if selected_results:
-                    location_results, pdfs_insights = update_materials_location(selected_results)
+                    location_results, pdfs_insights = update_materials_location(selected_results, content_mappings)
                     response = save_user_progress(course_id, user_email, user_message, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)
                     #dispatcher.utter_message(text="</br></br>You can find related information in:</br>" + "</br>".join(location_results))
                     dispatcher.utter_message(
@@ -983,6 +984,7 @@ class ActionAnalyzeProgress(Action):
         print(f"\n📖  --------- Getting Knowledge --------- 📖 ")
         print(f"\nQUIZ Question: {progress_data['question']} 📩")
         
+        content_mappings = tracker.latest_message.get("metadata", {}).get("content_mappings", {})
         authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
         print(f"📚  Authorized resources from metadata: {authorized_resources}")
         intent = "explanation of"  # Podemos usar a explicação para analisar o progresso do aluno, já que queremos entender onde ele errou e como melhorar
@@ -1112,13 +1114,13 @@ Please provide the HTML feedback analysis adhering strictly to the requested ton
         
         print(f"\n🔖  --------- Getting class materials location --------- 🔖 ")
 
-        location_results, _ = get_materials_location(selected_results, complex_tokens, simple_tokens, course_id)
+        location_results, _ = get_materials_location(selected_results, complex_tokens, simple_tokens, course_id, content_mappings)
         location_materials_text = "<span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>" + "</br>".join(location_results) + "</span></i>"
         
         if not location_results:
             # no exact references found, so return related PDFs found in previous function
             if selected_results:
-                location_results, _ = update_materials_location(selected_results)
+                location_results, _ = update_materials_location(selected_results, content_mappings)
                 location_materials_text = "<span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>" + "</br>".join(location_results) + "</span></i>"
             else:                
                 print("\n ⚠️  No exact references found, but you might check related PDFs.")

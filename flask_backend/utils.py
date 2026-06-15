@@ -341,6 +341,7 @@ def get_moodle_contents_and_videos(course_id, moodle_url, moodle_token):
     
     try:
         contents = call_moodle(moodle_url, moodle_token, function, params, timeout=5)
+        print(f"Resposta bruta do Moodle: {contents}")
         
         if isinstance(contents, list):
             for section in contents:

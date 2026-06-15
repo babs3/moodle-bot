@@ -245,7 +245,7 @@ def extract_simple_tokens(query): # ['pestel', 'analysis']
     keywords = list(dict.fromkeys(keywords))
     return keywords
 
-def group_pages_by_pdf(document_entries):
+def group_pages_by_pdf(document_entries, content_mappings):
     """
     Groups consecutive pages for the same PDF into a range format.
     Example:
@@ -255,8 +255,13 @@ def group_pages_by_pdf(document_entries):
     grouped_results = []
     current_pdf = None
     current_pages = []
+    print(f"🔍  Content Mappings: {content_mappings}")
 
     for file_name, pages in document_entries:
+        # substitute file_nem with display name using content_mappings
+        print(f"\n🔹  Original file name: '{file_name}'")
+        file_name = content_mappings.get(file_name, file_name)
+        print(f"🔹  Mapped file name: '{file_name}'")
         pages_list = pages.split("-")
         # Convert to integers and sort
         pages_list = [int(page) for page in pages_list if page.isdigit()]
@@ -279,7 +284,7 @@ def group_pages_by_pdf(document_entries):
     # Add the last processed PDF
     if current_pdf:
         grouped_results.append(format_page_range(current_pdf, current_pages))
-
+        
     return grouped_results
 
 def format_page_range(file_name, pages):
@@ -758,7 +763,7 @@ def normalize_topic(new_topic, threshold=0.85):
     return new_topic  # Return the new topic if no close match was found
 
 
-def get_materials_location(selected_results, complex_tokens, simple_tokens, course_id):
+def get_materials_location(selected_results, complex_tokens, simple_tokens, course_id, content_mappings):
     location_results = []
     document_entries = []  # Store documents before sorting
     pdfs_insights = []
@@ -791,7 +796,7 @@ def get_materials_location(selected_results, complex_tokens, simple_tokens, cour
     
     # **Sort by PDF name (A-Z) and then by page number (ascending)**
     document_entries.sort(key=lambda x: (x[0].lower(), x[1]))  
-    location_results = group_pages_by_pdf(document_entries) # Format results
+    location_results = group_pages_by_pdf(document_entries, content_mappings) # Format results
     
     return location_results, pdfs_insights  # Return both the formatted results and the list of PDFs
 
@@ -800,7 +805,7 @@ def print_results(results):
     for result in results:
         print(result)
         
-def update_materials_location(selected_results):
+def update_materials_location(selected_results, content_mappings):
     location_results = [] 
     document_entries = []  # Store documents before sorting
     pdfs_insights = [] # Store unique PDF names
@@ -815,7 +820,7 @@ def update_materials_location(selected_results):
     for file_name, page_number in document_entries:
         pdfs_insights.append(file_name)
     pdfs_insights = list(set(pdfs_insights))
-    location_results = group_pages_by_pdf(document_entries) # Format results
+    location_results = group_pages_by_pdf(document_entries, content_mappings) # Format results
     
     print_results(location_results)
     

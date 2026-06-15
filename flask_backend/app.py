@@ -169,13 +169,15 @@ def chat():
         resources = extract_visible_resources(moodle_contents)
         # Se resources já são os autorizados, basta extrair os nomes:
         authorized_resources = [res.get("filename") for res in resources if res.get("filename")]
+        content_mappings = {res.get("filename"): res.get("display_name", res.get("filename")) for res in resources if res.get("filename")}
 
         if not authorized_resources:
             app.logger.warning("No authorized resources found for this course.")
             #return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
         else:
             print(f"🔑  Authorized resources for user {user_id} in course {course_id}: {authorized_resources}")
-    
+            print(f"🔑  Content mappings for user {user_id} in course {course_id}: {content_mappings}")
+
     # check if user is in tutor mode
     user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
 
@@ -193,6 +195,7 @@ def chat():
                     "input_time":current_time,
                     "user_id": user_id,
                     "authorized_resources": authorized_resources,
+                    "content_mappings": content_mappings,
                     "tutor_mode": True,
                     "topic_id": user_message,
                     "course_id": course_id,
@@ -270,7 +273,8 @@ def chat():
                 "course_id": course_id, 
                 "is_teacher": is_teacher,
                 "length_preference": length_preference,
-                "tone_preference": tone_preference
+                "tone_preference": tone_preference,
+                "content_mappings": content_mappings
             }
         }
 
@@ -405,6 +409,7 @@ def background_sync(app, course_id, pdf_folder, moodle_token, moodle_url):
                     
                     # Se encontrarmos texto HTML, corremos o Regex à procura do YouTube
                     if html_text:
+                        print(f"----- html_text: {html_text}")
                         found_ids = re.findall(YOUTUBE_REGEX, html_text)
                         for yt_id in found_ids:
                             video_record = KnowledgeVideos.query.filter_by(course_id=course_id, video_id=yt_id).first()
@@ -1037,10 +1042,10 @@ def tarefa_monitor():
             while True:
                 app.logger.info("A aguardar alguns segundos antes do polling para dar tempo ao trigger do Moodle...")
                 time.sleep(20)
-                response = new_quiz_polling()
-                if response != None:
-                    app.logger.info("Polling de quizzes concluído com sucesso.")
-                    break
+                #response = new_quiz_polling()
+                #if response != None:
+                #    app.logger.info("Polling de quizzes concluído com sucesso.")
+                #    break
         except Exception as e:
             app.logger.error(f"Erro no monitor: {e}")
 
