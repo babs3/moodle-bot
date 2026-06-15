@@ -336,53 +336,61 @@ def get_moodle_contents_and_videos(course_id, moodle_url, moodle_token):
     print(f"--- INÍCIO DA BUSCA DE CONTEÚDOS E VÍDEOS --- | Course ID: {course_id}")
     params = {'courseid': course_id}
     
-    filenames = []
-    youtube_ids = set()  # Usamos um set para evitar IDs duplicados
-    
     try:
         contents = call_moodle(moodle_url, moodle_token, function, params, timeout=5)
         print(f"Resposta bruta do Moodle: {contents}")
         
-        if isinstance(contents, list):
-            for section in contents:
-                for module in section.get('modules', []):
+        allowed_materials = []
+    
+        # Percorrer cada secção (Geral, aula 0, aula 1...)
+        for section in contents:
+            # Percorrer cada módulo dentro da secção
+            for module in section.get('modules', []):
+                
+                # Filtro 1: É um recurso (ficheiro)?
+                # Filtro 2: Está visível para o aluno?
+                if module['modname'] == 'resource' and module['visible'] == 1:
                     
-                    # 1. Mapeia PDFs e ficheiros normais (como já tinhas)
-                    if 'contents' in module:
-                        for content in module['contents']:
-                            filenames.append(content.get('filename', 'sem nome'))
+                    # Extraímos o ID e o Nome
+                    resource_info = {
+                        'moodle_id': module['id'],
+                        'display_name': module['name'],
+                        # Opcional: extrair o nome real do ficheiro se existir
+                        'filename': module['contents'][0]['filename'] if 'contents' in module else module['name']
+                    }
+                    allowed_materials.append(resource_info)
+                
+                # Filtro 1: É um video (dentro de um label)?
+                # Filtro 2: Está visível para o aluno?
+                elif module['modname'] == 'label' and module['visible'] == 1:
                     
-                    # 2. PROCURA VÍDEOS DO YOUTUBE
-                    # O HTML pode estar no 'intro' (descrição) ou no 'description' do módulo
-                    html_text = ""
-                    if 'intro' in module:
-                        html_text += module['intro']
-                    if 'description' in module:
-                        html_text += module['description']
-                    
-                    # Se for uma página de conteúdo dinâmico, inspeciona os conteúdos de texto
-                    if 'contents' in module:
-                        for content in module['contents']:
-                            if 'content' in content: # Texto corrido dentro da página
-                                html_text += content['content']
-
-                    # Se encontrarmos texto, procuramos por links/iframes do YouTube
-                    if html_text:
-                        found_ids = re.findall(YOUTUBE_REGEX, html_text)
-                        for yt_id in found_ids:
-                            print(f"[VÍDEO DETETADO] Encontrado vídeo do YouTube com ID: {yt_id}")
-                            youtube_ids.add(yt_id)
-                                                                        
-        if isinstance(contents, dict) and "exception" in contents:
-            print(f"ERRO: Erro na API Moodle: {contents['message']}")
-            return None, None, None
-
-        print(f"Conteúdos e {len(youtube_ids)} vídeos processados com sucesso.")
-        return contents, filenames, list(youtube_ids)
-
+                    if 'description' in module and module['description']:
+                        # Procura todas as ocorrências do padrão no HTML da descrição
+                        found_youtube_ids = re.findall(YOUTUBE_REGEX, module['description'])
+                        
+                        # Se encontrou pelo menos um ID
+                        if found_youtube_ids:
+                            # Usamos o set() para o caso de o mesmo ID aparecer duplicado no HTML
+                            for yt_id in set(found_youtube_ids):
+                                print(f"Vídeo detetado! ID extraído: {yt_id}")
+                                
+                                # Aqui geras o dicionário para a tua lista de materiais autorizados
+                                video_info = {
+                                    'moodle_id': module['id'],
+                                    'display_name': f"Video Lecture - {module['name']}",
+                                    'filename': yt_id  # Guardará 'bhzEkTQTgsY'
+                                }
+                                allowed_materials.append(video_info)
+                                
+        # Se resources já são os autorizados, basta extrair os nomes:
+        authorized_resources = [res.get("filename") for res in allowed_materials if res.get("filename")]
+        content_mappings = {res.get("filename"): res.get("display_name", res.get("filename")) for res in allowed_materials if res.get("filename")}
+        
+        return authorized_resources, content_mappings
+    
     except requests.exceptions.RequestException as e:
         print(f"ERRO: Erro na requisição ao Moodle: {e}")
-        return None, None, None
+        return None, None
     
 def extract_visible_resources(moodle_json):
     allowed_materials = []

@@ -151,32 +151,19 @@ def chat():
     cached_rasa = cache.get(cache_key)
     if not cached_rasa:
         app.logger.info(f"Cache MISS para Moodle contents - User: {user_id}, Course: {course_id}. Fetching from Moodle...")
-        moodle_contents, moodle_contents_names, youtube_ids = get_moodle_contents_and_videos(course_id, moodle_url, moodle_token)
-        cache.set(cache_key, (moodle_contents, moodle_contents_names, youtube_ids), timeout=1800) # Guarda por 30 minutos
+        authorized_resources, content_mappings = get_moodle_contents_and_videos(course_id, moodle_url, moodle_token)
+        cache.set(cache_key, (authorized_resources, content_mappings), timeout=1800) # Guarda por 30 minutos
     else:
         app.logger.info(f"Cache HIT para Moodle contents - User: {user_id}, Course: {course_id}. Loaded from cache.")
-        moodle_contents, moodle_contents_names, youtube_ids = cached_rasa
+        authorized_resources, content_mappings = cached_rasa
 
-    if moodle_contents_names == None:
-        app.logger.error("Failed to fetch Moodle contents.")
+    if authorized_resources == None:
         return jsonify([{"text": "There is no content available for this course or an error occurred while fetching the content. Please try again later."}])
-    elif moodle_contents_names == []:
-        app.logger.warning("No contents found for this course.")
+    elif authorized_resources == []:
         return jsonify([{"text": "There is no content available for this course. Please check back later or contact your instructor."}])
     else:
-        print(f"📂  Moodle contents for course {course_id}: {moodle_contents_names}, {youtube_ids}")
-        print(f"   moodle_contents: {moodle_contents}")
-        resources = extract_visible_resources(moodle_contents)
-        # Se resources já são os autorizados, basta extrair os nomes:
-        authorized_resources = [res.get("filename") for res in resources if res.get("filename")]
-        content_mappings = {res.get("filename"): res.get("display_name", res.get("filename")) for res in resources if res.get("filename")}
-
-        if not authorized_resources:
-            app.logger.warning("No authorized resources found for this course.")
-            #return jsonify([{"text": "You don't have access to any resources for this course. Please check back later or contact your instructor."}])
-        else:
-            print(f"🔑  Authorized resources for user {user_id} in course {course_id}: {authorized_resources}")
-            print(f"🔑  Content mappings for user {user_id} in course {course_id}: {content_mappings}")
+        print(f"🔑  Authorized resources for user {user_id} in course {course_id}: {authorized_resources}")
+        print(f"🔑  Content mappings for user {user_id} in course {course_id}: {content_mappings}")
 
     # check if user is in tutor mode
     user = MoodleUsers.query.filter_by(moodle_id=user_id).first()
@@ -269,12 +256,12 @@ def chat():
                 "input_time":current_time, 
                 "user_id": user_id, 
                 "authorized_resources": authorized_resources, 
+                "content_mappings": content_mappings,
                 "tutor_mode": False, 
                 "course_id": course_id, 
                 "is_teacher": is_teacher,
                 "length_preference": length_preference,
-                "tone_preference": tone_preference,
-                "content_mappings": content_mappings
+                "tone_preference": tone_preference
             }
         }
 
