@@ -90,6 +90,7 @@ services:
       FLASK_ENV: "development"
       DB_HOST: db 
       REDIS_HOST: redis # 💡 Passamos o nome do serviço Redis como Host
+      HF_TOKEN: ${HF_TOKEN}
       POSTGRES_USER: ${APP_DATABASE_USER}
       POSTGRES_PASSWORD: ${APP_DATABASE_PASS}
       POSTGRES_DB: ${APP_DATABASE_NAME}

@@ -10,6 +10,7 @@ Copy the `.env` file and `materials` folder.
 `.env` file template:
 ```
 GOOGLE_API_KEY=MY_API_KEY_HERE
+HF_TOKEN=HUGGINFACE_ACCESS_TOKEN # to extract text from videos
 APP_DATABASE_USER=MY_DB_USER
 APP_DATABASE_PASS=MY_DB_PASSWORD
 APP_DATABASE_NAME=MY_DB_NAME
