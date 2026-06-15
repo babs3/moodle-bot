@@ -83,6 +83,7 @@ class KnowledgeFiles(db.Model):
     
 class KnowledgeVideos(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
     course_id = db.Column(db.Integer, nullable=False)
     video_id = db.Column(db.String(255), nullable=False)
     last_updated = db.Column(db.DateTime, default=datetime.now)

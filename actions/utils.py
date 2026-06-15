@@ -253,7 +253,7 @@ def group_pages_by_pdf(document_entries, content_mappings):
         Output: ["file1.pdf (Pages 1-3)", "file2.pdf (Pages 10, 12)"]
     """
     grouped_results = []
-    current_pdf = None
+    current_file = None
     current_pages = []
     print(f"🔍  Content Mappings: {content_mappings}")
 
@@ -265,12 +265,12 @@ def group_pages_by_pdf(document_entries, content_mappings):
         pages_list = pages.split("-")
         # Convert to integers and sort
         pages_list = [int(page) for page in pages_list if page.isdigit()]
-        if file_name != current_pdf:  
+        if file_name != current_file:  
             # If switching to a new PDF, store the previous result
-            if current_pdf:
-                grouped_results.append(format_page_range(current_pdf, current_pages))
+            if current_file:
+                grouped_results.append(format_page_range(current_file, current_pages))
             # Reset tracking for new PDF
-            current_pdf = file_name
+            current_file = file_name
             tmp_list = []
             for page in pages_list:
                 if page not in tmp_list:
@@ -282,8 +282,8 @@ def group_pages_by_pdf(document_entries, content_mappings):
                     current_pages.append(page)
 
     # Add the last processed PDF
-    if current_pdf:
-        grouped_results.append(format_page_range(current_pdf, current_pages))
+    if current_file:
+        grouped_results.append(format_page_range(current_file, current_pages))
         
     return grouped_results
 
@@ -312,8 +312,12 @@ def format_page_range(file_name, pages):
         ranges.append(f"{start}")
     else:
         ranges.append(f"{start}-{pages[-1]}")
-
-    return f"📄  {file_name} (p. {', '.join(ranges)})"
+        
+    # se o file começar com "Video Lecture" não mostrar páginas
+    if file_name.startswith("Video Lecture"):
+        return f"🎥  {file_name}"
+    else:
+        return f"📄  {file_name} (p. {', '.join(ranges)})"
 
 
 def treat_pdf_name(pdf_name):

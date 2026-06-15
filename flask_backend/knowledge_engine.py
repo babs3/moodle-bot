@@ -687,7 +687,7 @@ def process_pdfs(pdf_folder, youtube_ids, course_id):
         print("-> Nenhum vídeo do YouTube para processar.")
     else: 
         print(f"-> Processando {len(youtube_ids)} vídeos do YouTube...")
-        for video_id in youtube_ids:
+        for video_id, video_name in youtube_ids:
             print(f"-> Novo vídeo detetado [{video_id}]. A iniciar extração de áudio...")
             
             audio_output_mp3 = os.path.join(pdf_folder, f"{video_id}.mp3")

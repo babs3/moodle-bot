@@ -387,27 +387,36 @@ def background_sync(app, course_id, pdf_folder, moodle_token, moodle_url):
                         html_text += module['intro']
                     if 'description' in module:
                         html_text += module['description']
-                    
+
                     # Se for uma página nativa do moodle, o texto rico está dentro de contents
                     if 'contents' in module:
                         for content in module['contents']:
                             if 'content' in content:
                                 html_text += content['content']
-                    
+
                     # Se encontrarmos texto HTML, corremos o Regex à procura do YouTube
                     if html_text:
                         print(f"----- html_text: {html_text}")
                         found_ids = re.findall(YOUTUBE_REGEX, html_text)
+                        
+                        # Extraímos o nome do módulo atribuído no Moodle para usar como nome do vídeo
+                        video_name = module.get('name', 'Unnamed Video Lecture')
+                        
                         for yt_id in found_ids:
                             video_record = KnowledgeVideos.query.filter_by(course_id=course_id, video_id=yt_id).first()
                             if video_record:
-                                print(f"Vídeo {yt_id} já foi transcrito anteriormente. A ignorar.")
+                                print(f"Vídeo {yt_id} ({video_name}) já foi transcrito anteriormente. A ignorar.")
                                 continue
                                 
-                            print(f"-> Novo vídeo detetado [{yt_id}]. A iniciar extração de áudio...")
-                            youtube_ids.add(yt_id)
+                            print(f"-> Novo vídeo detetado [{yt_id}] - Nome: '{video_name}'. Adicionado para processamento.")
+                            
+                            # 💡 ALTERAÇÃO AQUI: Em vez de guardares só o ID no set, 
+                            # podes guardar um tuplo (ID, Nome) para a função de transcrição saber o nome.
+                            # Lembra-te de inicializar o `youtube_ids = set()` antes deste loop.
+                            youtube_ids.add((yt_id, video_name))
+                            
                             # Guardar na BD que o vídeo já está feito
-                            new_video = KnowledgeVideos(course_id=course_id, video_id=yt_id)
+                            new_video = KnowledgeVideos(course_id=course_id, video_id=yt_id, filename="Video - " + video_name)
                             db.session.add(new_video)
                             db.session.commit()
                             print(f"✓ Transcrição do vídeo {yt_id} concluída e guardada.")
@@ -496,10 +505,12 @@ def populate_with_moodle_contents(course_id):
 def list_knowledge(course_id):
     # Procura na base de dados do Flask/PostgreSQL
     files = KnowledgeFiles.query.filter_by(course_id=course_id).all()
+    videos = KnowledgeVideos.query.filter_by(course_id=course_id).all()
     
+    all_files = files + videos  # Combina PDFs e vídeos
     return jsonify([
         {"filename": f.filename} 
-        for f in files
+        for f in all_files
     ])
     
 @app.route('/tutor_toggle', methods=['POST'])
