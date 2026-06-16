@@ -381,7 +381,10 @@ def get_moodle_contents_and_videos(course_id, moodle_url, moodle_token):
                                     'filename': yt_id  # Guardará 'bhzEkTQTgsY'
                                 }
                                 allowed_materials.append(video_info)
-                                
+                
+                #elif module['modname'] == 'page' and module['visible'] == 1:
+                
+        
         # Se resources já são os autorizados, basta extrair os nomes:
         authorized_resources = [res.get("filename") for res in allowed_materials if res.get("filename")]
         content_mappings = {res.get("filename"): res.get("display_name", res.get("filename")) for res in allowed_materials if res.get("filename")}

@@ -40,6 +40,68 @@ jwt = JWTManager(app)
 active_syncs = set()
 
 
+PANOPTO_SERVER = os.getenv("PANOPTO_SERVER")
+CLIENT_ID = os.getenv("PANOPTO_CLIENT_ID")
+CLIENT_SECRET = os.getenv("PANOPTO_CLIENT_SECRET")
+
+def get_panopto_token():
+    """Obtém o token Bearer adicionando os scopes necessários"""
+    url = f"https://{PANOPTO_SERVER}/Panopto/oauth2/connect/token"
+    
+    payload = {
+        'grant_type': 'client_credentials', # Tenta primeiro com client_credentials outra vez com o scope adicionado!
+        'client_id': CLIENT_ID,
+        'client_secret': CLIENT_SECRET,
+        'scope': 'api offline_access' # 👈 O MAPA DO TESOURO ESTÁ AQUI
+    }
+    
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    
+    response = requests.post(url, data=payload, headers=headers)
+    
+    # Se o client_credentials falhar por causa do teu login federado, 
+    # experimenta mudar o grant_type para 'password' mantendo o 'scope'.
+    
+    if response.status_code == 200:
+        return response.json().get('access_token')
+    else:
+        raise Exception(f"Erro Panopto Auth: {response.status_code} - {response.text}")
+
+def processar_videos_panopto(folder_id):
+    """Bypass usando os cookies do teu navegador da U.Porto"""
+    try:
+        url = f"https://uporto.cloud.panopto.eu/Panopto/api/v1/folders/{folder_id}/sessions"
+        
+        # Colamos o teu cookie exatamente como o apanhaste:
+        MEU_COOKIE_DO_NAVEGADOR = (
+            "UserSettings=LastLoginMembershipProvider=Moodle2425; "
+            ".ASPXAUTH=CC636D85CFE45E01C4D1D500B614447B4DC6624C094BB927E2B2B7D6A709064B1FC41B4E533FB449DA4D5F272C2D704D00E3368F8D0B5EAC3FAEBC0A6C99158E8058F91B4E1810D1ECD0757BAFD6415A75B932E2ABFBE87471447EED8F13FE073DF24524C0419633EF2F02CB8150EE58E02B9F066632E6C00E24A5B9164F5A429FBD83B37FF3696FBA795B482591392C6B935627919ABCA399537ADE95F6F20FA1B6D6017F8FD318A0C7421FA853145026D393E115807F05DDA39C10DE91C712A5B58D8CEC1EB326690A5A81081F17643D061710E52347A008166E7720423047E4AAA18455F8DE83EDC1E1276ABCA7BF; "
+            "csrfToken=g34%2bKr4fI7wr5F3cxwk6N57oumMvgTg%2bB6YNbSwfBEYzRWFP%2bBNkcu9BdB%2bPYAUNgVt9ZbYX3mBhZBEDTZC5iXIOLqFFmadylr2grmy%2b1HQ8m5fKOHJL6c3vrSQUkeqscZcqmhPuWZ9voftdrsL5T4fv1k3D%2bWyBIJwDEPohq81%2bwjNbnXb1Wt6%2bsF8%2fy5v%2f3NlwC6hnMhzCwwl4liu442TfeuCVUF3y6xaaehmANRnAuUHnVh8snHOY8P9GMtRy; "
+            "sandboxCookie=13426098018.5585"
+        )
+        
+        headers = {
+            "Accept": "application/json",
+            "Cookie": MEU_COOKIE_DO_NAVEGADOR,
+            "X-Csrf-Token": "g34+Kr4fI7wr5F3cxwk6N57oumMvgTg+B6YNbSwfBEYzRWFP+BNkcu9BdB+PYAUNgVt9ZbYX3mBhZBEDTZC5iXIOLqFFmadylr2grmy+1HQ8m5fKOHJL6c3vrSQUkeqscZcqmhPuWZ9voftdrsL5T4fv1k3D+WyBIJwDEPohq81+wjNbnXb1Wt6+sF8/y5v/3NlwC6hnMhzCwwl4liu442TfeuCVUF3y6xaaehmANRnAuUHnVh8snHOY8P9GMtRy"
+        }
+        
+        print("A disparar pedido ao Panopto com a sessão capturada...")
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            dados_videos = response.json()
+            return {
+                "status": "sucesso",
+                "total_videos": len(dados_videos.get('Results', [])),
+                "videos": dados_videos.get('Results', [])
+            }, 200
+        else:
+            return {"error": "Erro ao ler vídeos", "detalhes": response.text}, response.status_code
+            
+    except Exception as e:
+        return {"error": str(e)}, 500
+    
 def wait_for_rasa():
     app.logger.info("A aguardar que o Rasa fique disponível...")
     while True:
@@ -324,6 +386,12 @@ def background_sync(app, course_id, pdf_folder, moodle_token, moodle_url):
     print(f"--- Iniciando sincronização completa para o curso {course_id} ---")
     
     with app.app_context():
+        
+        folder_id = "8f4b79cd-0c6d-49a5-9486-b3f60120c321" # TODO: passar dinamicamente do moodle
+        #dados, status = processar_videos_panopto(folder_id)
+        #print(f"Resposta da sincronização Panopto: {dados} | Status: {status}")
+        
+       
         try:
             # 1. Obter a estrutura do curso via Web Service
             ws_url = f"{moodle_url}/webservice/rest/server.php"
