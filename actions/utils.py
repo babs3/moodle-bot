@@ -169,6 +169,19 @@ def clean_key_phrase(phrase):
     
     return phrase
 
+def extract_noun(query, concept):
+    doc = nlp(query)
+
+    # Extract cleaned multi-word noun phrases
+    check_noun = False
+    for token in doc:
+        if check_noun:
+            if token.pos_ in {"NOUN", "PROPN"} and not token.is_stop:
+                return concept + ' ' + token.lemma_.lower()
+        if token.text.lower() == concept.lower():
+            check_noun = True
+    return ""
+
 def extract_query_keywords(query):
     """
     Extracts the most meaningful keyword or phrase from a user query.
@@ -406,12 +419,12 @@ def dense_vector_search(intent, complex_tokens, simple_tokens, context, query, c
     if complex_tokens != []:
         if simple_tokens != []:
             # se existir acronimos nos simple tokens, adiciona-os ao início da query, seguido dos complex tokens
-            acronimos = [token for token in simple_tokens if token.isupper()]
+            #acronimos = [token for token in simple_tokens if token.isupper()]
             # se complex_token acabar com 'and', adicionar o acronimo depois
             if complex_tokens and complex_tokens[-1].endswith('and'):
-                query = intent + " " + " ".join(complex_tokens) + " " + " ".join(acronimos)
+                query = intent + " " + " ".join(complex_tokens) + " " #+ " ".join(acronimos)
             else: 
-                query = intent + " " + " ".join(acronimos) + " " + " ".join(complex_tokens)
+                query = intent + " " + " ".join(complex_tokens) #  + " ".join(acronimos) + " "
             query = re.sub(r'\s+', ' ', query).strip()  # Remove extra spaces
         else:          
             query = intent + " " + " ".join(complex_tokens)  # Give more weight to complex tokens in the query
@@ -463,7 +476,7 @@ def dense_vector_search(intent, complex_tokens, simple_tokens, context, query, c
             unique_docs.append((doc, meta, score))
             seen_combinations.add(file_page_combo)
     
-    vector_docs, vector_metadata, normalized_vector_scores = zip(*unique_docs) if unique_docs else ([], [], [])
+    vector_docs, vector_metadata, vector_scores = zip(*unique_docs) if unique_docs else ([], [], [])
     
     #print(f"\n📖  1. Found {len(vector_docs)} documents with vector search.")
     #for doc, meta, score in zip(vector_docs, vector_metadata, vector_scores):
@@ -480,7 +493,7 @@ def dense_vector_search(intent, complex_tokens, simple_tokens, context, query, c
     return vector_docs, vector_metadata, normalized_vector_scores
 
 
-def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id, alpha=0.8):
+def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id, alpha=0.9):
     # === Perform Hybrid BM25 search === #
     
     if complex_tokens != []:
@@ -625,19 +638,64 @@ def get_ngrams(text, n=2):
     tokens = text.split()
     return [' '.join(ngram) for ngram in ngrams(tokens, n)]
         
-def hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_docs, bm25_meta, normalized_bm25_scores, alpha=0.6):
-    # === MERGE & RE-RANK RESULTS === #
+
+def calculate_engine_threshold(scores):
+    """Função auxiliar para calcular o threshold adaptativo de um motor específico."""
+    if not scores:
+        return 0
+    max_score = max(scores)
+    adaptive_threshold = np.mean(scores) + 0.5 * np.std(scores)
+    percentile_70 = np.percentile(scores, 70)
+    max_score_threshold = 0.8 * max_score
+    
+    return min(adaptive_threshold, percentile_70, max_score_threshold)
+
+def hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_docs, bm25_meta, normalized_bm25_scores, alpha=0.5):
+    # 1. Identificar quais os ficheiros/páginas que passaram nos thresholds individuais de cada motor
+    vector_threshold = calculate_engine_threshold(normalized_vector_scores)
+    bm25_threshold = calculate_engine_threshold(normalized_bm25_scores)
+    
+    # Criar conjuntos (sets) para controlo de quem veio de onde e quem passou nos thresholds
+    vector_passed = set()
+    bm25_passed = set()
+    all_vector_keys = set()
+    all_bm25_keys = set()
+    
+    # Analisar resultados do Vetor
+    for meta, score in zip(vector_metadata, normalized_vector_scores):
+        key = (meta['file'], meta['page'])
+        all_vector_keys.add(key)
+        if score >= vector_threshold:
+            vector_passed.add(key)
+            
+    # Analisar resultados do BM25
+    for meta, score in zip(bm25_meta, normalized_bm25_scores):
+        key = (meta['file'], meta['page'])
+        all_bm25_keys.add(key)
+        if score >= bm25_threshold:
+            bm25_passed.add(key)
+            
+    # 2. Aplicar a tua regra de seleção lógica (União das 3 condições)
+    # Condição 1: Interseção pura (Aparece em ambos os motores, independentemente do score)
+    intersection_keys = all_vector_keys.intersection(all_bm25_keys)
+    
+    # Combinar todas as chaves autorizadas
+    authorized_keys = intersection_keys.union(vector_passed).union(bm25_passed)
+    
+    # === MERGE & RE-RANK RESULTS ===
     hybrid_results = []
 
+    # Adicionar scores do vetor (pesados por alpha)
     for doc, meta, score in zip(vector_docs, vector_metadata, normalized_vector_scores):
         hybrid_score = alpha * score        
         hybrid_results.append((doc, meta, hybrid_score))
 
+    # Adicionar scores do BM25 (pesados por 1 - alpha)
     for doc, meta, score in zip(bm25_docs, bm25_meta, normalized_bm25_scores):
         hybrid_score = (1 - alpha) * score 
         hybrid_results.append((doc, meta, hybrid_score))
         
-    # if some hybrid_results have the same meta['file'] and meta['page'], sum the scores
+    # Agrupar e somar os scores híbridos
     hybrid_results_dict = {}
     for doc, meta, score in hybrid_results:
         key = (meta['file'], meta['page'])
@@ -645,32 +703,35 @@ def hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_d
             hybrid_results_dict[key][2] += score
         else:
             hybrid_results_dict[key] = [doc, meta, score]
-    # convert back to list
+            
+    # Converter de volta para lista
     hybrid_results = [(doc, meta, score) for (_, _), (doc, meta, score) in hybrid_results_dict.items()]
 
-    # Sort results by hybrid score
+    # Ordenar os resultados finais pelo score híbrido combinado
     hybrid_results = sorted(hybrid_results, key=lambda x: x[2], reverse=True)
-    print("\n📊  All Merged Results:")
-    for i, (doc, meta, score) in enumerate(hybrid_results):
-        print(f"{i+1}. 📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
-
-    # === ADAPTIVE THRESHOLDING BASED ON PERCENTILE === #
-    scores = [score for _, _, score in hybrid_results]
-    max_score = max(scores) if scores else 1
     
-    print(f"\n==== THRESHOLDING ====")        
-    adaptive_threshold = np.mean(scores) + 0.5 * np.std(scores)
-    percentile_70 = np.percentile(scores, 70)
-    max_score_threshold = 0.8 * max_score  # Set a threshold of 70% of the maximum score
-    #print(f"📊  Adaptive Threshold: {adaptive_threshold:.3f}")
-    #print(f"📊  Percentile_70: {percentile_70:.3f}")
-    #print(f"📊  Max Score Threshold: {max_score_threshold:.3f}")
+    # === FILTRAGEM FINAL ===
+    # Só entram os documentos cujas chaves foram pré-aprovadas pelas tuas 3 regras
+    selected_results = []
+    print(f"\n==== 📊  HYBRID SELECTION LOG ==== ")
+    print(f">> Vector Threshold: {vector_threshold:.3f} | BM25 Threshold: {bm25_threshold:.3f}")
     
-    threshold = min(adaptive_threshold, percentile_70, max_score_threshold)
-    print(f">>  📊  Final Threshold: {threshold:.3f}")   
-    
-    # Filter results
-    selected_results = [(doc, meta, score) for doc, meta, score in hybrid_results if score >= threshold]
+    for doc, meta, score in hybrid_results:
+        key = (meta['file'], meta['page'])
+        
+        if key in authorized_keys:
+            selected_results.append((doc, meta, score))
+            
+            # Print explicativo do porquê deste documento ter sido salvo
+            reasons = []
+            if key in intersection_keys: reasons.append("Encontrado em Ambos")
+            if key in vector_passed: reasons.append("Passou Threshold Vetor")
+            if key in bm25_passed: reasons.append("Passou Threshold BM25")
+            
+            print(f"✅  Selecionado: PDF: {meta['file'][:25]} | Pág: {meta['page']} | Score Híbrido: {score:.4f} | Motivo: {', '.join(reasons)}")
+        else:
+            print(f"❌  Eliminado:   PDF: {meta['file'][:25]} | Pág: {meta['page']} | Score Híbrido: {score:.4f}")
+            
     #print(f"\n📖  Found {len(selected_results)} relevant documents in a total of {len(hybrid_results)}:")
     #for doc, meta, score in selected_results:
     #    print(f"    📄  PDF: {meta['file']} | Page: {meta['page']}") #| Score: {score:.4f}

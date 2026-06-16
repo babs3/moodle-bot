@@ -326,18 +326,12 @@ def action_process(dispatcher, tracker, payload):
     print(f"\n📖  --------- Getting Knowledge --------- 📖 ")
     print(f"\n🧒  User ({user_email}) said: {user_message} 📩")
     
-    # Extract variables from chat memory
-    concept = tracker.get_slot("concept")  
-    concept = concept.lower().strip() if concept else ""  
-    # remove stopwords from concept for better matching with keywords later
-    #concept_tokens = tokenize_and_clean_text(concept)
-    #concept = " ".join(concept_tokens) if concept_tokens else ""     
+    # Extract variables from chat memory   
     context = tracker.get_slot("context")   
     context = context.lower().strip() if context else ""     
-    print(f"🔍  Concept from slot: '{concept}' || Context from slot: '{context}'")
     
     concepts = list(tracker.get_latest_entity_values("concept"))
-    print(f"\n🔍 🔍  Concepts extracted from entities: {concepts}")
+    print(f"🔍  Concepts from slot: '{concepts}' || Context from slot: '{context}'")
     
     complex_tokens = []
     simple_tokens = []
@@ -345,15 +339,28 @@ def action_process(dispatcher, tracker, payload):
         # check if concept is just one word or multiple words
         for concept in concepts:
             if " " in concept:         
-                complex_tokens_split = tokenize_and_clean_text(concept)
-                print(f"🔍  Concept '{concept}' split into simple lemma tokens: {complex_tokens_split}")
+                complex_tokens_split = tokenize_and_clean_text(concept.lower())
+                print(f"🔍  Concept '{concept.lower()}' split into simple lemma tokens: {complex_tokens_split}")
                 for token in complex_tokens_split:
                     simple_tokens.append(token)        
                 text = " ".join(complex_tokens_split)
                 complex_tokens.append(text)
             else: 
-                simple_tokens.append(tokenize_and_clean_text(concept)[0]) # lemmatize and add the single word concept to simple tokens
-                print(f"🔍  Concept '{concept}' is a single word. Added to simple tokens: {simple_tokens}")
+                # check if there is a noun phrase in the user message that matches the concept
+                # for example in query "give me some examples of cps requirements", the concept is "cps" and we want to extract it as a complex token "cps requirements" from the user message
+                no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
+                complex_tokens = [extract_noun(no_punct_query, concept.lower())]
+                print(f"🔍  > complex_tokens: {complex_tokens}")
+                if complex_tokens != ['']:
+                    complex_tokens_split = tokenize_and_clean_text(complex_tokens[0])
+                    print(f"🔍  Concept '{complex_tokens[0]}' split into simple lemma tokens: {complex_tokens_split}")
+                    for token in complex_tokens_split:
+                        simple_tokens.append(token)
+                else:
+                    complex_tokens = []
+                    simple_tokens.append(tokenize_and_clean_text(concept.lower())[0]) # lemmatize and add the single word concept to simple tokens
+                    print(f"🔍  Concept '{concept.lower()}' is a single word. Added to simple tokens: {simple_tokens}")
+                
                 
         # stay with acronyms in uppercase from user_message:
         query_tokens = user_message.split()
@@ -363,7 +370,24 @@ def action_process(dispatcher, tracker, payload):
                 print(f"🔍  Added uppercase token '{token}' from user message to simple tokens: {simple_tokens}")
         # remove duplicates from simple_tokens
         simple_tokens = list(set(simple_tokens))
+        
+        # if simple_tokens len is 2, we must check if they are near each other in the user_message, if they are, we can create a complex token with them
+        # like in "What is the PESTEL framework?", the simple tokens are ["pestel", "framework"] and they are near each other, so we can create a complex token "pestel framework"
+        if len(simple_tokens) == 2:
+            token1, token2 = simple_tokens
             
+            # Procura as duas combinações possíveis na mensagem
+            match1 = re.search(rf"\b{re.escape(token1)}\b.*\b{re.escape(token2)}\b", user_message, re.IGNORECASE)
+            match2 = re.search(rf"\b{re.escape(token2)}\b.*\b{re.escape(token1)}\b", user_message, re.IGNORECASE)
+            
+            if match1 or match2:
+                # Se match1 for verdadeiro, significa que token1 apareceu primeiro ("pestel framework")
+                # Se match2 for verdadeiro, significa que token2 apareceu primeiro ("framework pestel")
+                ordered_token = f"{token1} {token2}" if match1 else f"{token2} {token1}"
+                
+                complex_tokens.append(ordered_token)
+                print(f"🔍  Tokens near each other. Added to complex tokens in correct order: {ordered_token}")
+                
     else:
         print(f"\n🔍  No concept identified by Rasa. Proceeding with keywords extraction from the entire query.")
         # Keywords Extraction Process 
@@ -385,7 +409,7 @@ def action_process(dispatcher, tracker, payload):
     bot_response = None
     if bm25_docs == [] and bm25_meta == []:
         print(f"\n⚠️  BM25 search returned no results for user query: '{user_message}'")
-        bot_response = "no_access"
+        bot_response = "no_response"
     elif normalized_bm25_scores == []:
         print(f"\n⚠️  Normalized BM25 scores is empty for user query: '{user_message}'")
         bot_response = "no_response"
