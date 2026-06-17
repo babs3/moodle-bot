@@ -444,51 +444,64 @@ def dense_vector_search(intent, complex_tokens, simple_tokens, context, query, c
         files_in_chroma = set(
             meta.get("file") for meta in all_data["metadatas"] if meta and "file" in meta
         )
-        
         print("\n--- 📁  FICHEIROS ATUALMENTE NO CHROMADB ---")
         for f in files_in_chroma:
             print(f"- {f}")
         print(f"Total de ficheiros únicos: {len(files_in_chroma)}\n")
-        
     else:
         print("A coleção está completamente vazia ou não tem metadados.")
     
+    
     # === DENSE (Vector) SEARCH === #
     print(f"\n🔛  Getting query embeddings for query: '{query}'\n...")
-    
+
     query_embedding = embedding_model.encode(query, convert_to_numpy=True).tolist()
-    vector_results = collection.query(query_embeddings=[query_embedding], n_results=20, where={
-        "file": {
-            "$in": authorized_resources  # O Chroma só procura nestes ficheiros
-        }
-    })  
+
+    # Modificação do Filtro WHERE para garantir que só procura nos filhos e nos ficheiros certos
+    search_filter = {
+        "$and": [
+            {"file": {"$in": authorized_resources}},
+            {"doc_type": "child"} # Ignora os pais na busca densa para não poluir os scores
+        ]
+    }
+
+    vector_results = collection.query(
+        query_embeddings=[query_embedding], 
+        n_results=20, 
+        where=search_filter
+    )  
 
     vector_docs = vector_results["documents"][0]
     vector_metadata = vector_results["metadatas"][0]
-    vector_scores = vector_results["distances"][0]  # Lower is better (L2 distance)
-    
-    # stay only with different documents (remove duplicates with same file and page)
+    vector_scores = vector_results["distances"][0] 
+
+    # === RETORNAR O PAI E REMOVER DUPLICADOS === #
     unique_docs = []
     seen_combinations = set()
-    for doc, meta, score in zip(vector_docs, vector_metadata, vector_scores):
+
+    for child_doc, meta, score in zip(vector_docs, vector_metadata, vector_scores):
         file_page_combo = (meta['file'], meta['page'])
+        
         if file_page_combo not in seen_combinations:
-            unique_docs.append((doc, meta, score))
+            # TRUQUE AQUI: Substituímos o texto do filho pelo texto do Pai!
+            parent_text = meta["parent_text"]
+            
+            # Limpar o metadado para não enviar o texto do pai duplicado para a frente
+            clean_meta = meta.copy()
+            del clean_meta["parent_text"] 
+            
+            unique_docs.append((parent_text, clean_meta, score))
             seen_combinations.add(file_page_combo)
-    
+
     vector_docs, vector_metadata, vector_scores = zip(*unique_docs) if unique_docs else ([], [], [])
-    
-    print(f"\n📖  1. Found {len(vector_docs)} documents with vector search.")
-    for doc, meta, score in zip(vector_docs, vector_metadata, vector_scores):
-        print(f"📄  PDF: {meta['file'][:25]} | Page: {meta['page']} | Score: {score:.4f}")
-    
+
     # === NORMALIZE SCORES === #
     normalized_vector_scores = normalize_score(vector_scores, True)
     
-    print(f"\n📖  2. Vector scores Normalized:")
+    print(f"\n📖  1. Found {len(vector_docs)} unique parent documents via child vector search.")
     for doc, meta, score in zip(vector_docs, vector_metadata, normalized_vector_scores):
-        print(f"📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
-        
+        print(f"📄  PDF: {meta['file'][:25]} | Page: {meta['page']} | Score: {score:.4f}")
+
     return vector_docs, vector_metadata, normalized_vector_scores
 
 
@@ -497,7 +510,7 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
     
     if complex_tokens != []:
         complex_tokens = filtrar_e_expandir_tokens(complex_tokens)
-    print(f"\n🔛  Getting BM25 sparse vectors for both:\n - {complex_tokens}\n - {simple_tokens}")
+    print(f"\n🔛  Getting BM25 sparse vectors for both:\n - {complex_tokens}\n - {simple_tokens}\n")
     
     # grant access to the BM25 index updated with new documents (if any)
     try:
@@ -508,7 +521,6 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
     except FileNotFoundError:
         print("👻  --> User does not have access to any documents in the authorized resources.")
         return [], [], []
-
 
     # check length of complex_tokens and perform != .get_scores
     if complex_tokens == []:
@@ -538,7 +550,7 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
                             for idx, score in enumerate(bm25_scores_complex_2_ct):
                                 if score > 0:
                                     meta = bm25_metadata[idx]
-                                    print(f"       📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
+                                    print(f"        📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
 
                 # combine both scores
                 if i == 0:
@@ -565,7 +577,7 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
                                 for idx, score in enumerate(bm25_scores_complex_2):
                                     if score > 0:
                                         meta = bm25_metadata[idx]
-                                        print(f"       📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
+                                        print(f"        📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
                         
 
     # Perform BM25 Search
@@ -578,36 +590,49 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
             for idx, score in enumerate(bm25_scores_simple_token):
                 if score > 0:
                     meta = bm25_metadata[idx]
-                    print(f"       📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
+                    print(f"        📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
     
-    # 1 & 2. Filtrar e já calcular os scores por documento usando um dicionário para alinhar
-    # Chave: um identificador único (pode ser o texto ou uma combinação de texto+file se o texto repetir)
-    combined_docs = {}
+    # =========================================================================
+    # MODIFICAÇÃO PARENT-CHILD ADAPTADA AO TEU AGREGADOR HÍBRIDO (SIMPLE + COMPLEX)
+    # =========================================================================
+    # Em vez de agregar pela chave `doc_text` (que era o texto do Filho), 
+    # vamos agregar pelo identificador único do Pai `(file, page)`.
+    combined_parents = {}
 
-    # Processar os scores simples
+    # 1. Processar os scores simples (vindos dos sub-chunks Filhos)
     for i, score in enumerate(bm25_scores_simple):
         meta = bm25_metadata[i]
         if meta['file'] in authorized_resources:
-            doc_text = bm25_documents[i]
-            combined_docs[doc_text] = {
-                "text": doc_text,
-                "metadata": meta,
-                "score_simple": score,
-                "score_complex": 0.0  # Default caso não exista no complex
-            }
+            file_page_combo = (meta['file'], meta['page'])
+            parent_text = meta["parent_text"] # Recuperamos o Pai real aqui!
+            
+            if file_page_combo not in combined_parents:
+                combined_parents[file_page_combo] = {
+                    "text": parent_text,
+                    "metadata": meta,
+                    "score_simple": score,
+                    "score_complex": 0.0
+                }
+            else:
+                # Max Pooling: Se outra parte da mesma página pontuar melhor, mantém o maior score
+                if score > combined_parents[file_page_combo]["score_simple"]:
+                    combined_parents[file_page_combo]["score_simple"] = score
 
-    # Processar os scores complexos (alinhar com o que já existe ou adicionar)
+    # 2. Processar os scores complexos (vindos dos sub-chunks Filhos)
     for i, score in enumerate(bm25_scores_complex):
         meta = bm25_metadata[i]
         if meta['file'] in authorized_resources:
-            doc_text = bm25_documents[i]
-            if doc_text in combined_docs:
-                combined_docs[doc_text]["score_complex"] = score
+            file_page_combo = (meta['file'], meta['page'])
+            parent_text = meta["parent_text"]
+            
+            if file_page_combo in combined_parents:
+                if score > combined_parents[file_page_combo]["score_complex"]:
+                    combined_parents[file_page_combo]["score_complex"] = score
             else:
-                combined_docs[doc_text] = {
-                    "text": doc_text,
+                combined_parents[file_page_combo] = {
+                    "text": parent_text,
                     "metadata": meta,
-                    "score_simple": 0.0,  # Default
+                    "score_simple": 0.0,
                     "score_complex": score
                 }
 
@@ -617,48 +642,47 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
     bm25_scores = []
 
     # Se não sobrou nenhum documento autorizado, parar cedo
-    if not combined_docs:
+    if not combined_parents:
         print("⚠️ No authorized documents found after filtering.")
     else:
-        # Converter para listas alinhadas
-        docs_list = list(combined_docs.values())
+        # Converter para lista plana para fazer os cálculos vetoriais em NumPy
+        parents_list = list(combined_parents.values())
         
-        raw_scores_simple = np.array([x["score_simple"] for x in docs_list])
-        raw_scores_complex = np.array([x["score_complex"] for x in docs_list])
+        raw_scores_simple = np.array([x["score_simple"] for x in parents_list])
+        raw_scores_complex = np.array([x["score_complex"] for x in parents_list])
         
-        # 3. Normalizar (e converter explicitamente para arrays do NumPy)
+        # 3. Normalizar
         norm_scores_simple = np.array(normalize_score(raw_scores_simple, False))
         norm_scores_complex = np.array(normalize_score(raw_scores_complex, False))
 
-        # Agora podes usar o .max() do NumPy sem problemas
         if norm_scores_complex.max() == 0:
             print("👻  --> Final, no matching for Complex Tokens")
             alpha = 0
             
-        # 4. Combinar scores (agora o NumPy vai fazer a matemática corretamente)
+        # 4. Combinar scores usando a tua ponderação alfa original
         final_scores = alpha * norm_scores_complex + (1 - alpha) * norm_scores_simple
         
-        # 5. Ordenar e Filtrar os Top 20 ÚNICOS com score > 0
+        # 5. Ordenar de forma decrescente
         sorted_indices = np.argsort(final_scores)[::-1]
-        seen_combinations = set()  # Controlar duplicados de página logo aqui
         
         for idx in sorted_indices:
+            # Critério de corte: score zero ou quando atingir o limite de 20 pais únicos
             if final_scores[idx] <= 0 or len(bm25_docs) >= 20:
                 break
                 
-            meta = docs_list[idx]["metadata"]
-            file_page_combo = (meta['file'], meta['page'])
+            meta_copy = parents_list[idx]["metadata"].copy()
             
-            # Só adiciona se ainda não vimos esta combinação de ficheiro + página
-            if file_page_combo not in seen_combinations:
-                bm25_docs.append(docs_list[idx]["text"])
-                bm25_meta.append(meta)
-                bm25_scores.append(final_scores[idx])
-                seen_combinations.add(file_page_combo)
+            # Limpeza crucial: remove o payload gigante de metadados para não sobrecarregar as camadas seguintes
+            if "parent_text" in meta_copy:
+                del meta_copy["parent_text"]
+                
+            bm25_docs.append(parents_list[idx]["text"]) # Guardamos o texto do PAI completo!
+            bm25_meta.append(meta_copy)
+            bm25_scores.append(final_scores[idx])
         
-    # Retorno e prints organizados (funcionam de forma segura em qualquer cenário)
+    # Retorno e prints organizados
     if bm25_scores:            
-        print(f"\n📖  BM25 scores Normalized:")
+        print(f"\n📖  BM25 scores Normalized (Parent-Child Aligned):")
         for doc, meta, score in zip(bm25_docs, bm25_meta, bm25_scores):
             print(f"📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
             
@@ -666,6 +690,7 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
     else:
         print("⚠️  Warning: max_bm25_score is zero. There are no contents about that subject.")
         return bm25_docs, bm25_meta, []
+    
         
 def get_ngrams(text, n=2):
     tokens = text.split()
@@ -809,7 +834,7 @@ def hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_d
         updated_results.append((doc, meta, score))
         
     for doc, meta, score in updated_results:
-        print(f"    📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | OCR: {meta.get('is_ocr', False)} | DOC text: {doc[:200]}...")
+        print(f"    📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | OCR: {meta.get('is_ocr', False)} | DOC text: \n{doc[:200]}...")
     
 
     return updated_results

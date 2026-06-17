@@ -428,14 +428,14 @@ def action_process(dispatcher, tracker, payload):
     
     if complex_tokens:
         if intent == "definition of ":
-            alpha = 0.6 # Use a lower alpha for definitions
+            alpha = 0.5 # Use a lower alpha for definitions
             print(f"\n🔍  Found keywords: {complex_tokens} and {simple_tokens}. \n     Using hybrid search with alpha = {alpha} because of the 'DEFINE' intent ")
         else:
             # For other intents, use a slightly higher alpha
-            alpha = 0.75
+            alpha = 0.6
             print(f"\n🔍  Found keywords: {complex_tokens} and {simple_tokens}. \n     Using hybrid search with alpha = {alpha}")
     else: # Use hybrid search with a higher weight for vector search
-        alpha = 0.85
+        alpha = 0.8
         print(f"\n🔍  Split case: found multiple keywords: {complex_tokens} and {simple_tokens}. Using hybrid search with alpha = {alpha}")
 
         

@@ -666,22 +666,55 @@ def process_pdfs(pdf_folder, youtube_ids, course_id):
                 page_chunks = extract_text_by_context(pdf_path)
                 
             for chunk in page_chunks:
-                doc_text = chunk["text"]           
-                
-                documents.append(doc_text)
-                #print(f"> text from {file} (page {chunk['page']}):\n{doc_text}\n\n")
-                
-                metadata.append({
+                # ... dentro do teu loop original ...
+                doc_text = chunk["text"]
+
+                parent_metadata = {
                     "file": file, 
                     "page": chunk["page"], 
                     "course_id": str(course_id),
-                    "is_ocr": chunk["is_ocr"]
-                })
-                
-                cleaned_text = tokenize_and_clean_text(clean_doc_text(doc_text))
-                simple_tokens.append(cleaned_text)
-                ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
-                ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
+                    "is_ocr": chunk["is_ocr"],
+                    "doc_type": "parent"
+                }
+
+                words = doc_text.split()
+                child_size = 100
+                overlap = 20
+
+                # === SALVAGUARDA PARA PAIS PEQUENOS ===
+                # Se o Pai for menor ou quase do tamanho do target do Filho, ele próprio vira Filho
+                if len(words) <= child_size:
+                    documents.append(doc_text)
+                    
+                    child_meta = parent_metadata.copy()
+                    child_meta["doc_type"] = "child"
+                    child_meta["parent_text"] = doc_text # O texto do pai é igual ao do filho
+                    metadata.append(child_meta)
+                    
+                    # Processamento para o BM25 (sobre o texto completo)
+                    cleaned_text = tokenize_and_clean_text(clean_doc_text(doc_text))
+                    simple_tokens.append(cleaned_text)
+                    ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
+                    ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
+
+                else:
+                    # Se for grande, corre o teu loop normal de fragmentação (Parent-Child)
+                    for i in range(0, len(words), child_size - overlap):
+                        child_text = " ".join(words[i:i + child_size])
+                        if not child_text.strip():
+                            continue
+                            
+                        documents.append(child_text)
+                        
+                        child_meta = parent_metadata.copy()
+                        child_meta["doc_type"] = "child"
+                        child_meta["parent_text"] = doc_text
+                        metadata.append(child_meta)
+                        
+                        cleaned_text = tokenize_and_clean_text(clean_doc_text(child_text))
+                        simple_tokens.append(cleaned_text)
+                        ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
+                        ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
                 
     if not youtube_ids:
         print("-> Nenhum vídeo do YouTube para processar.")
@@ -717,25 +750,65 @@ def process_pdfs(pdf_folder, youtube_ids, course_id):
                     # Juntar os segmentos em texto corrido
                     full_text = "\n".join([segment.text for segment in segments])
                     video_chunks = process_video_transcription(full_text)
-                    
+                                        
                     inc = 1
+                    child_size = 100
+                    overlap = 20
+
                     for chunk in video_chunks:
-                        documents.append(chunk["text"])
-                        metadata.append({
+                        doc_text = chunk["text"]
+                        
+                        # 1. Definir o metadado base que identifica o Pai
+                        # Nota: Mantemos o campo "page" mapeado para o teu incremento (inc) para não quebrar a lógica de UI
+                        parent_metadata = {
                             "file": video_id, 
                             "page": str(inc), 
                             "course_id": str(course_id),
-                            "is_ocr": False
-                        })
-                        inc += 1
+                            "is_ocr": False,
+                            "doc_type": "parent"  # Identificador crucial!
+                        }
                         
-                        cleaned_text = tokenize_and_clean_text(clean_doc_text(chunk["text"]))
-                        simple_tokens.append(cleaned_text)
-                        ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
-                        ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
-                        #print(f"    Simple tokens: {cleaned_text}")
-                        #print(f"    2-grams: {ngram_docs_2[-1]}")
-                        #print(f"    3-grams: {ngram_docs_3[-1]}\n")
+                        words = doc_text.split()
+                        
+                        # === SALVAGUARDA PARA CHUNKS DE VÍDEO CURTOS ===
+                        # Se o texto do vídeo for pequeno, ele próprio vira o Filho (cópia exata)
+                        if len(words) <= child_size:
+                            documents.append(doc_text)
+                            
+                            child_meta = parent_metadata.copy()
+                            child_meta["doc_type"] = "child"
+                            child_meta["parent_text"] = doc_text  # O texto do pai é igual ao do filho
+                            metadata.append(child_meta)
+                            
+                            # Processamento para o BM25 sobre o bloco de vídeo
+                            cleaned_text = tokenize_and_clean_text(clean_doc_text(doc_text))
+                            simple_tokens.append(cleaned_text)
+                            ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
+                            ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
+                            
+                        else:
+                            # === DIVISÃO PARENT-CHILD SE FOR GRANDE ===
+                            for i in range(0, len(words), child_size - overlap):
+                                child_text = " ".join(words[i:i + child_size])
+                                if not child_text.strip():
+                                    continue
+                                    
+                                documents.append(child_text)
+                                
+                                # O metadado do filho herda o contexto do vídeo e armazena o texto do Pai
+                                child_meta = parent_metadata.copy()
+                                child_meta["doc_type"] = "child"
+                                child_meta["parent_text"] = doc_text
+                                metadata.append(child_meta)
+                                
+                                # Processamento BM25 focado na granularidade do Filho
+                                cleaned_text = tokenize_and_clean_text(clean_doc_text(child_text))
+                                simple_tokens.append(cleaned_text)
+                                ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
+                                ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
+                                
+                        # O incremento original continua a avançar por bloco "Pai" processado
+                        inc += 1
                 
             except Exception as e:
                 print(f"Erro ao processar o vídeo {video_id}: {e}")
