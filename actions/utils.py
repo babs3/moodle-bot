@@ -63,7 +63,7 @@ def get_latest_gemini_pro_model():
     return _CACHED_MODEL_NAME
 
 # Uso no teu código:
-MODEL_NAME = get_latest_gemini_pro_model()
+MODEL_NAME = get_latest_gemini_pro_model() #"models/gemini-2.5-flash"
 print(f"✅  Using latest model found: {MODEL_NAME}")
 
 # Load Spacy model for NLP tasks
@@ -478,12 +478,11 @@ def dense_vector_search(intent, complex_tokens, simple_tokens, context, query, c
     
     vector_docs, vector_metadata, vector_scores = zip(*unique_docs) if unique_docs else ([], [], [])
     
-    #print(f"\n📖  1. Found {len(vector_docs)} documents with vector search.")
-    #for doc, meta, score in zip(vector_docs, vector_metadata, vector_scores):
-    #    print(f"📄  PDF: {meta['file'][:25]} | Page: {meta['page']} | Score: {score:.4f}")
+    print(f"\n📖  1. Found {len(vector_docs)} documents with vector search.")
+    for doc, meta, score in zip(vector_docs, vector_metadata, vector_scores):
+        print(f"📄  PDF: {meta['file'][:25]} | Page: {meta['page']} | Score: {score:.4f}")
     
     # === NORMALIZE SCORES === #
-    
     normalized_vector_scores = normalize_score(vector_scores, True)
     
     print(f"\n📖  2. Vector scores Normalized:")
@@ -493,7 +492,7 @@ def dense_vector_search(intent, complex_tokens, simple_tokens, context, query, c
     return vector_docs, vector_metadata, normalized_vector_scores
 
 
-def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id, alpha=0.9):
+def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id, alpha=0.8):
     # === Perform Hybrid BM25 search === #
     
     if complex_tokens != []:
@@ -531,6 +530,15 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
                 
                 if bm25_scores_complex_2.max() != 0:
                     print(f"--> Complex Tokens match with len == 2: {complex_tokens_2}")
+                    # print from what pages the 2-grams are matching
+                    for ct in complex_tokens_2:
+                        bm25_scores_complex_2_ct = bm25_2gram.get_scores([ct])
+                        if bm25_scores_complex_2_ct.max() != 0:
+                            print(f"    - 2-gram '{ct}' matches with pages:")
+                            for idx, score in enumerate(bm25_scores_complex_2_ct):
+                                if score > 0:
+                                    meta = bm25_metadata[idx]
+                                    print(f"       📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
 
                 # combine both scores
                 if i == 0:
@@ -549,87 +557,112 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
                 if len(token.split()) == 2:
                     if bm25_scores_complex.max() != 0:
                         print(f"--> Complex Tokens match with len == 2: {[token]}")
+                        # print from what pages the 2-grams are matching
+                        for idx, score in enumerate(bm25_scores_complex_2):
+                            if score > 0:
+                                meta = bm25_metadata[idx]
+                                print(f"    - 2-gram '{token}' matches with pages:")
+                                for idx, score in enumerate(bm25_scores_complex_2):
+                                    if score > 0:
+                                        meta = bm25_metadata[idx]
+                                        print(f"       📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
                         
 
     # Perform BM25 Search
     bm25_scores_simple = bm25_simple.get_scores(simple_tokens)
+    # print from what pages the simple tokens are matching
+    for token in simple_tokens:
+        bm25_scores_simple_token = bm25_simple.get_scores([token])
+        if bm25_scores_simple_token.max() != 0:
+            print(f"--> Simple Token '{token}' matches with pages:")
+            for idx, score in enumerate(bm25_scores_simple_token):
+                if score > 0:
+                    meta = bm25_metadata[idx]
+                    print(f"       📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
     
-    
-    # Filter scores to only have words from authorized resources (files)
-    filtered_bm25_scores_simple = []
-    filtered_bm25_scores_complex = []
+    # 1 & 2. Filtrar e já calcular os scores por documento usando um dicionário para alinhar
+    # Chave: um identificador único (pode ser o texto ou uma combinação de texto+file se o texto repetir)
+    combined_docs = {}
 
+    # Processar os scores simples
     for i, score in enumerate(bm25_scores_simple):
-        # Verificar se o ficheiro deste chunk está na lista de visíveis
-        file_name = bm25_metadata[i]['file']
-        
-        if file_name in authorized_resources:
-            #print(f"    ✅  File '{file_name}' is authorized. Keeping this BM25 score.")
-            filtered_bm25_scores_simple.append({
-                "score": score,
-                "text": bm25_documents[i],
-                "metadata": bm25_metadata[i]
-            })
-            
+        meta = bm25_metadata[i]
+        if meta['file'] in authorized_resources:
+            doc_text = bm25_documents[i]
+            combined_docs[doc_text] = {
+                "text": doc_text,
+                "metadata": meta,
+                "score_simple": score,
+                "score_complex": 0.0  # Default caso não exista no complex
+            }
+
+    # Processar os scores complexos (alinhar com o que já existe ou adicionar)
     for i, score in enumerate(bm25_scores_complex):
-        # Verificar se o ficheiro deste chunk está na lista de visíveis
-        file_name = bm25_metadata[i]['file']
-        
-        if file_name in authorized_resources:
-            filtered_bm25_scores_complex.append({
-                "score": score,
-                "text": bm25_documents[i],
-                "metadata": bm25_metadata[i]
-            })
+        meta = bm25_metadata[i]
+        if meta['file'] in authorized_resources:
+            doc_text = bm25_documents[i]
+            if doc_text in combined_docs:
+                combined_docs[doc_text]["score_complex"] = score
+            else:
+                combined_docs[doc_text] = {
+                    "text": doc_text,
+                    "metadata": meta,
+                    "score_simple": 0.0,  # Default
+                    "score_complex": score
+                }
 
-    # 5. Ordenar pelos melhores scores e pegar nos top N
-    filtered_bm25_scores_simple = sorted(filtered_bm25_scores_simple, key=lambda x: x['score'], reverse=True)
-    
-    # Normalize BM25 Scores
-    bm25_scores_complex = normalize_bm25_indexes(bm25_scores_complex)
-    bm25_scores_simple = normalize_bm25_indexes(bm25_scores_simple)
-        
-    # change alpha if bm_25_scores_complex is zero
-    if bm25_scores_complex.max() == 0:
-        print("👻  --> Final, no matching for Complex Tokens")
-        alpha = 0  # Weight for simple matches
-    #print(f"alpha: {alpha}")
-        
-    # Step 5: Combine Scores (Weighting Complex Matches Higher)
-    final_scores = alpha * bm25_scores_complex + (1 - alpha) * bm25_scores_simple  # Give priority to complex matches    
-    top_bm25_indices = np.argsort(final_scores)[::-1][:20]  # Top 20 results  
-    
-    # remove results with zero scores
-    top_bm25_indices = [i for i in top_bm25_indices if final_scores[i] > 0]  
+    # Inicializar variáveis de retorno para o caso de falha precoce
+    bm25_docs = []
+    bm25_meta = []
+    bm25_scores = []
 
-    bm25_docs = [bm25_documents[i] for i in top_bm25_indices]
-    bm25_meta = [bm25_metadata[i] for i in top_bm25_indices]
-    bm25_scores = [final_scores[i] for i in top_bm25_indices]
-    
-    # stay only with different documents (remove duplicates with same file and page)
-    unique_docs = []
-    seen_combinations = set()
-    for doc, meta, score in zip(bm25_docs, bm25_meta, bm25_scores):
-        file_page_combo = (meta['file'], meta['page'])
-        if file_page_combo not in seen_combinations:
-            unique_docs.append((doc, meta, score))
-            seen_combinations.add(file_page_combo)
-    
-    bm25_docs, bm25_meta, normalized_bm25_scores = zip(*unique_docs) if unique_docs else ([], [], [])
-    
-    #print(f"\n📖  1. Found {len(bm25_docs)} documents with bm25 search.")
-    #for doc, meta, score in zip(bm25_docs, bm25_meta, bm25_scores):
-    #    print(f"📄  PDF: {meta['file'][:25]} | Page: {meta['page']} | Score: {score:.4f}")            
+    # Se não sobrou nenhum documento autorizado, parar cedo
+    if not combined_docs:
+        print("⚠️ No authorized documents found after filtering.")
+    else:
+        # Converter para listas alinhadas
+        docs_list = list(combined_docs.values())
         
-    # === NORMALIZE SCORES === #
-    
+        raw_scores_simple = np.array([x["score_simple"] for x in docs_list])
+        raw_scores_complex = np.array([x["score_complex"] for x in docs_list])
+        
+        # 3. Normalizar (e converter explicitamente para arrays do NumPy)
+        norm_scores_simple = np.array(normalize_score(raw_scores_simple, False))
+        norm_scores_complex = np.array(normalize_score(raw_scores_complex, False))
+
+        # Agora podes usar o .max() do NumPy sem problemas
+        if norm_scores_complex.max() == 0:
+            print("👻  --> Final, no matching for Complex Tokens")
+            alpha = 0
+            
+        # 4. Combinar scores (agora o NumPy vai fazer a matemática corretamente)
+        final_scores = alpha * norm_scores_complex + (1 - alpha) * norm_scores_simple
+        
+        # 5. Ordenar e Filtrar os Top 20 ÚNICOS com score > 0
+        sorted_indices = np.argsort(final_scores)[::-1]
+        seen_combinations = set()  # Controlar duplicados de página logo aqui
+        
+        for idx in sorted_indices:
+            if final_scores[idx] <= 0 or len(bm25_docs) >= 20:
+                break
+                
+            meta = docs_list[idx]["metadata"]
+            file_page_combo = (meta['file'], meta['page'])
+            
+            # Só adiciona se ainda não vimos esta combinação de ficheiro + página
+            if file_page_combo not in seen_combinations:
+                bm25_docs.append(docs_list[idx]["text"])
+                bm25_meta.append(meta)
+                bm25_scores.append(final_scores[idx])
+                seen_combinations.add(file_page_combo)
+        
+    # Retorno e prints organizados (funcionam de forma segura em qualquer cenário)
     if bm25_scores:            
-        normalized_bm25_scores = normalize_score(bm25_scores, False)
         print(f"\n📖  BM25 scores Normalized:")
-        for doc, meta, score in zip(bm25_docs, bm25_meta, normalized_bm25_scores):
+        for doc, meta, score in zip(bm25_docs, bm25_meta, bm25_scores):
             print(f"📄  PDF: {meta['file'][:45]} | Page: {meta['page']} | Score: {score:.4f}")
             
-        return bm25_docs, bm25_meta, normalized_bm25_scores
+        return bm25_docs, bm25_meta, bm25_scores
     else:
         print("⚠️  Warning: max_bm25_score is zero. There are no contents about that subject.")
         return bm25_docs, bm25_meta, []
@@ -639,21 +672,42 @@ def get_ngrams(text, n=2):
     return [' '.join(ngram) for ngram in ngrams(tokens, n)]
         
 
-def calculate_engine_threshold(scores):
-    """Função auxiliar para calcular o threshold adaptativo de um motor específico."""
+def calculate_engine_threshold(scores, strictness_factor=1.0):
+    """
+    Calcula o threshold adaptativo.
+    strictness_factor < 1.0 -> Threshold mais baixo (mais permissivo, mais resultados)
+    strictness_factor > 1.0 -> Threshold mais alto (mais rigoroso, menos resultados)
+    """
     if not scores:
         return 0
+        
     max_score = max(scores)
     adaptive_threshold = np.mean(scores) + 0.5 * np.std(scores)
     percentile_70 = np.percentile(scores, 70)
     max_score_threshold = 0.8 * max_score
     
-    return min(adaptive_threshold, percentile_70, max_score_threshold)
+    # Calculamos o threshold base original
+    base_threshold = min(adaptive_threshold, percentile_70, max_score_threshold)
+    
+    # Aplicamos o fator para subir ou descer a fasquia
+    final_threshold = base_threshold * strictness_factor
+    
+    # Garantia para o threshold não ultrapassar o score máximo possível por erro matemático
+    return min(final_threshold, max_score)
 
-def hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_docs, bm25_meta, normalized_bm25_scores, alpha=0.5):
-    # 1. Identificar quais os ficheiros/páginas que passaram nos thresholds individuais de cada motor
-    vector_threshold = calculate_engine_threshold(normalized_vector_scores)
-    bm25_threshold = calculate_engine_threshold(normalized_bm25_scores)
+def hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_docs, bm25_meta, normalized_bm25_scores, alpha=0.6):
+    
+    # === AJUSTE DINÂMICO DOS THRESHOLDS BASEADO NO ALPHA ===
+    # Exemplo com alpha = 0.85:
+    # vector_strictness = 1.5 - 0.85 = 0.65 (Threshold do vetor DESCE -> mais resultados)
+    # bm25_strictness   = 0.5 + 0.85 = 1.35 (Threshold do BM25 SOBE -> menos resultados)
+    vector_strictness = 1.5 - alpha  
+    bm25_strictness = 0.5 + alpha    
+
+    # Calcular os thresholds com os respetivos pesos de exigência
+    vector_threshold = calculate_engine_threshold(normalized_vector_scores, strictness_factor=vector_strictness)
+    bm25_threshold = calculate_engine_threshold(normalized_bm25_scores, strictness_factor=bm25_strictness)
+    print(f"\n📊  Calculated Thresholds:\n - Vector Threshold: {vector_threshold:.4f} (Strictness: {vector_strictness:.2f})\n - BM25 Threshold: {bm25_threshold:.4f} (Strictness: {bm25_strictness:.2f})")
     
     # Criar conjuntos (sets) para controlo de quem veio de onde e quem passou nos thresholds
     vector_passed = set()

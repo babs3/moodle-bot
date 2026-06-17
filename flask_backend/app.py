@@ -1108,10 +1108,10 @@ def tarefa_monitor():
             while True:
                 app.logger.info("A aguardar alguns segundos antes do polling para dar tempo ao trigger do Moodle...")
                 time.sleep(20)
-                #response = new_quiz_polling()
-                #if response != None:
-                #    app.logger.info("Polling de quizzes concluído com sucesso.")
-                #    break
+                response = new_quiz_polling()
+                if response != None:
+                    app.logger.info("Polling de quizzes concluído com sucesso.")
+                    break
         except Exception as e:
             app.logger.error(f"Erro no monitor: {e}")
 
@@ -1128,13 +1128,13 @@ if __name__ == "__main__":
     import threading
     def background_tasks():
         wait_for_rasa()
-        tarefa_monitor()
+        #tarefa_monitor() #TODO: Uncomment
         print("✅  Polling inicial concluído em background.")
 
     threading.Thread(target=background_tasks, daemon=True).start()
     
-    # 2. Configuração do agendador
-    scheduler.add_job(id='moodle_monitor_job', func=tarefa_monitor, trigger='interval', minutes=60)
+    # 2. Configuração do agendador #TODO: Uncomment
+    #scheduler.add_job(id='moodle_monitor_job', func=tarefa_monitor, trigger='interval', minutes=60)
     scheduler.init_app(app)
     scheduler.start()
 
