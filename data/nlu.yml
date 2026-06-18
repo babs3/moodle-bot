@@ -130,6 +130,11 @@ nlu:
     - Could you define what [Pathogens](concept) represent?
     - What are the [four layers](concept) defined in the [5-Layer IoT Architecture graph](context)?
     - What is an [End-to-End connectivity middleware platform](concept)?
+    - What is the definition of a [Measuring point](concept) when we are talking about [machine monitoring](context)?
+    - Professor, could you give me the formal definition of [Equipment down time](concept)?
+    - What is the definition of [Predictive maintenance](concept) in [industrial IoT](context)?
+    - What does the term [Industrial data analytics](concept) stand for?
+    - Could you define what [Industrial IoT](concept) means in the context of [Industry 4.0](context)?
 
 - intent: ask_for_examples
   examples: |

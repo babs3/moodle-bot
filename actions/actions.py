@@ -370,6 +370,7 @@ def action_process(dispatcher, tracker, payload):
         # remove duplicates from simple_tokens
         simple_tokens = list(set(simple_tokens))
         
+        no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip() 
         lemma_query = " ".join(tokenize_and_clean_text(no_punct_query))
                 
         # if simple_tokens len is 2, we must check if they are near each other in the user_message, if they are, we can create a complex token with them
