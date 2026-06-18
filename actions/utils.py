@@ -89,6 +89,7 @@ def tokenize_and_clean_text(text):
     tokens_text = [t.text for t in doc]
     
     for i, token in enumerate(doc):
+        #print(f"\nToken: '{token.text}', POS: {token.pos_}, Lemma: '{token.lemma_}', Is_Stop: {token.is_stop}")
         # Verifica se o token atual está colado a um hifen
         is_hyphenated = (
             token.text == "-" or 
@@ -103,7 +104,12 @@ def tokenize_and_clean_text(text):
                 continue
                 
             # Define a formatação (Acrónimo vs Lemma)
-            valor_token = token.text if token.text.isupper() else token.lemma_.lower()
+            if token.text.isupper():
+                valor_token = token.text  # Mantém acrónimos em maiúsculas
+            elif token.lemma_ == "datum":
+                valor_token = 'data'  # Corrige "datum" para "data"
+            else:
+                valor_token = token.lemma_.lower()
             tokens.append(valor_token)
     
     text = " ".join(tokens)
@@ -169,16 +175,53 @@ def clean_key_phrase(phrase):
     
     return phrase
 
+def upgrade_to_3grams(treated_query, complex_tokens, simple_tokens):
+    # 1. Limpar a query original (remover pontuação e passar para minúsculas)
+    query_words = treated_query.split()
+    
+    # 2. Gerar todos os 3-grams possíveis da query original
+    # Ex: "what does the", "does the term", ..., "industrial data analytics"
+    query_3grams = []
+    for i in range(len(query_words) - 2):
+        ngram = f"{query_words[i]} {query_words[i+1]} {query_words[i+2]}"
+        query_3grams.append(ngram)
+    
+    # Criamos cópias para não modificar as listas originais diretamente
+    new_complex = []
+    # 3. Verificar se algum dos 3-grams é composto pelos teus tokens existentes
+    for ngram in query_3grams:
+        ngram_words = ngram.split()
+        
+        # Verifica se TODAS as palavras do 3-gram existem nos teus tokens simples
+        # (Garante que são palavras semanticamente relevantes capturadas pelo teu pipeline)
+        if all(word in simple_tokens for word in ngram_words):
+            
+            # Se o 3-gram real existe na query e ainda não está nos complex_tokens
+            if ngram not in new_complex:
+                new_complex.append(ngram)
+    
+    if new_complex != []:
+        return new_complex, simple_tokens
+    else:                        
+        return complex_tokens, simple_tokens
+
+
 def extract_noun(query, concept):
     doc = nlp(query)
 
     # Extract cleaned multi-word noun phrases
     check_noun = False
     for token in doc:
+        #print(f"Token: '{token.text}', POS: {token.pos_}, Lemma: '{token.lemma_}', Is_Stop: {token.is_stop}")
         if check_noun:
             if token.pos_ in {"NOUN", "PROPN"} and not token.is_stop:
-                return concept + ' ' + token.lemma_.lower()
+                if token.lemma_ == "datum":
+                    return concept + ' data'
+                else:
+                    return concept + ' ' + token.lemma_.lower()
+                
         if token.text.lower() == concept.lower():
+            #print(f"Found concept '{concept}' in query. Looking for nouns after this token...")
             check_noun = True
     return ""
 
@@ -415,21 +458,25 @@ def filtrar_e_expandir_tokens(complex_tokens):
     return lista_final_cleaned
 
 def dense_vector_search(intent, complex_tokens, simple_tokens, context, query, collection, authorized_resources):
-
+    complex_2grams = [token for token in complex_tokens if len(token.split()) == 2]
+    complex_3grams = [token for token in complex_tokens if len(token.split()) == 3]
+    
     if complex_tokens != []:
-        if simple_tokens != []:
+        if complex_3grams != []:
+            query = intent + " " + " ".join(complex_3grams)
+        elif complex_2grams != []:
+            query = intent + " " + " ".join(complex_tokens) 
+        
             # se existir acronimos nos simple tokens, adiciona-os ao início da query, seguido dos complex tokens
             #acronimos = [token for token in simple_tokens if token.isupper()]
             # se complex_token acabar com 'and', adicionar o acronimo depois
-            if complex_tokens and complex_tokens[-1].endswith('and'):
-                query = intent + " " + " ".join(complex_tokens) + " " #+ " ".join(acronimos)
-            else: 
-                query = intent + " " + " ".join(complex_tokens) #  + " ".join(acronimos) + " "
-            query = re.sub(r'\s+', ' ', query).strip()  # Remove extra spaces
-        else:          
-            query = intent + " " + " ".join(complex_tokens)  # Give more weight to complex tokens in the query
-    elif simple_tokens != []:
-        query = intent + " " + " ".join(simple_tokens)  # If no complex tokens, use simple tokens
+            #if complex_tokens and complex_tokens[-1].endswith('and'):
+            #    query = intent + " " + " ".join(complex_tokens) + " " #+ " ".join(acronimos)
+            #else: 
+            #    query = intent + " " + " ".join(complex_tokens) #  + " ".join(acronimos) + " "
+            #query = re.sub(r'\s+', ' ', query).strip()  # Remove extra spaces
+    else:          
+        query = intent + " " + " ".join(simple_tokens)
         
     if context and context.strip() != "":
         query += " in " + context  # Add context to the query if it exists
@@ -522,6 +569,7 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
         print("👻  --> User does not have access to any documents in the authorized resources.")
         return [], [], []
 
+
     # check length of complex_tokens and perform != .get_scores
     if complex_tokens == []:
         bm25_scores_complex = bm25_2gram.get_scores(complex_tokens)
@@ -531,43 +579,31 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
         for i, token in enumerate(complex_tokens):
             if len(token.split()) == 3:
                 bm25_scores_complex_3 = bm25_3gram.get_scores([token])
-                bm25_scores_complex_3 = normalize_bm25_indexes(bm25_scores_complex_3)
                 
                 if bm25_scores_complex_3.max() != 0:
                     print(f"--> Complex Tokens match with len == 3: {[token]}") 
-                
-                complex_tokens_2 = get_ngrams(token, 2)
-                bm25_scores_complex_2 = bm25_2gram.get_scores(complex_tokens_2)
-                bm25_scores_complex_2 = normalize_bm25_indexes(bm25_scores_complex_2)  
-                
-                if bm25_scores_complex_2.max() != 0:
-                    print(f"--> Complex Tokens match with len == 2: {complex_tokens_2}")
                     # print from what pages the 2-grams are matching
-                    for ct in complex_tokens_2:
-                        bm25_scores_complex_2_ct = bm25_2gram.get_scores([ct])
-                        if bm25_scores_complex_2_ct.max() != 0:
-                            print(f"    - 2-gram '{ct}' matches with pages:")
-                            for idx, score in enumerate(bm25_scores_complex_2_ct):
+                    for idx, score in enumerate(bm25_scores_complex_3):
+                        if score > 0:
+                            meta = bm25_metadata[idx]
+                            print(f"    - 3-gram '{token}' matches with pages:")
+                            for idx, score in enumerate(bm25_scores_complex_3):
                                 if score > 0:
                                     meta = bm25_metadata[idx]
                                     print(f"        📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
-
+                                                
+                
                 # combine both scores
                 if i == 0:
-                    bm25_scores_complex = bm25_scores_complex_3 + bm25_scores_complex_2
+                    bm25_scores_complex = bm25_scores_complex_3
                 else:
-                    bm25_scores_complex += bm25_scores_complex_3 + bm25_scores_complex_2  
+                    bm25_scores_complex += bm25_scores_complex_3 
                 
             else: #len(complex_tokens[0]) == 2:  
                 bm25_scores_complex_2 = bm25_2gram.get_scores([token])
-                bm25_scores_complex_2 = normalize_bm25_indexes(bm25_scores_complex_2)               
-                if i == 0:                     
-                    bm25_scores_complex = bm25_scores_complex_2
-                else:
-                    bm25_scores_complex +=  bm25_scores_complex_2
                 
                 if len(token.split()) == 2:
-                    if bm25_scores_complex.max() != 0:
+                    if bm25_scores_complex_2.max() != 0:
                         print(f"--> Complex Tokens match with len == 2: {[token]}")
                         # print from what pages the 2-grams are matching
                         for idx, score in enumerate(bm25_scores_complex_2):
@@ -578,8 +614,11 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
                                     if score > 0:
                                         meta = bm25_metadata[idx]
                                         print(f"        📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
-                        
-
+                if i == 0:                     
+                    bm25_scores_complex = bm25_scores_complex_2
+                else:
+                    bm25_scores_complex +=  bm25_scores_complex_2
+                
     # Perform BM25 Search
     bm25_scores_simple = bm25_simple.get_scores(simple_tokens)
     # print from what pages the simple tokens are matching
@@ -591,6 +630,7 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
                 if score > 0:
                     meta = bm25_metadata[idx]
                     print(f"        📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
+    
     
     # =========================================================================
     # MODIFICAÇÃO PARENT-CHILD ADAPTADA AO TEU AGREGADOR HÍBRIDO (SIMPLE + COMPLEX)

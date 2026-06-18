@@ -132,7 +132,12 @@ def get_ngrams(text, n=2):
         if not is_hyphenated:
             # se o token nao for stop ou for um hifen, mantem o token
             if not token.is_stop or token.text != "-":
-                tokens_limpos.append(token.lemma_.lower())
+                # Define a formatação (Acrónimo vs Lemma)
+                if token.lemma_.lower() == "datum":
+                    valor_token = 'data'  # Corrige "datum" para "data"
+                else:
+                    valor_token = token.lemma_.lower()
+                tokens_limpos.append(valor_token)
                 continue
         # se tiver hifenados, mantem o token original (sem lematizar) e junta com os tokens vizinhos se forem hifenados
         else:
@@ -575,7 +580,13 @@ def tokenize_and_clean_text(text):
                 continue
                 
             # Define a formatação (Acrónimo vs Lemma)
-            valor_token = token.text if token.text.isupper() else token.lemma_.lower()
+            if token.text.isupper():
+                valor_token = token.text  # Mantém acrónimos em maiúsculas
+            elif token.lemma_.lower() == "datum":
+                valor_token = 'data'  # Corrige "datum" para "data"
+            else:
+                valor_token = token.lemma_.lower()
+            
             tokens.append(valor_token)
             
     text = " ".join(tokens)
@@ -715,6 +726,8 @@ def process_pdfs(pdf_folder, youtube_ids, course_id):
                         simple_tokens.append(cleaned_text)
                         ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
                         ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
+                        #print(f"---> simple_tokens: {cleaned_text}\n")
+                        print(f"3-gram tokens: {get_ngrams(' '.join(cleaned_text), 3)}\n")
                 
     if not youtube_ids:
         print("-> Nenhum vídeo do YouTube para processar.")

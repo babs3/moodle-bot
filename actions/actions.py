@@ -360,8 +360,7 @@ def action_process(dispatcher, tracker, payload):
                     complex_tokens = []
                     simple_tokens.append(tokenize_and_clean_text(concept.lower())[0]) # lemmatize and add the single word concept to simple tokens
                     print(f"🔍  Concept '{concept.lower()}' is a single word. Added to simple tokens: {simple_tokens}")
-                
-                
+                        
         # stay with acronyms in uppercase from user_message:
         query_tokens = user_message.split()
         for token in query_tokens:
@@ -371,14 +370,16 @@ def action_process(dispatcher, tracker, payload):
         # remove duplicates from simple_tokens
         simple_tokens = list(set(simple_tokens))
         
+        lemma_query = " ".join(tokenize_and_clean_text(no_punct_query))
+                
         # if simple_tokens len is 2, we must check if they are near each other in the user_message, if they are, we can create a complex token with them
         # like in "What is the PESTEL framework?", the simple tokens are ["pestel", "framework"] and they are near each other, so we can create a complex token "pestel framework"
         if len(simple_tokens) == 2:
             token1, token2 = simple_tokens
             
             # Procura as duas combinações possíveis na mensagem
-            match1 = re.search(rf"\b{re.escape(token1)}\b.*\b{re.escape(token2)}\b", user_message, re.IGNORECASE)
-            match2 = re.search(rf"\b{re.escape(token2)}\b.*\b{re.escape(token1)}\b", user_message, re.IGNORECASE)
+            match1 = re.search(rf"\b{re.escape(token1)}\b.*\b{re.escape(token2)}\b", lemma_query, re.IGNORECASE)
+            match2 = re.search(rf"\b{re.escape(token2)}\b.*\b{re.escape(token1)}\b", lemma_query, re.IGNORECASE)
             
             if match1 or match2:
                 # Se match1 for verdadeiro, significa que token1 apareceu primeiro ("pestel framework")
@@ -387,6 +388,9 @@ def action_process(dispatcher, tracker, payload):
                 
                 complex_tokens.append(ordered_token)
                 print(f"🔍  Tokens near each other. Added to complex tokens in correct order: {ordered_token}")
+                
+        complex_tokens, simple_tokens = upgrade_to_3grams(lemma_query, complex_tokens, simple_tokens)
+        
                 
     else:
         print(f"\n🔍  No concept identified by Rasa. Proceeding with keywords extraction from the entire query.")
@@ -441,6 +445,8 @@ def action_process(dispatcher, tracker, payload):
         
     selected_results = hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_docs, bm25_meta, normalized_bm25_scores, alpha)
     
+    return []
+
     if len(selected_results) == 0:
         print("\n🚨  No relevant materials found!")
         return  [
