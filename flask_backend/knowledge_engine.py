@@ -135,6 +135,8 @@ def get_ngrams(text, n=2):
                 # Define a formatação (Acrónimo vs Lemma)
                 if token.lemma_.lower() == "datum":
                     valor_token = 'data'  # Corrige "datum" para "data"
+                elif token.lemma_.lower() == "learning":
+                    valor_token = 'learn'
                 else:
                     valor_token = token.lemma_.lower()
                 tokens_limpos.append(valor_token)
@@ -584,6 +586,8 @@ def tokenize_and_clean_text(text):
                 valor_token = token.text  # Mantém acrónimos em maiúsculas
             elif token.lemma_.lower() == "datum":
                 valor_token = 'data'  # Corrige "datum" para "data"
+            elif token.lemma_.lower() == "learning":
+                    valor_token = 'learn'
             else:
                 valor_token = token.lemma_.lower()
             

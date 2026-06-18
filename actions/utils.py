@@ -106,8 +106,10 @@ def tokenize_and_clean_text(text):
             # Define a formatação (Acrónimo vs Lemma)
             if token.text.isupper():
                 valor_token = token.text  # Mantém acrónimos em maiúsculas
-            elif token.lemma_ == "datum":
+            elif token.lemma_.lower() == "datum":
                 valor_token = 'data'  # Corrige "datum" para "data"
+            elif token.lemma_.lower() == "learning":
+                valor_token = 'learn'
             else:
                 valor_token = token.lemma_.lower()
             tokens.append(valor_token)
@@ -176,34 +178,59 @@ def clean_key_phrase(phrase):
     return phrase
 
 def upgrade_to_3grams(treated_query, complex_tokens, simple_tokens):
-    # 1. Limpar a query original (remover pontuação e passar para minúsculas)
-    query_words = treated_query.split()
-    
-    # 2. Gerar todos os 3-grams possíveis da query original
-    # Ex: "what does the", "does the term", ..., "industrial data analytics"
-    query_3grams = []
-    for i in range(len(query_words) - 2):
-        ngram = f"{query_words[i]} {query_words[i+1]} {query_words[i+2]}"
-        query_3grams.append(ngram)
-    
-    # Criamos cópias para não modificar as listas originais diretamente
     new_complex = []
-    # 3. Verificar se algum dos 3-grams é composto pelos teus tokens existentes
-    for ngram in query_3grams:
-        ngram_words = ngram.split()
+    used_tokens = set()
+
+    # 1. Tentar fundir bigrams sobrepostos
+    # Ex: 'learning analysis' + 'analysis algorithm' -> 'learning analysis algorithm'
+    for i, token_a in enumerate(complex_tokens):
+        words_a = token_a.split()
         
-        # Verifica se TODAS as palavras do 3-gram existem nos teus tokens simples
-        # (Garante que são palavras semanticamente relevantes capturadas pelo teu pipeline)
-        if all(word in simple_tokens for word in ngram_words):
-            
-            # Se o 3-gram real existe na query e ainda não está nos complex_tokens
-            if ngram not in new_complex:
-                new_complex.append(ngram)
-    
-    if new_complex != []:
-        return new_complex, simple_tokens
-    else:                        
-        return complex_tokens, simple_tokens
+        # Só tentamos fundir se for um bigram (2 palavras)
+        if len(words_a) == 2:
+            for j, token_b in enumerate(complex_tokens):
+                if i == j:
+                    continue
+                words_b = token_b.split()
+                
+                if len(words_b) == 2:
+                    # Se a última palavra de A for igual à primeira de B
+                    if words_a[-1] == words_b[0]:
+                        merged_ngram = f"{words_a[0]} {words_a[1]} {words_b[1]}"
+                        if merged_ngram not in new_complex:
+                            new_complex.append(merged_ngram)
+                        used_tokens.add(token_a)
+                        used_tokens.add(token_b)
+
+    # 2. Adicionar os complex_tokens que NÃO foram fundidos em trigrams
+    for token in complex_tokens:
+        if token not in used_tokens and token not in new_complex:
+            new_complex.append(token)
+
+    # 3. Fallback: Se não fundiu nada por sobreposição, corre a lógica original de 3-grams seguidos
+    if not any(len(t.split()) == 3 for t in new_complex):
+        query_words = treated_query.split()
+        query_3grams = []
+        for i in range(len(query_words) - 2):
+            ngram = f"{query_words[i]} {query_words[i+1]} {query_words[i+2]}"
+            query_3grams.append(ngram)
+        
+        for ngram in query_3grams:
+            ngram_words = ngram.split()
+            if all(word in simple_tokens for word in ngram_words):
+                if ngram not in new_complex:
+                    new_complex.append(ngram)
+
+    # Se gerámos novos trigrams, filtramos bigrams redundantes que ficaram lá dentro
+    # Ex: Se temos 'learning analysis algorithm', já não precisamos de 'learning analysis'
+    final_complex = []
+    for token in new_complex:
+        # Verifica se este token já está contido noutro token maior da lista
+        if any(token != other and token in other for other in new_complex):
+            continue
+        final_complex.append(token)
+
+    return final_complex if final_complex else complex_tokens, simple_tokens
 
 
 def extract_noun(query, concept):
@@ -215,8 +242,10 @@ def extract_noun(query, concept):
         #print(f"Token: '{token.text}', POS: {token.pos_}, Lemma: '{token.lemma_}', Is_Stop: {token.is_stop}")
         if check_noun:
             if token.pos_ in {"NOUN", "PROPN"} and not token.is_stop:
-                if token.lemma_ == "datum":
+                if token.lemma_.lower() == "datum":
                     return concept + ' data'
+                elif token.lemma_.lower() == "learning":
+                    return concept + ' learn'
                 else:
                     return concept + ' ' + token.lemma_.lower()
                 

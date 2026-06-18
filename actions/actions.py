@@ -332,6 +332,8 @@ def action_process(dispatcher, tracker, payload):
     
     concepts = list(tracker.get_latest_entity_values("concept"))
     print(f"🔍  Concepts from slot: '{concepts}' || Context from slot: '{context}'")
+    concepts = [tokenize_and_clean_text(concept.lower())[0] for concept in concepts if concept.strip() != ""]  # Lemmatize and clean concepts
+    print(f"🔍  Concepts after lemmatization and cleaning: '{concepts}'")    
     
     complex_tokens = []
     simple_tokens = []
@@ -349,13 +351,14 @@ def action_process(dispatcher, tracker, payload):
                 # check if there is a noun phrase in the user message that matches the concept
                 # for example in query "give me some examples of cps requirements", the concept is "cps" and we want to extract it as a complex token "cps requirements" from the user message
                 no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
-                complex_tokens = [extract_noun(no_punct_query, concept.lower())]
-                print(f"🔍  > complex_tokens: {complex_tokens}")
-                if complex_tokens != ['']:
-                    complex_tokens_split = tokenize_and_clean_text(complex_tokens[0])
-                    print(f"🔍  Concept '{complex_tokens[0]}' split into simple lemma tokens: {complex_tokens_split}")
+                tmp_complex_tokens = [extract_noun(no_punct_query, concept.lower())]
+                print(f"🔍  > tmp_complex_tokens: {tmp_complex_tokens}")
+                if tmp_complex_tokens != ['']:
+                    complex_tokens_split = tokenize_and_clean_text(tmp_complex_tokens[0])
+                    print(f"🔍  Concept '{tmp_complex_tokens[0]}' split into simple lemma tokens: {complex_tokens_split}")
                     for token in complex_tokens_split:
                         simple_tokens.append(token)
+                    complex_tokens.append(tmp_complex_tokens[0])
                 else:
                     complex_tokens = []
                     simple_tokens.append(tokenize_and_clean_text(concept.lower())[0]) # lemmatize and add the single word concept to simple tokens
