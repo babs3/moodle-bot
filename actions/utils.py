@@ -233,7 +233,7 @@ def upgrade_to_3grams(treated_query, complex_tokens, simple_tokens):
     return final_complex if final_complex else complex_tokens, simple_tokens
 
 
-def extract_noun(query, concept):
+def extract_noun_after(query, concept):
     doc = nlp(query)
 
     # Extract cleaned multi-word noun phrases
@@ -438,8 +438,13 @@ def filtrar_e_expandir_tokens(complex_tokens):
             # 2. Adiciona todas as combinações de 2 palavras (bi-grams)
             for i in range(num_palavras - 1):
                 lista_final.append(" ".join(palavras[i:i+2]))
+        elif num_palavras == 3:
+            # Se tiver exatamente 3 palavras, adiciona a expressão original e os bi-grams
+            lista_final.append(token)  # Mantém o token original
+            for i in range(num_palavras - 1):
+                lista_final.append(" ".join(palavras[i:i+2]))
         else:
-            # Se já tiver 2 ou 3 palavras (ou menos), mantém o token original
+            # Se já tiver 2  palavras (ou menos), mantém o token original
             lista_final.append(token)
     
     print(f"\n🔍  ComplexTokens after filtering and expansion: {lista_final}")
@@ -648,18 +653,40 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
                 else:
                     bm25_scores_complex +=  bm25_scores_complex_2
                 
-    # Perform BM25 Search
-    bm25_scores_simple = bm25_simple.get_scores(simple_tokens)
-    # print from what pages the simple tokens are matching
+    fallback_tokens = []
+    valid_tokens = []
+    # Perform BM25 Search por token
     for token in simple_tokens:
         bm25_scores_simple_token = bm25_simple.get_scores([token])
+        
         if bm25_scores_simple_token.max() != 0:
-            print(f"--> Simple Token '{token}' matches with pages:")
-            for idx, score in enumerate(bm25_scores_simple_token):
-                if score > 0:
-                    meta = bm25_metadata[idx]
-                    print(f"        📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
+            # Conta quantos chunks têm score > 0 para este token
+            match_count = sum(1 for score in bm25_scores_simple_token if score > 0)
+            
+            if match_count > 10:
+                print(f"⚠️ Token '{token}' é muito abrangente ({match_count} matches). Guardado como garantia.")
+                # Guardamos nas garantias (fallback)
+                fallback_tokens.append(token)
+            else:
+                print(f"--> Simple Token '{token}' matches with pages ({match_count} matches):")
+                # Guardamos nos tokens válidos
+                valid_tokens.append(token)
+                
+                # O teu print original (apenas para os válidos)
+                #for idx, score in enumerate(bm25_scores_simple_token):
+                #    if score > 0:
+                #        meta = bm25_metadata[idx]
+                #        print(f"        📄  {meta['file'][:30]} | Page: {meta['page']} | Score: {score:.4f}")
     
+    if valid_tokens:
+        print(f"\n🔍  Valid Simple Tokens for BM25 search: {valid_tokens}")
+        bm25_scores_simple = bm25_simple.get_scores(valid_tokens)
+    elif fallback_tokens:
+        print("⚠️  No valid simple tokens found. Using fallback tokens for BM25 search.")
+        bm25_scores_simple = bm25_simple.get_scores(fallback_tokens)
+    else:
+        print("⚠️  No valid or fallback simple tokens found. BM25 search will return no results.")
+        bm25_scores_simple = np.zeros(len(bm25_metadata))  # No matches
     
     # =========================================================================
     # MODIFICAÇÃO PARENT-CHILD ADAPTADA AO TEU AGREGADOR HÍBRIDO (SIMPLE + COMPLEX)

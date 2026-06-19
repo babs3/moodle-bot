@@ -332,7 +332,12 @@ def action_process(dispatcher, tracker, payload):
     
     concepts = list(tracker.get_latest_entity_values("concept"))
     print(f"🔍  Concepts from slot: '{concepts}' || Context from slot: '{context}'")
-    concepts = [tokenize_and_clean_text(concept.lower())[0] for concept in concepts if concept.strip() != ""]  # Lemmatize and clean concepts
+    lemma_concepts = []
+    for concept in concepts:
+        lemma_concept_text = " ".join(tokenize_and_clean_text(concept.lower()))
+        print(f"    - Concept '{concept}' lemmatized and cleaned to: {lemma_concept_text}")
+        lemma_concepts.append(lemma_concept_text)
+    concepts = lemma_concepts
     print(f"🔍  Concepts after lemmatization and cleaning: '{concepts}'")    
     
     complex_tokens = []
@@ -351,7 +356,7 @@ def action_process(dispatcher, tracker, payload):
                 # check if there is a noun phrase in the user message that matches the concept
                 # for example in query "give me some examples of cps requirements", the concept is "cps" and we want to extract it as a complex token "cps requirements" from the user message
                 no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
-                tmp_complex_tokens = [extract_noun(no_punct_query, concept.lower())]
+                tmp_complex_tokens = [extract_noun_after(no_punct_query, concept.lower())]
                 print(f"🔍  > tmp_complex_tokens: {tmp_complex_tokens}")
                 if tmp_complex_tokens != ['']:
                     complex_tokens_split = tokenize_and_clean_text(tmp_complex_tokens[0])
@@ -449,8 +454,7 @@ def action_process(dispatcher, tracker, payload):
         
     selected_results = hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_docs, bm25_meta, normalized_bm25_scores, alpha)
     
-    return []
-
+    return
     if len(selected_results) == 0:
         print("\n🚨  No relevant materials found!")
         return  [
@@ -870,6 +874,7 @@ class ActionGetClassMaterialLocation(Action):
         return "action_get_class_material_location"
 
     def run(self, dispatcher, tracker, domain):
+        return
 
         bot_response = tracker.get_slot("bot_response")
         input_time = tracker.get_slot("input_time")
