@@ -326,6 +326,8 @@ def action_process(dispatcher, tracker, payload):
     print(f"\n📖  --------- Getting Knowledge --------- 📖 ")
     print(f"\n🧒  User ({user_email}) said: {user_message} 📩")
     
+    no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
+    
     # Extract variables from chat memory   
     context = tracker.get_slot("context")   
     context = context.lower().strip() if context else ""     
@@ -345,29 +347,58 @@ def action_process(dispatcher, tracker, payload):
     if concepts: # and concept.strip() != "":
         # check if concept is just one word or multiple words
         for concept in concepts:
-            if " " in concept:         
-                complex_tokens_split = tokenize_and_clean_text(concept.lower())
-                print(f"🔍  Concept '{concept.lower()}' split into simple lemma tokens: {complex_tokens_split}")
-                for token in complex_tokens_split:
-                    simple_tokens.append(token)        
-                text = " ".join(complex_tokens_split)
-                complex_tokens.append(text)
-            else: 
-                # check if there is a noun phrase in the user message that matches the concept
-                # for example in query "give me some examples of cps requirements", the concept is "cps" and we want to extract it as a complex token "cps requirements" from the user message
-                no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip()  # Remove punctuation except '-' and '&'
+            if " " in concept:
                 tmp_complex_tokens = [extract_noun_after(no_punct_query, concept.lower())]
-                print(f"🔍  > tmp_complex_tokens: {tmp_complex_tokens}")
+                print(f"    > AFTER tmp_complex_tokens: {tmp_complex_tokens}")
                 if tmp_complex_tokens != ['']:
                     complex_tokens_split = tokenize_and_clean_text(tmp_complex_tokens[0])
-                    print(f"🔍  Concept '{tmp_complex_tokens[0]}' split into simple lemma tokens: {complex_tokens_split}")
+                    print(f"\n🔍  Concept '{tmp_complex_tokens[0]}' split into simple lemma tokens: {complex_tokens_split}")
                     for token in complex_tokens_split:
                         simple_tokens.append(token)
                     complex_tokens.append(tmp_complex_tokens[0])
+                    
+                tmp_complex_tokens = [extract_noun_before(no_punct_query, concept.lower())]
+                print(f"    > BEFORE tmp_complex_tokens: {tmp_complex_tokens}")
+                if tmp_complex_tokens != ['']:
+                    complex_tokens_split = tokenize_and_clean_text(tmp_complex_tokens[0])
+                    print(f"\n🔍  Concept '{tmp_complex_tokens[0]}' split into simple lemma tokens: {complex_tokens_split}")
+                    for token in complex_tokens_split:
+                        simple_tokens.append(token)
+                    complex_tokens.append(tmp_complex_tokens[0])                
+                
+                else:                      
+                    complex_tokens_split = tokenize_and_clean_text(concept.lower())
+                    print(f"\n🔍  Concept '{concept.lower()}' split into simple lemma tokens: {complex_tokens_split}")
+                    for token in complex_tokens_split:
+                        simple_tokens.append(token)        
+                    text = " ".join(complex_tokens_split)
+                    complex_tokens.append(text)
+            else: 
+                # check if there is a noun phrase in the user message that matches the concept
+                # for example in query "give me some examples of cps requirements", the concept is "cps" and we want to extract it as a complex token "cps requirements" from the user message
+                
+                tmp_complex_tokens = [extract_noun_after(no_punct_query, concept.lower())]
+                print(f"    > AFTER tmp_complex_tokens: {tmp_complex_tokens}")
+                if tmp_complex_tokens != ['']:
+                    complex_tokens_split = tokenize_and_clean_text(tmp_complex_tokens[0])
+                    print(f"\n🔍  Concept '{tmp_complex_tokens[0]}' split into simple lemma tokens: {complex_tokens_split}")
+                    for token in complex_tokens_split:
+                        simple_tokens.append(token)
+                    complex_tokens.append(tmp_complex_tokens[0])
+                    
+                tmp_complex_tokens = [extract_noun_before(no_punct_query, concept.lower())]
+                print(f"    > BEFORE tmp_complex_tokens: {tmp_complex_tokens}")
+                if tmp_complex_tokens != ['']:
+                    complex_tokens_split = tokenize_and_clean_text(tmp_complex_tokens[0])
+                    print(f"\n🔍  Concept '{tmp_complex_tokens[0]}' split into simple lemma tokens: {complex_tokens_split}")
+                    for token in complex_tokens_split:
+                        simple_tokens.append(token)
+                    complex_tokens.append(tmp_complex_tokens[0])                
+                
                 else:
                     complex_tokens = []
                     simple_tokens.append(tokenize_and_clean_text(concept.lower())[0]) # lemmatize and add the single word concept to simple tokens
-                    print(f"🔍  Concept '{concept.lower()}' is a single word. Added to simple tokens: {simple_tokens}")
+                    print(f"\n🔍  Concept '{concept.lower()}' is a single word. Added to simple tokens: {simple_tokens}")
                         
         # stay with acronyms in uppercase from user_message:
         query_tokens = user_message.split()
@@ -377,8 +408,7 @@ def action_process(dispatcher, tracker, payload):
                 print(f"🔍  Added uppercase token '{token}' from user message to simple tokens: {simple_tokens}")
         # remove duplicates from simple_tokens
         simple_tokens = list(set(simple_tokens))
-        
-        no_punct_query = re.sub(r"[^\w\s\-\&]", "", user_message).strip() 
+         
         lemma_query = " ".join(tokenize_and_clean_text(no_punct_query))
                 
         # if simple_tokens len is 2, we must check if they are near each other in the user_message, if they are, we can create a complex token with them

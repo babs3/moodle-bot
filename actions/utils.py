@@ -234,6 +234,13 @@ def upgrade_to_3grams(treated_query, complex_tokens, simple_tokens):
 
 
 def extract_noun_after(query, concept):
+    #print(f"\n🔍  Extracting noun after concept '{concept}' in query: '{query}'")
+    before_concept = " "
+    if " " in concept:
+        before_concept = " " + concept.split()[0]  # Pega a primeira palavra do conceito para procurar no texto
+        concept = concept.split()[-1]  # Pega a última palavra do conceito para procurar no texto
+        print(f"🔹  Adjusted concept for search: '{concept}', before_concept: '{before_concept}'")
+        
     doc = nlp(query)
 
     # Extract cleaned multi-word noun phrases
@@ -243,15 +250,51 @@ def extract_noun_after(query, concept):
         if check_noun:
             if token.pos_ in {"NOUN", "PROPN"} and not token.is_stop:
                 if token.lemma_.lower() == "datum":
-                    return concept + ' data'
+                    return before_concept + concept + ' data'
                 elif token.lemma_.lower() == "learning":
-                    return concept + ' learn'
+                    return before_concept + concept + ' learn'
                 else:
-                    return concept + ' ' + token.lemma_.lower()
+                    return before_concept + concept + ' ' + token.lemma_.lower()
                 
         if token.text.lower() == concept.lower():
             #print(f"Found concept '{concept}' in query. Looking for nouns after this token...")
             check_noun = True
+    return ""
+
+def extract_noun_before(query, concept):
+    #print(f"\n🔍  Extracting noun before concept '{concept}' in query: '{query}'")
+    after_concept = ""
+    if " " in concept:
+        after_concept = " " + concept.split()[-1]  # Pega a última palavra do conceito para procurar no texto
+        concept = concept.split()[0]  # Pega a primeira palavra do conceito para procurar no texto
+        print(f"🔹  Adjusted concept for search: '{concept}', after_concept: '{after_concept}'")
+    
+    doc = nlp(query)
+
+    last_noun = None
+
+    for token in doc:
+        # Se encontrarmos o conceito, verificamos se já tínhamos guardado um substantivo antes
+        if token.text.lower() == concept.lower():
+            if last_noun is not None:
+                return last_noun + ' ' + concept + after_concept
+            return ""  # Encontrou o conceito, mas não havia substantivo antes
+
+        # Vai guardando/atualizando o último substantivo válido encontrado
+        if token.pos_ in {"NOUN", "PROPN"} and not token.is_stop:
+            if token.lemma_.lower() == "datum":
+                last_noun = "data"
+            elif token.lemma_.lower() == "learning":
+                last_noun = "learn"
+            else:
+                last_noun = token.lemma_.lower()
+        else:
+            # Opcional: Se houver palavras irrelevantes (que não stop-words) entre o nome 
+            # e o conceito, podes querer "fazer reset" ao last_noun.
+            # Se queres que o nome esteja COLADO ao conceito, descomenta a linha abaixo:
+            # last_noun = None
+            pass
+
     return ""
 
 def extract_query_keywords(query):
