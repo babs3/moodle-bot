@@ -74,7 +74,7 @@ model_path = "/app/models/all-MiniLM-L6-v2"
 embedding_model = SentenceTransformer(model_path)
 
 # Set irrelevant intent words to filter out from complex and simple tokens
-irrelevant_intent_words = ["example", "definition", "explanation", "info", "information", "details", "description", "overview", "summary", "clarification", "insight", "comparison"]
+irrelevant_intent_words = ["example", "definition", "significance", "explanation", "meaning", "info", "information", "details", "description", "overview", "summary", "clarification", "insight", "comparison"]
 
 
 def load_bm25_index(course_id):

@@ -561,7 +561,7 @@ def clean_doc_text(text):
     text = text.replace(" - ", " ")
     return text.strip()
 
-def tokenize_and_clean_text(text):
+def tokenize_and_clean_text_kb(text):
     doc = nlp(text)
     
     tokens = []
@@ -707,7 +707,7 @@ def process_pdfs(pdf_folder, youtube_ids, course_id):
                     metadata.append(child_meta)
                     
                     # Processamento para o BM25 (sobre o texto completo)
-                    cleaned_text = tokenize_and_clean_text(clean_doc_text(doc_text))
+                    cleaned_text = tokenize_and_clean_text_kb(clean_doc_text(doc_text))
                     simple_tokens.append(cleaned_text)
                     ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
                     ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
@@ -726,12 +726,12 @@ def process_pdfs(pdf_folder, youtube_ids, course_id):
                         child_meta["parent_text"] = doc_text
                         metadata.append(child_meta)
                         
-                        cleaned_text = tokenize_and_clean_text(clean_doc_text(child_text))
+                        cleaned_text = tokenize_and_clean_text_kb(clean_doc_text(child_text))
                         simple_tokens.append(cleaned_text)
                         ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
                         ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
                         #print(f"---> simple_tokens: {cleaned_text}\n")
-                        print(f"3-gram tokens: {get_ngrams(' '.join(cleaned_text), 3)}\n")
+                        #print(f"3-gram tokens: {get_ngrams(' '.join(cleaned_text), 3)}\n")
                 
     if not youtube_ids:
         print("-> Nenhum vídeo do YouTube para processar.")
@@ -798,7 +798,7 @@ def process_pdfs(pdf_folder, youtube_ids, course_id):
                             metadata.append(child_meta)
                             
                             # Processamento para o BM25 sobre o bloco de vídeo
-                            cleaned_text = tokenize_and_clean_text(clean_doc_text(doc_text))
+                            cleaned_text = tokenize_and_clean_text_kb(clean_doc_text(doc_text))
                             simple_tokens.append(cleaned_text)
                             ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
                             ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
@@ -819,7 +819,7 @@ def process_pdfs(pdf_folder, youtube_ids, course_id):
                                 metadata.append(child_meta)
                                 
                                 # Processamento BM25 focado na granularidade do Filho
-                                cleaned_text = tokenize_and_clean_text(clean_doc_text(child_text))
+                                cleaned_text = tokenize_and_clean_text_kb(clean_doc_text(child_text))
                                 simple_tokens.append(cleaned_text)
                                 ngram_docs_2.append(get_ngrams(" ".join(cleaned_text), 2))
                                 ngram_docs_3.append(get_ngrams(" ".join(cleaned_text), 3))
@@ -984,7 +984,7 @@ def delete_pdf_from_knowledge(filename, course_id):
         new_documents = [documents[i] for i in indices_para_manter]
         
         # Precisas de re-tokenizar para o BM25 (ou guardar os tokens no pkl anteriormente para ser mais rápido)
-        new_simple_tokens = [tokenize_and_clean_text(clean_doc_text(doc)) for doc in new_documents]
+        new_simple_tokens = [tokenize_and_clean_text_kb(clean_doc_text(doc)) for doc in new_documents]
         new_ngram_docs_2 = [get_ngrams(" ".join(tokens), 2) for tokens in new_simple_tokens]
         new_ngram_docs_3 = [get_ngrams(" ".join(tokens), 3) for tokens in new_simple_tokens]
 

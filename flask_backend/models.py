@@ -41,17 +41,23 @@ class MoodleQuizData(db.Model):
     question_feedback = db.Column(db.Text, nullable=True)
     last_updated = db.Column(db.DateTime, default=datetime.now)
     
-class MoodleUserHistory(db.Model):
+class StudentTopicMastery(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     course_id = db.Column(db.Integer, nullable=False)
+    quiz_id = db.Column(db.Integer, nullable=False)  # ID do Quiz no Moodle
     user_moodle_id = db.Column(db.Integer, db.ForeignKey('moodle_users.moodle_id', ondelete="CASCADE"), nullable=False)
-    question = db.Column(db.Text, nullable=False)
-    response = db.Column(db.Text, nullable=False)
-    pdfs = db.Column(db.String(255), nullable=True)
-    is_tutor_interaction = db.Column(db.Boolean, default=False)
-    time_to_respond = db.Column(db.String(100), nullable=False)  # Tempo que o bot levou para responder
-    timestamp = db.Column(db.DateTime, default=datetime.now)
-    # TODO: devo por o topic_id aqui também? Talvez seja útil para análises futuras, mas não é essencial no momento.
+    topic_id = db.Column(db.Integer, db.ForeignKey('topics.id', ondelete="CASCADE"), nullable=False)
+    
+    # Métricas para o Professor/Aluno verem
+    total_attempts = db.Column(db.Integer, default=0)
+    total_errors = db.Column(db.Integer, default=0)
+    
+    # O "termómetro" do aluno no tópico (Ex: 0 a 100%)
+    mastery_score = db.Column(db.Float, default=0.0) 
+    # Estado atual baseado nas últimas respostas
+    status = db.Column(db.String(20), default="struggling") # Ex: "struggling", "improving", "mastered"
+    
+    last_updated = db.Column(db.DateTime, default=datetime.now)
     
 class TutorProgress(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -67,7 +73,19 @@ class TutorProgress(db.Model):
     question_feedback = db.Column(db.Text, nullable=True)  # Feedback específico da questão, se disponível
     state=db.Column(db.String(20), default="pending", nullable=False)  # Ex: "pending", "reviewed", "mastered"
     timestamp = db.Column(db.DateTime, default=datetime.now)
-    
+
+class MoodleUserHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    course_id = db.Column(db.Integer, nullable=False)
+    user_moodle_id = db.Column(db.Integer, db.ForeignKey('moodle_users.moodle_id', ondelete="CASCADE"), nullable=False)
+    question = db.Column(db.Text, nullable=False)
+    response = db.Column(db.Text, nullable=False)
+    pdfs = db.Column(db.String(255), nullable=True)
+    is_tutor_interaction = db.Column(db.Boolean, default=False)
+    time_to_respond = db.Column(db.String(100), nullable=False)  # Tempo que o bot levou para responder
+    timestamp = db.Column(db.DateTime, default=datetime.now)
+    # TODO: devo por o topic_id aqui também? Talvez seja útil para análises futuras, mas não é essencial no momento.
+      
 class Topics(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), unique=True, nullable=False)
