@@ -13,3 +13,5 @@ cleaned_output.sql
 whisper_models
 migrations
 __pycache__
+actions/__pycache__
+flask_backend/__pycache__
