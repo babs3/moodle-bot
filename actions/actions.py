@@ -344,61 +344,84 @@ def action_process(dispatcher, tracker, payload):
     
     complex_tokens = []
     simple_tokens = []
-    if concepts: # and concept.strip() != "":
+    if concepts:
         # check if concept is just one word or multiple words
         for concept in concepts:
             if " " in concept:
+                add_concept_as_complex = False
                 tmp_complex_tokens = [extract_noun_after(no_punct_query, concept.lower())]
                 print(f"    > AFTER tmp_complex_tokens: {tmp_complex_tokens}")
                 if tmp_complex_tokens != ['']:
+                    add_concept_as_complex = True
                     complex_tokens_split = tokenize_and_clean_text(tmp_complex_tokens[0])
-                    print(f"\n🔍  Concept '{tmp_complex_tokens[0]}' split into simple lemma tokens: {complex_tokens_split}")
-                    for token in complex_tokens_split:
+                    
+                    # remove irrelevant intent words from complex_tokens_split
+                    complex_tokens_tmp = [token for token in complex_tokens_split if token not in irrelevant_intent_words]                                                       
+                            
+                    for token in complex_tokens_tmp:
                         simple_tokens.append(token)
                     complex_tokens.append(tmp_complex_tokens[0])
                     
                 tmp_complex_tokens = [extract_noun_before(no_punct_query, concept.lower())]
                 print(f"    > BEFORE tmp_complex_tokens: {tmp_complex_tokens}")
-                if tmp_complex_tokens != ['']:
-                    complex_tokens_split = tokenize_and_clean_text(tmp_complex_tokens[0])
-                    print(f"\n🔍  Concept '{tmp_complex_tokens[0]}' split into simple lemma tokens: {complex_tokens_split}")
-                    for token in complex_tokens_split:
-                        simple_tokens.append(token)
-                    complex_tokens.append(tmp_complex_tokens[0])                
                 
-                else:                      
+                if tmp_complex_tokens != ['']:
+                    add_concept_as_complex = True
+                    complex_tokens_split = tokenize_and_clean_text(tmp_complex_tokens[0])
+                    
+                    # remove irrelevant intent words from complex_tokens_split
+                    complex_tokens_tmp = [token for token in complex_tokens_split if token not in irrelevant_intent_words]                            
+                    
+                    for token in complex_tokens_tmp:
+                        simple_tokens.append(token)
+                    complex_tokens.append(" ".join(complex_tokens_tmp))                
+                
+                if add_concept_as_complex:                      
                     complex_tokens_split = tokenize_and_clean_text(concept.lower())
                     print(f"\n🔍  Concept '{concept.lower()}' split into simple lemma tokens: {complex_tokens_split}")
-                    for token in complex_tokens_split:
-                        simple_tokens.append(token)        
-                    text = " ".join(complex_tokens_split)
-                    complex_tokens.append(text)
+                    
+                    # remove irrelevant intent words from complex_tokens_split
+                    complex_tokens_tmp = [token for token in complex_tokens_split if token not in irrelevant_intent_words]                            
+                            
+                    for token in complex_tokens_tmp:
+                        simple_tokens.append(token)
+                    complex_tokens.append(" ".join(complex_tokens_tmp))
             else: 
                 # check if there is a noun phrase in the user message that matches the concept
                 # for example in query "give me some examples of cps requirements", the concept is "cps" and we want to extract it as a complex token "cps requirements" from the user message
-                
+                add_concept_as_simple = False
                 tmp_complex_tokens = [extract_noun_after(no_punct_query, concept.lower())]
                 print(f"    > AFTER tmp_complex_tokens: {tmp_complex_tokens}")
                 if tmp_complex_tokens != ['']:
+                    add_concept_as_simple = True
                     complex_tokens_split = tokenize_and_clean_text(tmp_complex_tokens[0])
-                    print(f"\n🔍  Concept '{tmp_complex_tokens[0]}' split into simple lemma tokens: {complex_tokens_split}")
-                    for token in complex_tokens_split:
+                    
+                    # remove irrelevant intent words from complex_tokens_split
+                    complex_tokens_tmp = [token for token in complex_tokens_split if token not in irrelevant_intent_words]                            
+                     
+                    for token in complex_tokens_tmp:
                         simple_tokens.append(token)
-                    complex_tokens.append(tmp_complex_tokens[0])
+                    complex_tokens.append(" ".join(complex_tokens_tmp))
                     
                 tmp_complex_tokens = [extract_noun_before(no_punct_query, concept.lower())]
                 print(f"    > BEFORE tmp_complex_tokens: {tmp_complex_tokens}")
                 if tmp_complex_tokens != ['']:
+                    add_concept_as_simple = True
                     complex_tokens_split = tokenize_and_clean_text(tmp_complex_tokens[0])
-                    print(f"\n🔍  Concept '{tmp_complex_tokens[0]}' split into simple lemma tokens: {complex_tokens_split}")
-                    for token in complex_tokens_split:
+                    
+                    # remove irrelevant intent words from complex_tokens_split
+                    complex_tokens_tmp = [token for token in complex_tokens_split if token not in irrelevant_intent_words]                            
+                     
+                    for token in complex_tokens_tmp: 
                         simple_tokens.append(token)
-                    complex_tokens.append(tmp_complex_tokens[0])                
+                    complex_tokens.append(" ".join(complex_tokens_tmp))                
                 
-                else:
+                if add_concept_as_simple:
                     complex_tokens = []
                     simple_tokens.append(tokenize_and_clean_text(concept.lower())[0]) # lemmatize and add the single word concept to simple tokens
                     print(f"\n🔍  Concept '{concept.lower()}' is a single word. Added to simple tokens: {simple_tokens}")
+                    # remove irrelevant intent words from simple_tokens
+                    simple_tokens = [token for token in simple_tokens if token not in irrelevant_intent_words]
                         
         # stay with acronyms in uppercase from user_message:
         query_tokens = user_message.split()
@@ -439,8 +462,11 @@ def action_process(dispatcher, tracker, payload):
         print(f"🔍  no_punct_query: {no_punct_query}")
         complex_tokens, simple_tokens, _ = keywords_to_tokens(keywords, no_punct_query, context)  
     
+    
+    # ===  Prepare context for search  === #
     context = " ".join(tokenize_and_clean_text(context)) if context else ""
     print(f"🔍  Tokenized context: {context}")
+    
     
     print(f"\n🔍  Final tokens to be used in search: \n    > Complex tokens: {complex_tokens} \n    > Simple tokens: {simple_tokens}")
     

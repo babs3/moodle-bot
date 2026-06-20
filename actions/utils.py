@@ -73,6 +73,10 @@ nlp = spacy.load("en_core_web_sm")
 model_path = "/app/models/all-MiniLM-L6-v2"
 embedding_model = SentenceTransformer(model_path)
 
+# Set irrelevant intent words to filter out from complex and simple tokens
+irrelevant_intent_words = ["example", "definition", "explanation", "info", "information", "details", "description", "overview", "summary", "clarification", "insight", "comparison"]
+
+
 def load_bm25_index(course_id):
     pkl_path = os.path.join("vector_store", f"bm25_index_{course_id}.pkl")
     if os.path.exists(pkl_path):
