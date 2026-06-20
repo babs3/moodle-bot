@@ -236,12 +236,40 @@ def upgrade_to_3grams(treated_query, complex_tokens, simple_tokens):
 
     return final_complex if final_complex else complex_tokens, simple_tokens
 
+def extract_context_after(query, context):
+    #print(f"\n🔍  Extracting noun after concept '{context}' in query: '{query}'")
+    before_context = ""
+    if " " in context:
+        before_context = context.split()[0] + " "  # Pega a primeira palavra do contexto para retornar no texto
+        context = context.split()[-1]  # Pega a última palavra do contexto para procurar no texto
+        print(f"🔹  Adjusted context for search: '{context}', before_context: '{before_context}'")
+        
+    doc = nlp(query)
+
+    # Extract cleaned multi-word noun phrases
+    new_context = []
+    check_noun = False
+    for token in doc:
+        #print(f"Token: '{token.text}', POS: {token.pos_}, Lemma: '{token.lemma_}', Is_Stop: {token.is_stop}")
+        if check_noun:
+            if token.pos_ in {"NOUN", "PROPN"} and not token.is_stop:
+                if token.lemma_.lower() == "datum":
+                    new_context.append('data')
+                elif token.lemma_.lower() == "learning":
+                    new_context.append('learn')
+                else:
+                    new_context.append(token.lemma_.lower())
+                
+        if token.text.lower() == context.lower():
+            #print(f"Found context '{context}' in query. Looking for nouns after this token...")
+            check_noun = True
+    return before_context + context + ' ' + " ".join(new_context) if new_context else before_context + context
 
 def extract_noun_after(query, concept):
     #print(f"\n🔍  Extracting noun after concept '{concept}' in query: '{query}'")
-    before_concept = " "
+    before_concept = ""
     if " " in concept:
-        before_concept = " " + concept.split()[0]  # Pega a primeira palavra do conceito para procurar no texto
+        before_concept = concept.split()[0] + " "  # Pega a primeira palavra do conceito para procurar no texto
         concept = concept.split()[-1]  # Pega a última palavra do conceito para procurar no texto
         print(f"🔹  Adjusted concept for search: '{concept}', before_concept: '{before_concept}'")
         

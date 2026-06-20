@@ -466,6 +466,8 @@ def action_process(dispatcher, tracker, payload):
     # ===  Prepare context for search  === #
     context = " ".join(tokenize_and_clean_text(context)) if context else ""
     print(f"🔍  Tokenized context: {context}")
+    context = extract_context_after(no_punct_query, context) if context else ""
+    print(f"🔍  Extracted context after the query: {context}")
     
     
     print(f"\n🔍  Final tokens to be used in search: \n    > Complex tokens: {complex_tokens} \n    > Simple tokens: {simple_tokens}")
