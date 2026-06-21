@@ -63,7 +63,7 @@ def get_latest_gemini_pro_model():
     return _CACHED_MODEL_NAME
 
 # Uso no teu código:
-MODEL_NAME = get_latest_gemini_pro_model() #"models/gemini-2.5-flash"
+MODEL_NAME = "models/gemini-2.5-flash" #get_latest_gemini_pro_model() #"models/gemini-2.5-flash"
 print(f"✅  Using latest model found: {MODEL_NAME}")
 
 # Load Spacy model for NLP tasks

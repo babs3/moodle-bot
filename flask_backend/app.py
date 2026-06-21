@@ -686,7 +686,7 @@ def tutor_toggle():
                             topic_mastery.status = "improving"
                         else:
                             topic_mastery.status = "struggling"
-                    db.session.commit()
+                db.session.commit()
             
             if erros:
                 novos_erros_encontrados.extend(erros)
@@ -706,7 +706,7 @@ def tutor_toggle():
                     error['topic_id'] = topic_id
 
                     # 2. Guardar o progresso
-                    # verificar se já existe um registo para este erro específico (mesmo quiz, mesma questão, mesma resposta do aluno)
+                    # verificar se já existe um registo para este erro específico (mesmo quiz, mesma questão)
                     progresso_existente = TutorProgress.query.filter_by(
                         course_id=course_id,
                         user_moodle_id=user_id,
@@ -714,12 +714,15 @@ def tutor_toggle():
                         quiz_id=question_data.quiz_id if question_data else None,
                         topic_id=error.get('topic_id'),
                         question=error.get('question'),
-                        student_answer=error.get('student_answer'),
-                        correct_answer=error.get('correct_answer'),
+                        #student_answer=error.get('student_answer'),
+                        #correct_answer=error.get('correct_answer'),
                     ).first()
                     
                     if progresso_existente:
+                        # atualizar o registo existente com a nova resposta do aluno para os casos que seja uma nova resposta
+                        progresso_existente.student_answer = error.get('student_answer')
                         progresso_existente.last_attempt_id = attempt_id
+                        progresso_existente.timestamp = datetime.now()
                         #app.logger.info(f"Progresso já existe para este erro específico, não criando duplicado. Detalhes: {progresso_existente}")
                         continue
                     
@@ -768,7 +771,6 @@ def tutor_toggle():
                             topic_mastery.status = "improving"
                         else:
                             topic_mastery.status = "struggling"
-                    db.session.commit()
 
                 analise = MoodleQuizAnalysis(
                     user_moodle_id=user_id, 
@@ -778,7 +780,6 @@ def tutor_toggle():
                     state="pending"
                 )
                 db.session.add(analise)
-                db.session.commit()
 
             
                 temas_id = list(set([e['topic_id'] for e in novos_erros_encontrados]))
@@ -791,143 +792,128 @@ def tutor_toggle():
                 msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}. Would you like to review these points with me?<br/>"
             else:
                 return jsonify([{"text": msg}])
-        else:
-            if analise.last_attempt_id != attempt_id:
-                # Houve uma nova tentativa desde a última análise, atualizar o registo para permitir nova análise
-                app.logger.info(f"Nova tentativa detectada para quiz_id {quiz_id} e user_id {user_id}. Atualizando análise para permitir nova revisão.")
-                analise.state = "pending"
-                analise.last_attempt_id = attempt_id
-                db.session.commit()
-                
-                # eliminar registos de progresso pendentes relacionados a esta tentativa antiga, para evitar confusão com os novos erros que vamos analisar agora
-                progresso_existente = TutorProgress.query.filter_by(
-                    last_attempt_id=attempt_id,
-                    course_id=course_id,
-                    user_moodle_id=user_id,
-                ).first()
-                if progresso_existente:
-                    db.session.delete(progresso_existente)
-                    db.session.commit()
-                
-                # Temos uma tentativa nova! Analisar...
-                review_data = get_quiz_attempt_review(attempt_id, moodle_url, moodle_token)
-                erros, acertos = analisar_desempenho_aluno(review_data) # A tua função BS4
-                
-                if acertos:
-                    for acerto in acertos:  
-                        question = acerto.get('question', 'N/A')
-                        question_data = MoodleQuizData.query.filter_by(question=question).first()
-                        topic_id = question_data.topic_id if question_data else None
-                        
-                        # popular a StudentTopicMastery 
-                        topic_mastery = StudentTopicMastery.query.filter_by(
+            
+        elif analise.last_attempt_id != attempt_id:
+            # Houve uma nova tentativa desde a última análise, atualizar o registo para permitir nova análise
+            print(f"Nova tentativa detectada para quiz_id {quiz_id} e user_id {user_id}. Atualizando análise para permitir nova revisão.")
+            analise.state = "pending"
+            analise.last_attempt_id = attempt_id
+            
+            # Eliminar diretamente na BD todos os registos pendentes desta tentativa antiga
+            # (O .delete(synchronize_session=False) é o método mais rápido e eficiente)
+            TutorProgress.query.filter_by(
+                course_id=course_id,
+                user_moodle_id=user_id
+            ).delete(synchronize_session=False)
+
+            # Temos uma tentativa nova! Analisar...
+            review_data = get_quiz_attempt_review(attempt_id, moodle_url, moodle_token)
+            erros, acertos = analisar_desempenho_aluno(review_data) # A tua função BS4
+            
+            if acertos:
+                for acerto in acertos:  
+                    question = acerto.get('question', 'N/A')
+                    question_data = MoodleQuizData.query.filter_by(question=question).first()
+                    topic_id = question_data.topic_id if question_data else None
+                    
+                    # popular a StudentTopicMastery 
+                    topic_mastery = StudentTopicMastery.query.filter_by(
+                        course_id=course_id,
+                        user_moodle_id=user_id,
+                        quiz_id=quiz_id,
+                        topic_id=topic_id
+                    ).first()
+                    
+                    if not topic_mastery:
+                        topic_mastery = StudentTopicMastery(
                             course_id=course_id,
                             user_moodle_id=user_id,
                             quiz_id=quiz_id,
-                            topic_id=topic_id
-                        ).first()
-                        
-                        if not topic_mastery:
-                            topic_mastery = StudentTopicMastery(
-                                course_id=course_id,
-                                user_moodle_id=user_id,
-                                quiz_id=quiz_id,
-                                topic_id=topic_id,
-                                total_attempts=1,
-                                total_errors=0,
-                                mastery_score=100,
-                                status = "mastered"
-                            )
-                            db.session.add(topic_mastery)
-                        else:
-                            topic_mastery.total_attempts += 1
-                            topic_mastery.mastery_score = max(0, 100 - (topic_mastery.total_errors / topic_mastery.total_attempts) * 100)
-                            if topic_mastery.mastery_score >= 80:
-                                topic_mastery.status = "mastered"
-                            elif topic_mastery.mastery_score >= 50:
-                                topic_mastery.status = "improving"
-                            else:
-                                topic_mastery.status = "struggling"
-                        db.session.commit()
-                
-                if erros:
-                    novos_erros_encontrados.extend(erros)
-                
-                # Preparar Resposta para o Aluno
-                if novos_erros_encontrados:
-                    app.logger.info(f"Novos erros encontrados para user_id {user_id}: {novos_erros_encontrados}")
-                    
-                    # Agora iteramos sobre a lista de objetos reais
-                    for error in novos_erros_encontrados:
-                        
-                        error_question = error.get('question', 'N/A')
-                        # get question topic from db
-                        question_data = MoodleQuizData.query.filter_by(question=error_question).first()
-                        topic_id = question_data.topic_id if question_data else None
-                        # atualizar o erro com o topic_id encontrado
-                        error['topic_id'] = topic_id
-
-                        # Guardar o progresso                                                
-                        progresso = TutorProgress(
-                            course_id=course_id,
-                            last_attempt_id=attempt_id,
-                            user_moodle_id=user_id,
-                            tipo=error.get('tipo'),
-                            quiz_id=question_data.quiz_id if question_data else None,
-                            topic_id=error.get('topic_id'),
-                            question=error.get('question'),
-                            student_answer=error.get('student_answer'),
-                            correct_answer=error.get('correct_answer'),
-                            question_feedback=error.get('question_feedback'),
-                            state="pending"
+                            topic_id=topic_id,
+                            total_attempts=1,
+                            total_errors=0,
+                            mastery_score=100,
+                            status = "mastered"
                         )
-                        db.session.add(progresso)
-                        
-                        topic_mastery = StudentTopicMastery.query.filter_by(
+                        db.session.add(topic_mastery)
+                    else:
+                        topic_mastery.total_attempts += 1
+                        topic_mastery.mastery_score = max(0, 100 - (topic_mastery.total_errors / topic_mastery.total_attempts) * 100)
+                        if topic_mastery.mastery_score >= 80:
+                            topic_mastery.status = "mastered"
+                        elif topic_mastery.mastery_score >= 50:
+                            topic_mastery.status = "improving"
+                        else:
+                            topic_mastery.status = "struggling"
+                db.session.commit()
+            
+            if erros:
+                novos_erros_encontrados.extend(erros)
+            
+            # Preparar Resposta para o Aluno
+            if novos_erros_encontrados:
+                print(f"Novos erros encontrados para user_id {user_id}: {novos_erros_encontrados}")
+                
+                # Agora iteramos sobre a lista de objetos reais
+                for error in novos_erros_encontrados:
+                    print(f"\nProcessando erro: {error}")
+                    error_question = error.get('question', 'N/A')
+                    # get question topic from db
+                    question_data = MoodleQuizData.query.filter_by(question=error_question).first()
+                    topic_id = question_data.topic_id if question_data else None
+                    # atualizar o erro com o topic_id encontrado
+                    error['topic_id'] = topic_id
+
+                    # Guardar o progresso                                                
+                    progresso = TutorProgress(
+                        course_id=course_id,
+                        last_attempt_id=attempt_id,
+                        user_moodle_id=user_id,
+                        tipo=error.get('tipo'),
+                        quiz_id=question_data.quiz_id if question_data else None,
+                        topic_id=error.get('topic_id'),
+                        question=error.get('question'),
+                        student_answer=error.get('student_answer'),
+                        correct_answer=error.get('correct_answer'),
+                        question_feedback=error.get('question_feedback'),
+                        state="pending"
+                    )
+                    db.session.add(progresso)
+                    
+                    topic_mastery = StudentTopicMastery.query.filter_by(
+                        course_id=course_id,
+                        user_moodle_id=user_id,
+                        quiz_id=quiz_id,
+                        topic_id=topic_id
+                    ).first()
+                    
+                    if not topic_mastery:
+                        topic_mastery = StudentTopicMastery(
                             course_id=course_id,
                             user_moodle_id=user_id,
                             quiz_id=quiz_id,
-                            topic_id=topic_id
-                        ).first()
-                        
-                        if not topic_mastery:
-                            topic_mastery = StudentTopicMastery(
-                                course_id=course_id,
-                                user_moodle_id=user_id,
-                                quiz_id=quiz_id,
-                                topic_id=topic_id,
-                                total_attempts=1,
-                                total_errors=1,
-                                mastery_score=0,
-                                status = "struggling"
-                            )
-                            db.session.add(topic_mastery)
+                            topic_id=topic_id,
+                            total_attempts=1,
+                            total_errors=1,
+                            mastery_score=0,
+                            status = "struggling"
+                        )
+                        db.session.add(topic_mastery)
+                    else:
+                        topic_mastery.total_attempts += 1
+                        topic_mastery.total_errors += 1
+                        topic_mastery.mastery_score = max(0, 100 - (topic_mastery.total_errors / topic_mastery.total_attempts) * 100)
+                        if topic_mastery.mastery_score >= 80:
+                            topic_mastery.status = "mastered"
+                        elif topic_mastery.mastery_score >= 50:
+                            topic_mastery.status = "improving"
                         else:
-                            topic_mastery.total_attempts += 1
-                            topic_mastery.total_errors += 1
-                            topic_mastery.mastery_score = max(0, 100 - (topic_mastery.total_errors / topic_mastery.total_attempts) * 100)
-                            if topic_mastery.mastery_score >= 80:
-                                topic_mastery.status = "mastered"
-                            elif topic_mastery.mastery_score >= 50:
-                                topic_mastery.status = "improving"
-                            else:
-                                topic_mastery.status = "struggling"
-
-                    db.session.commit()
-
-                
-                    temas_id = list(set([e['topic_id'] for e in novos_erros_encontrados]))
-                    temas = []
-                    for topic_id in temas_id:
-                        topic = Topics.query.filter_by(id=topic_id).first()
-                        if topic:
-                            temas.append("<strong>" + topic.name + "</strong>")
+                            topic_mastery.status = "struggling"
+            else:
+                return jsonify([{"text": msg}])       
                     
-                    msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}. Would you like to review these points with me?<br/>"
-                    
-                    
-            app.logger.info(f"Quiz_id: {quiz_id} para user_id: {user_id} já foi analisado anteriormente com estado '{analise.state}'.")
-    
+            db.session.commit() 
+               
             temas_id = list(set([p.topic_id for p in TutorProgress.query.filter_by(
                                                         course_id=course_id, 
                                                         user_moodle_id=user_id, 
@@ -938,7 +924,6 @@ def tutor_toggle():
                 topic = Topics.query.filter_by(id=topic_id).first()
                 if topic:
                     temas.append("<strong>" + topic.name + "</strong>")
-            
             if temas:
                 msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}.  Would you like to review these points with me?<br/>"
                     
