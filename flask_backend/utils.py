@@ -296,13 +296,33 @@ def analisar_desempenho_aluno(quiz_data):
         resposta_aluno = "Sem resposta"
         
         if q['type'] in ['multichoice', 'truefalse']:
-            # Procura o label associado ao rádio/checkbox marcado
+            # 1. Procura o rádio/checkbox marcado
             checked_input = soup.find('input', checked=True)
+            
             if checked_input:
-                # Tenta encontrar o texto da opção ao lado do input
-                label = soup.find('label', {'for': checked_input.get('id')})
-                if label:
-                    resposta_aluno = label.get_text(strip=True)
+                resposta_aluno = None
+                input_id = checked_input.get('id')
+                aria_label_id = checked_input.get('aria-labelledby')
+                
+                # 2. Tenta a abordagem tradicional (caso do truefalse: procura por label com 'for')
+                if input_id:
+                    label = soup.find('label', {'for': input_id})
+                    if label:
+                        resposta_aluno = label.get_text(strip=True)
+                
+                # 3. Se não encontrou, tenta a abordagem Moodle multichoice (procura por aria-labelledby)
+                if not resposta_aluno and aria_label_id:
+                    label_container = soup.find(id=aria_label_id)
+                    if label_container:
+                        # Remove a letra da opção (ex: "b. ") se quiseres apenas o texto puro
+                        # Caso queiras a letra incluída, basta fazer: label_container.get_text(strip=True)
+                        answernumber = label_container.find(class_='answernumber')
+                        if answernumber:
+                            # Extrai o texto limpando o prefixo da letra (ex: "Iphone of Thomas")
+                            texto_opcao = label_container.get_text(strip=True).replace(answernumber.get_text(strip=True), "").strip()
+                            resposta_aluno = texto_opcao
+                        else:
+                            resposta_aluno = label_container.get_text(strip=True)
         
         elif q['type'] == 'shortanswer':
             input_text = soup.find('input', type='text')

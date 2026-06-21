@@ -645,6 +645,7 @@ def tutor_toggle():
         print(f"Análise existente para quiz_id {quiz_id} e user_id {user_id}: {analise}")
         
         review_data = get_quiz_attempt_review(attempt_id, moodle_url, moodle_token)
+        print(f"Dados de revisão para quiz_id {quiz_id} e user_id {user_id}: {review_data}")
         erros, acertos = analisar_desempenho_aluno(review_data) # A tua função BS4
         print(f"Análise do quiz_id {quiz_id} para user_id {user_id}: {len(erros)} erros, {len(acertos)} acertos.")
 
