@@ -643,51 +643,15 @@ def tutor_toggle():
             quiz_id=quiz_id
         ).first()
         print(f"Análise existente para quiz_id {quiz_id} e user_id {user_id}: {analise}")
+        
+        review_data = get_quiz_attempt_review(attempt_id, moodle_url, moodle_token)
+        erros, acertos = analisar_desempenho_aluno(review_data) # A tua função BS4
+        print(f"Análise do quiz_id {quiz_id} para user_id {user_id}: {len(erros)} erros, {len(acertos)} acertos.")
 
         msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
         if not analise: # not pending and not reviewed, ou seja, nunca analisámos este quiz para este aluno
-            # Temos uma tentativa nova! Analisar...
-            review_data = get_quiz_attempt_review(attempt_id, moodle_url, moodle_token)
-            erros, acertos = analisar_desempenho_aluno(review_data) # A tua função BS4
-            
-            print(f"Análise do quiz_id {quiz_id} para user_id {user_id}: {len(erros)} erros, {len(acertos)} acertos.")
             if acertos:
-                for acerto in acertos:  
-                    question = acerto.get('question', 'N/A')
-                    question_data = MoodleQuizData.query.filter_by(question=question).first()
-                    topic_id = question_data.topic_id if question_data else None
-                    
-                    # popular a StudentTopicMastery 
-                    topic_mastery = StudentTopicMastery.query.filter_by(
-                        course_id=course_id,
-                        user_moodle_id=user_id,
-                        quiz_id=quiz_id,
-                        topic_id=topic_id
-                    ).first()
-                    
-                    if not topic_mastery:
-                        topic_mastery = StudentTopicMastery(
-                            course_id=course_id,
-                            user_moodle_id=user_id,
-                            quiz_id=quiz_id,
-                            topic_id=topic_id,
-                            total_attempts=1,
-                            total_errors=0,
-                            mastery_score=100,
-                            status = "mastered"
-                        )
-                        db.session.add(topic_mastery)
-                    else:
-                        topic_mastery.total_attempts += 1
-                        topic_mastery.mastery_score = max(0, 100 - (topic_mastery.total_errors / topic_mastery.total_attempts) * 100)
-                        if topic_mastery.mastery_score >= 80:
-                            topic_mastery.status = "mastered"
-                        elif topic_mastery.mastery_score >= 50:
-                            topic_mastery.status = "improving"
-                        else:
-                            topic_mastery.status = "struggling"
-                db.session.commit()
-            
+                fill_student_topic_mastery(acertos, course_id, user_id, quiz_id)
             if erros:
                 novos_erros_encontrados.extend(erros)
                 
@@ -806,47 +770,8 @@ def tutor_toggle():
                 user_moodle_id=user_id
             ).delete(synchronize_session=False)
 
-            # Temos uma tentativa nova! Analisar...
-            review_data = get_quiz_attempt_review(attempt_id, moodle_url, moodle_token)
-            erros, acertos = analisar_desempenho_aluno(review_data) # A tua função BS4
-            
             if acertos:
-                for acerto in acertos:  
-                    question = acerto.get('question', 'N/A')
-                    question_data = MoodleQuizData.query.filter_by(question=question).first()
-                    topic_id = question_data.topic_id if question_data else None
-                    
-                    # popular a StudentTopicMastery 
-                    topic_mastery = StudentTopicMastery.query.filter_by(
-                        course_id=course_id,
-                        user_moodle_id=user_id,
-                        quiz_id=quiz_id,
-                        topic_id=topic_id
-                    ).first()
-                    
-                    if not topic_mastery:
-                        topic_mastery = StudentTopicMastery(
-                            course_id=course_id,
-                            user_moodle_id=user_id,
-                            quiz_id=quiz_id,
-                            topic_id=topic_id,
-                            total_attempts=1,
-                            total_errors=0,
-                            mastery_score=100,
-                            status = "mastered"
-                        )
-                        db.session.add(topic_mastery)
-                    else:
-                        topic_mastery.total_attempts += 1
-                        topic_mastery.mastery_score = max(0, 100 - (topic_mastery.total_errors / topic_mastery.total_attempts) * 100)
-                        if topic_mastery.mastery_score >= 80:
-                            topic_mastery.status = "mastered"
-                        elif topic_mastery.mastery_score >= 50:
-                            topic_mastery.status = "improving"
-                        else:
-                            topic_mastery.status = "struggling"
-                db.session.commit()
-            
+                fill_student_topic_mastery(acertos, course_id, user_id, quiz_id)
             if erros:
                 novos_erros_encontrados.extend(erros)
             
