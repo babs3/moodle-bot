@@ -13,7 +13,8 @@ intents:
   - ask_for_comparison
   - generate_menu_buttons
   - create_topics
-  - view_metrics
+  - view_chat_and_materials_metrics
+  - view_student_performance_metrics
   - ask_course_info
   - show_topics
   - analyze_progress
@@ -156,6 +157,7 @@ actions:
 - action_create_topics
 - action_setup_user_role
 - action_get_metrics_from_db
+- action_get_performance_from_db
 - action_call_llm_with_context
 - action_get_course_info
 

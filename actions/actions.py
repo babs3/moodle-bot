@@ -56,12 +56,31 @@ You are a Concise Educational Data Analyst. Your output is displayed in a narrow
 1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
 2. **HTML ONLY:** Use <b>text</b> for bold, <ul><li></li></ul> for lists, and <br> for line breaks.
 3. **NO INTROS/OTHERS:** Start directly with the analysis. Do not say "Hello" or "Here is the report".
-4. **MAX BREVITY:** Maximum 3-4 paragraphs in total. Keep the total word count under 120 words.
+4. **BREVITY:** Maximum 4-5 paragraphs in total. Keep the total word count under 300 words.
 5. **LANGUAGE:** Always respond in English (UK).
-6. **VISUAL CHARTS:** If the data shows a clear trend over time, a comparison between 2-3 main categories, or metrics that benefit from visual aid, append a single Chart Image at the very end of your response using this exact HTML structure:
-6. **VISUAL CHARTS:** If relevant, append a single Chart Image at the very end using this exact structure:
-<br><br><a href="https://quickchart.io/chart?c={{chart_json}}" target="_blank"><img src="https://quickchart.io/chart?c={{chart_json}}" width="100%"></a>
-Keep the chart design extremely simple, clean, and fit for a narrow sidebar (e.g., a small bar or line chart with minimal labels). If a chart is not relevant for the specific question, do not include the img tag.
+6. **VISUAL CHARTS:** If the data benefits from a visual aid (e.g. showing the most consulted PDFs or the volume of questions per topic), append a single chart configuration at the very end of your response using the custom <chart> tag. Inside it, write a clean, standard JSON object. Use valid JSON formatting (wrap all keys and strings in double quotes). Do NOT output HTML <a> or <img> tags for the chart, and do NOT attempt to URL-encode the text.
+
+Example format (Bar chart for most active files/topics):
+<chart>
+{{
+  "type": "bar",
+  "data": {{
+    "labels": ["Syllabus.pdf", "Lecture_1.pdf", "Lab_2.pdf"],
+    "datasets": [{{
+      "label": "Questions Asked",
+      "data": [12, 28, 5],
+      "backgroundColor": "#3498db"
+    }}]
+  }},
+  "options": {{
+    "legend": {{ "display": false }},
+    "title": {{ "display": true, "text": "Top Consulted Materials" }},
+    "scales": {{
+      "yAxes": [{{ "ticks": {{ "beginAtZero": true }} }}]
+    }}
+  }}
+}}
+</chart>
 
 ### CONTEXT
 Data: {data_snippet}
@@ -91,8 +110,9 @@ Data: {data_snippet}
                     print("\n🎯  Gemini Response Generated Successfully!")
                     formatted_response = format_gemini_response(response.text)
                     #print(formatted_response)
-                    save_user_progress(course_id, user_email, teacher_question, formatted_response, [], input_time, user_id, False)
-                    dispatcher.utter_message(text=formatted_response)
+                    final_html = re.sub(r'<chart>(.*?)</chart>', encode_chart_match, formatted_response, flags=re.DOTALL)
+                    save_user_progress(course_id, user_email, teacher_question, final_html, [], input_time, user_id, False)
+                    dispatcher.utter_message(text=final_html)
                 else:
                     print("\n ⚠️  Gemini Response is empty.")
                     dispatcher.utter_message(text="Sorry, I couldn't generate a response.")
@@ -104,6 +124,106 @@ Data: {data_snippet}
                 print(f"\n❌  Error calling Gemini API: {e}")
         else:
             # Se for aluno ou estiver vazio, dispara a mensagem de erro
+            dispatcher.utter_message(template="utter_permission_denied")
+        
+        return []
+
+class ActionGetPerformanceFromDB(Action):
+    def name(self) -> str:
+        return "action_get_performance_from_db"
+
+    def run(self, dispatcher, tracker, domain):
+        print("\n📊  Generating bot 'action_get_performance_from_db' response...")
+        # 1. Verificar o slot
+        role = tracker.get_slot("user_role")
+
+        # 2. Lógica de decisão (Gatekeeper)
+        if role == "teacher":
+            user_email = tracker.sender_id
+            user_id = tracker.latest_message.get("metadata", {}).get("user_id")
+            course_id = tracker.latest_message.get("metadata", {}).get("course_id")
+            input_time = tracker.latest_message.get("metadata", {}).get("input_time")
+            teacher_question = tracker.latest_message.get("text")
+            print(f"Teacher question: {teacher_question}")
+            
+            analysis_data = get_llm_classroom_analysis(course_id)
+            if analysis_data:
+                system_instruction = f"""
+### ROLE
+You are a Concise Educational Data Analyst specializing in Student Proficiency and Quiz Performance. Your output is displayed in a narrow LMS sidebar.
+
+### RULES
+1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
+2. **HTML ONLY:** Use <b>text</b> for bold, <ul><li></li></ul> for lists, and <br> for line breaks.
+3. **NO INTROS/OTHERS:** Start directly with the analysis. Do not say "Hello" or "Here is the report".
+4. **BREVITY:** Maximum 4-5 paragraphs in total. Keep the total word count under 300 words.
+5. **LANGUAGE:** Always respond in English (UK).
+6. **VISUAL CHARTS:** If the data benefits from a visual aid, append a single chart configuration at the very end of your response using the custom <chart> tag. Inside it, write a clean, standard JSON object. Use valid JSON formatting (wrap all keys and strings in double quotes). Do NOT output HTML <a> or <img> tags for the chart, and do NOT attempt to URL-encode the text.
+
+Example format:
+<chart>
+{{
+  "type": "horizontalBar",
+  "data": {{
+    "labels": ["Topic 1", "Topic 2", "Topic 3"],
+    "datasets": [{{
+      "data": [25, 0, 100],
+      "backgroundColor": ["#f1c40f", "#e74c3c", "#2ecc71"]
+    }}]
+  }},
+  "options": {{
+    "legend": {{ "display": false }},
+    "title": {{ "display": true, "text": "Average Mastery Score" }}
+  }}
+}}
+</chart>
+
+
+### CONTEXT
+Data (JSON format): {analysis_data}
+
+### INSTRUCTIONS
+- Identify the most critical conceptual bottleneck (the topic with the lowest average mastery score or highest total errors).
+- Call out specific high-risk student IDs from the alert lists (e.g., those stuck with long error streaks or sudden drops in performance).
+- Provide exactly one concise, actionable pedagogical recommendation for the teacher to address the class's current weakness.
+
+### RESPONSE (HTML format)
+"""
+                
+                generation_config = {
+                    "temperature": 0.2,
+                }
+                
+                formatted_response = "Sorry, I couldn't generate a response..."
+                try:
+                    g_model = genai.GenerativeModel(
+                        model_name=MODEL_NAME,
+                        system_instruction=system_instruction,
+                        generation_config=generation_config
+                    )
+                    response = g_model.generate_content(teacher_question)
+
+                    if hasattr(response, "text") and response.text:
+                        print("\n🎯  Gemini Response Generated Successfully!")
+                        formatted_response = format_gemini_response(response.text)
+                        #print(formatted_response)
+                        # Procura o padrão <chart>...</chart> e substitui pelo link com o encoding correto
+                        final_html = re.sub(r'<chart>(.*?)</chart>', encode_chart_match, formatted_response, flags=re.DOTALL)
+                        save_user_progress(course_id, user_email, teacher_question, final_html, [], input_time, user_id, False)
+                        dispatcher.utter_message(text=final_html)
+                    else:
+                        print("\n ⚠️  Gemini Response is empty.")
+                        dispatcher.utter_message(text="Sorry, I couldn't generate a response.")
+                        save_user_progress(course_id, user_email, teacher_question, "Sorry, I couldn't generate a response.", [], input_time, user_id, False)
+                        
+                except Exception as e:
+                    dispatcher.utter_message(text="Sorry, I couldn't process that request.")
+                    save_user_progress(course_id, user_email, teacher_question, "Sorry, I couldn't process that request.", [], input_time, user_id, False)
+                    print(f"\n❌  Error calling Gemini API: {e}")
+            else:
+                dispatcher.utter_message(text="Sorry, I couldn't retrieve the performance analysis.")
+        
+        else:
             dispatcher.utter_message(template="utter_permission_denied")
         
         return []
@@ -1206,7 +1326,8 @@ Please provide the HTML feedback analysis adhering strictly to the requested ton
             
         except Exception as e:
             print(f"Error calling Gemini: {e}")
-            
+            dispatcher.utter_message(text="Sorry, I couldn't analyze your progress due to an error. Please try again later.")
+            return []           
             
         
         print(f"\n🔖  --------- Getting class materials location --------- 🔖 ")

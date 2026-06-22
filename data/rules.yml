@@ -108,8 +108,16 @@ rules:
   - slot_was_set:
       - user_role: teacher
   steps:
-  - intent: view_metrics
+  - intent: view_chat_and_materials_metrics
   - action: action_get_metrics_from_db
+
+- rule: Teacher asks for student performance metrics
+  condition:
+  - slot_was_set:
+      - user_role: teacher
+  steps:
+  - intent: view_student_performance_metrics
+  - action: action_get_performance_from_db
 
 - rule: Teacher asks question (Rasa trocou o intent)
   condition:

@@ -14,6 +14,7 @@ from sentence_transformers import SentenceTransformer, util
 import numpy as np
 import google.generativeai as genai
 import os
+import urllib.parse
 from nltk import ngrams
 
 # Set up Google Gemini API Key
@@ -63,7 +64,7 @@ def get_latest_gemini_pro_model():
     return _CACHED_MODEL_NAME
 
 # Uso no teu código:
-MODEL_NAME = "models/gemini-2.5-flash" #get_latest_gemini_pro_model() #"models/gemini-2.5-flash"
+MODEL_NAME = get_latest_gemini_pro_model() #"models/gemini-2.5-flash"
 print(f"✅  Using latest model found: {MODEL_NAME}")
 
 # Load Spacy model for NLP tasks
@@ -85,6 +86,15 @@ def load_bm25_index(course_id):
     else:
         return [], [], [], [], []
     
+# 3. Processar o marcador <chart> no teu Python:
+def encode_chart_match(match):
+    json_str = match.group(1).strip()
+    # Faz o URL encoding perfeito de TODA a string JSON
+    encoded_json = urllib.parse.quote(json_str)
+    
+    # Retorna o HTML perfeitamente montado e seguro
+    return f'<br><br><a href="https://quickchart.io/chart?c={encoded_json}" target="_blank"><img src="https://quickchart.io/chart?c={encoded_json}" width="100%"></a>'
+
 def tokenize_and_clean_text(text):
     # REMOVIDO: text.replace('-', ' ') -> Mantemos os hifens!
     doc = nlp(text)
@@ -496,6 +506,16 @@ def get_user_history(course_id):
     else:
         print("⚠️  Failed to retrieve user progress data.")
         return pd.DataFrame()    
+    
+def get_llm_classroom_analysis(course_id):
+    response = requests.get(f"http://flask-server:8080/api/get_llm_classroom_analysis/{course_id}")
+    if response.status_code == 200:
+        analysis_data = response.json()
+        print(f"📊  LLM classroom analysis retrieved: {analysis_data}")
+        return analysis_data
+    else:
+        print("⚠️  Failed to retrieve LLM classroom analysis.")
+        return {}
 
 def filtrar_e_expandir_tokens(complex_tokens):
     lista_final = []

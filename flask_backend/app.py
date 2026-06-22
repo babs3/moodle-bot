@@ -10,6 +10,7 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_caching import Cache
+from collections import defaultdict
 from utils import *
 from models import *
 from knowledge_engine import *
@@ -963,6 +964,74 @@ def get_user_history(course_id):
         is_tutor_interaction=False
     ).all()
     return jsonify([{"user_id": h.user_moodle_id, "question": h.question, "pdfs": h.pdfs, "timestamp": h.timestamp} for h in history])
+
+
+@app.route('/api/get_llm_classroom_analysis/<course_id>', methods=['GET'])
+def get_llm_classroom_analysis(course_id):
+    if not course_id:
+        return jsonify({"error": "Missing course_id"}), 400
+
+    # 1. Procurar todos os registos do curso
+    mastery_records = StudentTopicMastery.query.filter_by(course_id=course_id).all()
+    
+    if not mastery_records:
+        return jsonify({"message": "Nenhum dado encontrado para este curso"}), 200
+
+    # Estruturas para agregação
+    topics_data = defaultdict(lambda: {"scores": [], "status_counts": defaultdict(int), "total_errors": 0, "total_attempts": 0})
+    alunos_criticos = []
+    alunos_recaida = []
+
+    for m in mastery_records:
+        # Agregação por Tópico (Macro)
+        t_id = m.topic_id
+        topics_data[t_id]["scores"].append(m.mastery_score)
+        topics_data[t_id]["status_counts"][m.status] += 1
+        topics_data[t_id]["total_errors"] += m.total_errors
+        topics_data[t_id]["total_attempts"] += m.total_attempts
+
+        # Filtros Inteligentes de Alunos (Micro)
+        # Caso 1: Aluno muito bloqueado (Ex: mais de 5 erros e continua em struggling)
+        if m.status == "struggling" and m.total_errors >= 5:
+            alunos_criticos.append({
+                "user_id": m.user_moodle_id,
+                "topic_id": t_id,
+                "attempts": m.total_attempts,
+                "errors": m.total_errors,
+                "score": m.mastery_score
+            })
+        
+        # Caso 2: Recaída (Score historicamente bom, mas errou a última)
+        if m.mastery_score >= 70 and m.last_answer_correct == False:
+            alunos_recaida.append({
+                "user_id": m.user_moodle_id,
+                "topic_id": t_id,
+                "historical_score": m.mastery_score
+            })
+
+    # Formatar dados dos tópicos para o LLM
+    macro_analysis = {}
+    for t_id, data in topics_data.items():
+        avg_score = sum(data["scores"]) / len(data["scores"])
+        macro_analysis[t_id] = {
+            "media_mastery_score": round(avg_score, 2),
+            "total_tentativas_turma": data["total_attempts"],
+            "total_erros_turma": data["total_errors"],
+            "distribuicao_status": dict(data["status_counts"])
+        }
+
+    # JSON final ideal para o Prompt do LLM
+    llm_payload = {
+        "course_id": course_id,
+        "visao_geral_topicos": macro_analysis,
+        "alertas_alunos": {
+            "criticos_com_muitas_dificuldades": alunos_criticos,
+            "alunos_em_queda_rendimento": alunos_recaida
+        }
+    }
+
+    return jsonify(llm_payload)
+
 
 @app.route("/api/get_topics", methods=["GET"])
 def get_topics():
