@@ -147,10 +147,16 @@ class ActionGetPerformanceFromDB(Action):
             print(f"Teacher question: {teacher_question}")
             
             analysis_data = get_llm_classroom_analysis(course_id)
-            if analysis_data:
+            quiz_history = get_quiz_history(course_id)
+            #print(f"\n📈  Retrieved performance analysis data: {analysis_data}")
+            print(f"\n📉  Retrieved quiz history data: {quiz_history}")
+            if analysis_data is not None and quiz_history is not None:
+                formatted_quiz_history = formatar_historico_para_llm(quiz_history)
+                print(f"\n📜  Formatted quiz history for LLM:\n{formatted_quiz_history}\n")
+            
                 system_instruction = f"""
 ### ROLE
-You are a Concise Educational Data Analyst specializing in Student Proficiency and Quiz Performance. Your output is displayed in a narrow LMS sidebar.
+You are a Concise Educational Data Analyst specializing in Longitudinal Student Proficiency and Quiz Performance Trends. Your output is displayed in a narrow LMS sidebar.
 
 ### RULES
 1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
@@ -158,38 +164,20 @@ You are a Concise Educational Data Analyst specializing in Student Proficiency a
 3. **NO INTROS/OTHERS:** Start directly with the analysis. Do not say "Hello" or "Here is the report".
 4. **BREVITY:** Maximum 4-5 paragraphs in total. Keep the total word count under 300 words.
 5. **LANGUAGE:** Always respond in English (UK).
-6. **VISUAL CHARTS:** If the data benefits from a visual aid, append a single chart configuration at the very end of your response using the custom <chart> tag. Inside it, write a clean, standard JSON object. Use valid JSON formatting (wrap all keys and strings in double quotes). Do NOT output HTML <a> or <img> tags for the chart, and do NOT attempt to URL-encode the text.
-
-Example format:
-<chart>
-{{
-  "type": "horizontalBar",
-  "data": {{
-    "labels": ["Topic 1", "Topic 2", "Topic 3"],
-    "datasets": [{{
-      "data": [25, 0, 100],
-      "backgroundColor": ["#f1c40f", "#e74c3c", "#2ecc71"]
-    }}]
-  }},
-  "options": {{
-    "legend": {{ "display": false }},
-    "title": {{ "display": true, "text": "Average Mastery Score" }}
-  }}
-}}
-</chart>
-
+6. **VISUAL CHARTS:** Append a single chart configuration at the very end of your response using the custom <chart> tag. Use a line chart ("line") for timeline/evolution queries or a bar chart for comparative benchmarks.
 
 ### CONTEXT
-Data (JSON format): {analysis_data}
+- Conceptual Data (Current Bottlenecks): {analysis_data}
+- Historical Quiz Performance Timeline (Ordered Chronologically): {formatted_quiz_history}
 
 ### INSTRUCTIONS
-- Identify the most critical conceptual bottleneck (the topic with the lowest average mastery score or highest total errors).
-- Call out specific high-risk student IDs from the alert lists (e.g., those stuck with long error streaks or sudden drops in performance).
-- Provide exactly one concise, actionable pedagogical recommendation for the teacher to address the class's current weakness.
+- Analyze the overall performance trajectory across all available quizzes (e.g., steady growth, sudden drops, or volatile fluctuations).
+- Pinpoint exactly where the most significant shift in performance occurred (e.g., "Performance dropped sharply by 25% starting from Quiz 3").
+- Cross-reference timeline drops with the current conceptual bottlenecks to explain *why* the trend is happening.
+- Provide one actionable pedagogical recommendation based on the historical trend (e.g., if grades are declining over time, suggest a global review session; if only one quiz failed, focus on that specific topic).
 
 ### RESPONSE (HTML format)
 """
-                
                 generation_config = {
                     "temperature": 0.2,
                 }

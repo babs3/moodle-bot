@@ -646,9 +646,34 @@ def tutor_toggle():
         print(f"Análise existente para quiz_id {quiz_id} e user_id {user_id}: {analise}")
         
         review_data = get_quiz_attempt_review(attempt_id, moodle_url, moodle_token)
-        #print(f"Dados de revisão para quiz_id {quiz_id} e user_id {user_id}: {review_data}")
-        erros, acertos = analisar_desempenho_aluno(review_data) # A tua função BS4
+        print(f"Dados de revisão para quiz_id {quiz_id} e user_id {user_id}: {review_data}")
+        erros, acertos, resumo_global = analisar_desempenho_aluno(review_data) # A tua função BS4
         print(f"Análise do quiz_id {quiz_id} para user_id {user_id}: {len(erros)} erros, {len(acertos)} acertos.")
+        
+        # check if there already exists a record in MoodleQuizHistory for this quiz and this user, if not, create a new record with the data from this attempt. If it already exists, we assume that this attempt has already been analyzed and we skip to the next quiz.
+        quiz_history = MoodleUserQuizHistory.query.filter_by(
+            course_id=course_id,
+            user_moodle_id=user_id,
+            quiz_id=quiz_id,
+            attempt_id=attempt_id
+        ).first()
+        
+        if not quiz_history:        
+            # fill MoodleUserQuizHistory com os dados desta tentativa
+            quiz_history = MoodleUserQuizHistory(
+                course_id=course_id,
+                user_moodle_id=user_id,
+                quiz_id=quiz_id,                
+                attempt_id=attempt_id,
+                grade=resumo_global.get('grade'),
+                max_grade=resumo_global.get('max_grade'),
+                percentage=resumo_global.get('percentage'),
+                timestamp=datetime.now()
+            )
+            db.session.add(quiz_history)
+            db.session.commit()
+            
+            print(f"Novo registo criado em MoodleUserQuizHistory para quiz_id {quiz_id} e user_id {user_id}. Detalhes: {quiz_history}")
 
         msg = "I have activated the tutor mode, but I didn't find any new attempts to analyze. When you take a test, please let me know!"
         if not analise: # not pending and not reviewed, ou seja, nunca analisámos este quiz para este aluno
@@ -965,6 +990,12 @@ def get_user_history(course_id):
     ).all()
     return jsonify([{"user_id": h.user_moodle_id, "question": h.question, "pdfs": h.pdfs, "timestamp": h.timestamp} for h in history])
 
+@app.route('/api/get_quiz_history/<course_id>', methods=['GET'])
+def get_quiz_history(course_id):
+    history = MoodleUserQuizHistory.query.filter_by(
+        course_id=course_id
+    ).all()
+    return jsonify([{"user_id": h.user_moodle_id, "quiz_id": h.quiz_id, "grade": h.grade, "max_grade": h.max_grade, "percentage": h.percentage, "timestamp": h.timestamp} for h in history])
 
 @app.route('/api/get_llm_classroom_analysis/<course_id>', methods=['GET'])
 def get_llm_classroom_analysis(course_id):

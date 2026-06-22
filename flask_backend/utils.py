@@ -276,6 +276,10 @@ def check_moodle_user_in_db(moodle_id, email, full_name):
 def analisar_desempenho_aluno(quiz_data):
     erros = []
     acertos = []
+    # 1. Extrair a nota que o aluno tirou (podes usar 'grade' ou 'sumgrades')
+    # Usamos o float() tratando a conversão caso venha como string ou número
+    nota_obtida = float(str(quiz_data.get('grade', 0)).replace(',', '.'))
+    nota_maxima_total = 0.0
     
     for q in quiz_data.get('questions', []):
         # Convertemos primeiro para string com str(), e só depois fazemos o replace
@@ -284,6 +288,9 @@ def analisar_desempenho_aluno(quiz_data):
 
         mark = float(mark_str.replace(',', '.'))
         max_mark = float(max_mark_str.replace(',', '.'))
+        
+        # Somar para obter a nota máxima que era possível tirar no quiz
+        nota_maxima_total += max_mark
             
         soup = BeautifulSoup(q['html'], 'html.parser')
         
@@ -358,8 +365,18 @@ def analisar_desempenho_aluno(quiz_data):
                 #'nota_obtida': mark,
                 #'nota_maxima': max_mark
             })
+        
+    # 2. Calcular a percentagem de aproveitamento
+    percentagem = (nota_obtida / nota_maxima_total * 100) if nota_maxima_total > 0 else 0.0
 
-    return erros, acertos
+    # 3. Criar o resumo focado no que os professores procuram
+    resumo_global = {
+        'grade': nota_obtida,
+        'max_grade': nota_maxima_total,
+        'percentage': round(percentagem, 2)
+    }
+
+    return erros, acertos, resumo_global
 
 def calculate_student_status(topic_mastery):
      # 1. Calcular o score histórico base (como já tinhas)

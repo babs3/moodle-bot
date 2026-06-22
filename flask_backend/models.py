@@ -90,6 +90,17 @@ class MoodleUserHistory(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.now)
     # TODO: devo por o topic_id aqui também? Talvez seja útil para análises futuras, mas não é essencial no momento.
       
+class MoodleUserQuizHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    attempt_id = db.Column(db.Integer, nullable=False)  # ID da tentativa do quiz no Moodle
+    course_id = db.Column(db.Integer, nullable=False)
+    user_moodle_id = db.Column(db.Integer, db.ForeignKey('moodle_users.moodle_id', ondelete="CASCADE"), nullable=False)
+    quiz_id = db.Column(db.Integer, nullable=False)  # ID do Quiz no Moodle
+    grade = db.Column(db.Float, nullable=False)  # Nota obtida no quiz
+    max_grade = db.Column(db.Float, nullable=False)  # Nota máxima possível no quiz
+    percentage = db.Column(db.Float, nullable=False)  # Percentual de acertos
+    timestamp = db.Column(db.DateTime, default=datetime.now)
+
 class Topics(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), unique=True, nullable=False)
