@@ -174,18 +174,18 @@ def fill_student_topic_mastery(acertos, course_id, user_id, quiz_id):
                 total_attempts=1,
                 total_errors=0,
                 mastery_score=100,
-                status = "mastered"
+                current_streak=1,
+                last_answer_correct=True,
+                status="mastered"
             )
             db.session.add(topic_mastery)
         else:
             topic_mastery.total_attempts += 1
             topic_mastery.mastery_score = max(0, 100 - (topic_mastery.total_errors / topic_mastery.total_attempts) * 100)
-            if topic_mastery.mastery_score >= 80:
-                topic_mastery.status = "mastered"
-            elif topic_mastery.mastery_score >= 50:
-                topic_mastery.status = "improving"
-            else:
-                topic_mastery.status = "struggling"
+            topic_mastery.current_streak += 1
+            topic_mastery.last_answer_correct = True
+            calculate_student_status(topic_mastery)
+            
     db.session.commit()
      
 def clean_user_input(user_message):
@@ -361,6 +361,22 @@ def analisar_desempenho_aluno(quiz_data):
 
     return erros, acertos
 
+def calculate_student_status(topic_mastery):
+     # 1. Calcular o score histórico base (como já tinhas)
+    if topic_mastery.total_attempts > 0:
+        topic_mastery.mastery_score = max(0, 100 - (topic_mastery.total_errors / topic_mastery.total_attempts) * 100)
+
+    # 2. Definir o Status com base no Score OU na Sequência Recente (Streak)
+    if (topic_mastery.mastery_score >= 80 and topic_mastery.last_answer_correct) or topic_mastery.current_streak >= 2:
+        topic_mastery.status = "mastered"
+        
+    elif topic_mastery.last_answer_correct:
+        # Acertou a última, mas ainda não tem score >= 80 nem streak de 2
+        topic_mastery.status = "improving"
+        
+    else:
+        # Errou a última
+        topic_mastery.status = "struggling"
 
 def get_moodle_user_data(user_id, moodle_token, moodle_url):
     # 1. Usa o IP direto e verifica se precisas de porta (ex: :80)

@@ -645,7 +645,7 @@ def tutor_toggle():
         print(f"Análise existente para quiz_id {quiz_id} e user_id {user_id}: {analise}")
         
         review_data = get_quiz_attempt_review(attempt_id, moodle_url, moodle_token)
-        print(f"Dados de revisão para quiz_id {quiz_id} e user_id {user_id}: {review_data}")
+        #print(f"Dados de revisão para quiz_id {quiz_id} e user_id {user_id}: {review_data}")
         erros, acertos = analisar_desempenho_aluno(review_data) # A tua função BS4
         print(f"Análise do quiz_id {quiz_id} para user_id {user_id}: {len(erros)} erros, {len(acertos)} acertos.")
 
@@ -689,22 +689,21 @@ def tutor_toggle():
                         progresso_existente.last_attempt_id = attempt_id
                         progresso_existente.timestamp = datetime.now()
                         #app.logger.info(f"Progresso já existe para este erro específico, não criando duplicado. Detalhes: {progresso_existente}")
-                        continue
-                    
-                    progresso = TutorProgress(
-                        course_id=course_id,
-                        last_attempt_id=attempt_id,
-                        user_moodle_id=user_id,
-                        tipo=error.get('tipo'),
-                        quiz_id=question_data.quiz_id if question_data else None,
-                        topic_id=error.get('topic_id'),
-                        question=error.get('question'),
-                        student_answer=error.get('student_answer'),
-                        correct_answer=error.get('correct_answer'),
-                        question_feedback=error.get('question_feedback'),
-                        state="pending"
-                    )
-                    db.session.add(progresso)
+                    else:
+                        progresso = TutorProgress(
+                            course_id=course_id,
+                            last_attempt_id=attempt_id,
+                            user_moodle_id=user_id,
+                            tipo=error.get('tipo'),
+                            quiz_id=question_data.quiz_id if question_data else None,
+                            topic_id=error.get('topic_id'),
+                            question=error.get('question'),
+                            student_answer=error.get('student_answer'),
+                            correct_answer=error.get('correct_answer'),
+                            question_feedback=error.get('question_feedback'),
+                            state="pending"
+                        )
+                        db.session.add(progresso)
                     
                     topic_mastery = StudentTopicMastery.query.filter_by(
                         course_id=course_id,
@@ -729,13 +728,11 @@ def tutor_toggle():
                     else:
                         topic_mastery.total_attempts += 1
                         topic_mastery.total_errors += 1
-                        topic_mastery.mastery_score = max(0, 100 - (topic_mastery.total_errors / topic_mastery.total_attempts) * 100)
-                        if topic_mastery.mastery_score >= 80:
-                            topic_mastery.status = "mastered"
-                        elif topic_mastery.mastery_score >= 50:
-                            topic_mastery.status = "improving"
-                        else:
-                            topic_mastery.status = "struggling"
+                        topic_mastery.current_streak = 0  # Quebrou a sequência
+                        topic_mastery.last_answer_correct = False
+
+                        calculate_student_status(topic_mastery)                       
+                       
 
                 analise = MoodleQuizAnalysis(
                     user_moodle_id=user_id, 
@@ -745,7 +742,8 @@ def tutor_toggle():
                     state="pending"
                 )
                 db.session.add(analise)
-
+                
+                db.session.commit()
             
                 temas_id = list(set([e['topic_id'] for e in novos_erros_encontrados]))
                 temas = []
@@ -821,6 +819,8 @@ def tutor_toggle():
                             topic_id=topic_id,
                             total_attempts=1,
                             total_errors=1,
+                            current_streak=0,
+                            last_answer_correct=False,
                             mastery_score=0,
                             status = "struggling"
                         )
@@ -828,13 +828,11 @@ def tutor_toggle():
                     else:
                         topic_mastery.total_attempts += 1
                         topic_mastery.total_errors += 1
-                        topic_mastery.mastery_score = max(0, 100 - (topic_mastery.total_errors / topic_mastery.total_attempts) * 100)
-                        if topic_mastery.mastery_score >= 80:
-                            topic_mastery.status = "mastered"
-                        elif topic_mastery.mastery_score >= 50:
-                            topic_mastery.status = "improving"
-                        else:
-                            topic_mastery.status = "struggling"
+                        topic_mastery.current_streak = 0  # Quebrou a sequência
+                        topic_mastery.last_answer_correct = False
+                        
+                        calculate_student_status(topic_mastery)
+            
             else:
                 return jsonify([{"text": msg}])       
                     

@@ -54,6 +54,10 @@ class StudentTopicMastery(db.Model):
     
     # O "termómetro" do aluno no tópico (Ex: 0 a 100%)
     mastery_score = db.Column(db.Float, default=0.0) 
+    # Guarda quantos acertos seguidos o aluno tem neste tópico atualmente
+    current_streak = db.Column(db.Integer, default=0)
+    last_answer_correct = db.Column(db.Boolean, nullable=True)
+    
     # Estado atual baseado nas últimas respostas
     status = db.Column(db.String(20), default="struggling") # Ex: "struggling", "improving", "mastered"
     
