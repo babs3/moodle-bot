@@ -38,7 +38,7 @@ class ActionGetMetricsFromDB(Action):
             course_id = tracker.latest_message.get("metadata", {}).get("course_id")
             input_time = tracker.latest_message.get("metadata", {}).get("input_time")
             teacher_question = tracker.latest_message.get("text")
-            print(f"Teacher question: {teacher_question}")
+            print(f"Teacher question: '{teacher_question}'")
 
             df = get_user_history(course_id)
             if df.empty:
@@ -144,15 +144,16 @@ class ActionGetPerformanceFromDB(Action):
             course_id = tracker.latest_message.get("metadata", {}).get("course_id")
             input_time = tracker.latest_message.get("metadata", {}).get("input_time")
             teacher_question = tracker.latest_message.get("text")
-            print(f"Teacher question: {teacher_question}")
+            print(f"Teacher question: '{teacher_question}'")
             
             analysis_data = get_llm_classroom_analysis(course_id)
             quiz_history = get_quiz_history(course_id)
-            #print(f"\n📈  Retrieved performance analysis data: {analysis_data}")
-            print(f"\n📉  Retrieved quiz history data: {quiz_history}")
+
             if analysis_data is not None and quiz_history is not None:
                 formatted_quiz_history = formatar_historico_para_llm(quiz_history)
-                print(f"\n📜  Formatted quiz history for LLM:\n{formatted_quiz_history}\n")
+                print(f"\n📜  Formatted quiz history for LLM:")
+                for obj in formatted_quiz_history:
+                    print(f"- {obj}")
             
                 system_instruction = f"""
 ### ROLE
@@ -230,7 +231,7 @@ class ActionCallLLMWithContext(Action):
         input_time = tracker.latest_message.get("metadata", {}).get("input_time")
         course_id = tracker.latest_message.get("metadata", {}).get("course_id")
         teacher_question = tracker.latest_message.get("text")
-        print(f"Teacher question: {teacher_question}")
+        print(f"Teacher question: '{teacher_question}'")
 
         df = get_user_history(course_id)
         if df.empty:

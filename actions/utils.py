@@ -512,7 +512,7 @@ def get_llm_classroom_analysis(course_id):
     response = requests.get(f"http://flask-server:8080/api/get_llm_classroom_analysis/{course_id}")
     if response.status_code == 200:
         analysis_data = response.json()
-        print(f"📊  LLM classroom analysis retrieved: {analysis_data}")
+        print(f"📊  LLM classroom analysis retrieved: \n{analysis_data}")
         return analysis_data
     else:
         print("⚠️  Failed to retrieve LLM classroom analysis.")
@@ -522,44 +522,42 @@ def get_quiz_history(course_id):
     response = requests.get(f"http://flask-server:8080/api/get_quiz_history/{course_id}")
     if response.status_code == 200:
         quiz_data = response.json()
-        print(f"📊  Quiz history data retrieved: {quiz_data}")
+        print(f"📊  Quiz history data retrieved:")
+        for obj in quiz_data:
+            print(f"- {obj}")
         return pd.DataFrame(quiz_data)
     else:
         print("⚠️  Failed to retrieve quiz history data.")
         return {}
 
 
-def formatar_historico_para_llm(quiz_history):
-    quiz_history_list = json.loads(quiz_history)
-    # Agrupa os dados por quiz
-    dados_por_quiz = defaultdict(lambda: {"notas": [], "timestamps": [], "reprovas": 0, "total": 0})
+def formatar_historico_para_llm(quiz_history_df):
+    # quiz_history_df is a dataframe
     
-    for h in quiz_history_list:
-        q_id = h.quiz_id
-        dados_por_quiz[q_id]["notas"].append(h.percentage)
-        dados_por_quiz[q_id]["timestamps"].append(h.timestamp)
-        dados_por_quiz[q_id]["total"] += 1
-        if h.percentage < 50.0:  # Critério de nota negativa
-            dados_por_quiz[q_id]["reprovas"] += 1
-
-    # Ordena os quizes cronologicamente com base na média das datas em que foram feitos
-    quizes_ordenados = sorted(
-        dados_por_quiz.items(), 
-        key=lambda x: min(x[1]["timestamps"]) if x[1]["timestamps"] else 0
-    )
-
-    # Cria a estrutura final que o LLM vai ler
-    historico_temporal = []
-    for q_id, info in quizes_ordenados:
-        media_quiz = sum(info["notas"]) / len(info["notas"]) if info["notas"] else 0
-        historico_temporal.append({
-            "quiz_id": q_id,
-            "class_average_percentage": round(media_quiz, 1),
-            "total_students_completed": info["total"],
-            "students_failed_count": info["reprovas"]
-        })
-        
-    return historico_temporal
+    # 1. Garantir que o timestamp está no formato datetime para ordenar corretamente
+    quiz_history_df['timestamp'] = pd.to_datetime(quiz_history_df['timestamp'])
+    # 2. Criar uma coluna booleana para identificar quem reprovou (nota < 50%)
+    quiz_history_df['failed'] = quiz_history_df['percentage'] < 50.0
+    
+    # 3. Agrupar por quiz_id e calcular as métricas necessárias
+    grouped = quiz_history_df.groupby('quiz_id').agg(
+        class_average_percentage=('percentage', 'mean'),
+        total_students_completed=('user_id', 'count'),
+        students_failed_count=('failed', 'sum'),
+        first_attempt_time=('timestamp', 'min')  # Usado apenas para ordenar a timeline
+    ).reset_index()
+    
+    # 4. Ordenar cronologicamente pela data de início do quiz
+    grouped = grouped.sort_values(by='first_attempt_time')
+    
+    # 5. Arredondar a média para uma casa decimal
+    grouped['class_average_percentage'] = grouped['class_average_percentage'].round(1)
+    
+    # 6. Converter para o formato de lista de dicionários (JSON) que o LLM espera
+    # Removemos a coluna auxiliar 'first_attempt_time' antes de exportar
+    resultado_final = grouped.drop(columns=['first_attempt_time']).to_dict(orient='records')
+    
+    return resultado_final # retorna em formato de ...
 
 def filtrar_e_expandir_tokens(complex_tokens):
     lista_final = []
