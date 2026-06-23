@@ -1202,6 +1202,17 @@ def update_materials_location(selected_results, content_mappings):
     print_results(location_results)
     
     return location_results, pdfs_insights  # Return both the formatted results and the list of PDFs
+
+def get_topics_from_ids(topics_ids):
+    topics = requests.get(f"http://flask-server:8080/api/get_topics_from_ids", json={"topics_ids": topics_ids})
+    if topics.status_code == 200:
+        topics_list = topics.json()
+        print(f"📚  Topics retrieved: {topics_list}")
+        return topics_list
+    else:
+        print(f"❌  Failed to retrieve topics. Status code: {topics.status_code}")
+        return []
+    
     
 def create_topics_buttons(user_id, course_id, moodle_url, moodle_token):
     # get user progress
@@ -1226,13 +1237,7 @@ def create_topics_buttons(user_id, course_id, moodle_url, moodle_token):
             topics_ids.append(topic_id)
             
     # get topics from topics_ids
-    topics = requests.get(f"http://flask-server:8080/api/get_topics_from_ids", json={"topics_ids": topics_ids})
-    if topics.status_code == 200:
-        topics_list = topics.json()
-    else:
-        print(f"❌  Failed to retrieve topics. Status code: {topics.status_code}")
-        topics_list = []
-    print(f"📚  Topics retrieved for user {user_id}: {topics_list}")
+    topics_list = get_topics_from_ids(topics_ids)
 
     buttons = []
     for topic in topics_list:

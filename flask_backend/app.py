@@ -1008,6 +1008,16 @@ def get_llm_classroom_analysis(course_id):
     if not mastery_records:
         return jsonify({"message": "Nenhum dado encontrado para este curso"}), 200
 
+    topics_ids = [m.topic_id for m in mastery_records]
+    topics_ids = list(set(topics_ids))
+    response = requests.get(f"http://flask-server:8080/api/get_topics_from_ids", json={"topics_ids": topics_ids})
+    if response.status_code == 200:
+        topics_list = response.json()
+        print(f"📚  Topics retrieved: {topics_list}")
+    else:
+        print(f"❌  Failed to retrieve topics. Status code: {response.status_code}")
+        topics_list = []
+    
     # Estruturas para agregação
     topics_data = defaultdict(lambda: {"scores": [], "status_counts": defaultdict(int), "total_errors": 0, "total_attempts": 0})
     alunos_criticos = []
@@ -1016,17 +1026,27 @@ def get_llm_classroom_analysis(course_id):
     for m in mastery_records:
         # Agregação por Tópico (Macro)
         t_id = m.topic_id
-        topics_data[t_id]["scores"].append(m.mastery_score)
-        topics_data[t_id]["status_counts"][m.status] += 1
-        topics_data[t_id]["total_errors"] += m.total_errors
-        topics_data[t_id]["total_attempts"] += m.total_attempts
+        t_name = ""
+        if topics_list != []:
+            for t in topics_list:
+                if t.get('id') == t_id:
+                    t_name = t.get('name')
+                    continue
+        if t_name == "":
+            t_name = t_id        
+        
+        topics_data[t_name]["scores"].append(m.mastery_score)
+        topics_data[t_name]["status_counts"][m.status] += 1
+        topics_data[t_name]["total_errors"] += m.total_errors
+        topics_data[t_name]["total_attempts"] += m.total_attempts
+        
 
         # Filtros Inteligentes de Alunos (Micro)
         # Caso 1: Aluno muito bloqueado (Ex: mais de 5 erros e continua em struggling)
         if m.status == "struggling" and m.total_errors >= 5:
             alunos_criticos.append({
                 "user_id": m.user_moodle_id,
-                "topic_id": t_id,
+                "topic_name": t_name,
                 "attempts": m.total_attempts,
                 "errors": m.total_errors,
                 "score": m.mastery_score
@@ -1036,15 +1056,15 @@ def get_llm_classroom_analysis(course_id):
         if m.mastery_score >= 70 and m.last_answer_correct == False:
             alunos_recaida.append({
                 "user_id": m.user_moodle_id,
-                "topic_id": t_id,
+                "topic_name": t_name,
                 "historical_score": m.mastery_score
             })
 
     # Formatar dados dos tópicos para o LLM
     macro_analysis = {}
-    for t_id, data in topics_data.items():
+    for t_name, data in topics_data.items():
         avg_score = sum(data["scores"]) / len(data["scores"])
-        macro_analysis[t_id] = {
+        macro_analysis[t_name] = {
             "media_mastery_score": round(avg_score, 2),
             "total_tentativas_turma": data["total_attempts"],
             "total_erros_turma": data["total_errors"],
