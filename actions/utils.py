@@ -65,7 +65,7 @@ def get_latest_gemini_pro_model():
     return _CACHED_MODEL_NAME
 
 # Uso no teu código:
-MODEL_NAME = get_latest_gemini_pro_model() #"models/gemini-2.5-flash"
+MODEL_NAME = "models/gemini-2.5-flash" #get_latest_gemini_pro_model() #
 print(f"✅  Using latest model found: {MODEL_NAME}")
 
 # Load Spacy model for NLP tasks
@@ -533,6 +533,8 @@ def get_quiz_history(course_id):
 
 def formatar_historico_para_llm(quiz_history_df):
     # quiz_history_df is a dataframe
+    if quiz_history_df.empty:
+        return []  # Devolve uma lista vazia para o LLM não rebentar
     
     # 1. Garantir que o timestamp está no formato datetime para ordenar corretamente
     quiz_history_df['timestamp'] = pd.to_datetime(quiz_history_df['timestamp'])

@@ -26,6 +26,124 @@ YOUTUBE_REGEX = r'(?:youtube\.com\/embed\/|youtu\.be\/|youtube\.com\/watch\?v=)(
 
 # --- SCRIPT DE POPULAÇÃO ---
 def populate_database(course_id=2):
+    print("A iniciar a população do MoodleUserQuizHistory e StudentTopicMastery...")
+    # 1. Limpar dados anteriores de teste para não duplicar (opcional, mas recomendado)
+    try:
+        StudentTopicMastery.query.delete()
+        MoodleUserQuizHistory.query.delete()
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # IDs de exemplo (Garante que os IDs 101 a 105 existem em moodle_users)
+    student_ids = [101, 102, 103, 104, 105]
+    course_id = 1
+    topics = [1, 2, 3]
+    
+    # Configuração dos 3 Quizzes com datas passadas para gerar evolução temporal
+    quizzes_config = [
+        {"quiz_id": 1, "days_ago": 6, "max_grade": 10.0},
+        {"quiz_id": 2, "days_ago": 3, "max_grade": 10.0},
+        {"quiz_id": 3, "days_ago": 0, "max_grade": 15.0} # Último quiz feito hoje
+    ]
+
+    base_time = datetime.now()
+
+    for student in student_ids:
+        # Definir um "perfil" para o aluno para criar dados realistas
+        # Alunos 101 e 102 são excelentes, 103 é mediano, 104 e 105 estão a falhar
+        if student in [101, 102]:
+            perfil = "excelente"
+        elif student == 103:
+            perfil = "mediano"
+        else:
+            perfil = "risco"
+
+        attempt_counter = random.randint(1000, 5000)
+
+        for quiz in quizzes_config:
+            quiz_id = quiz["quiz_id"]
+            max_grade = quiz["max_grade"]
+            quiz_date = base_time - timedelta(days=quiz["days_ago"])
+            
+            # --- 1. Simular Notas para o Histórico (MoodleUserQuizHistory) ---
+            if perfil == "excelente":
+                percentage = random.uniform(80.0, 100.0)
+            elif perfil == "mediano":
+                # Simula uma ligeira evolução ao longo dos quizzes
+                percentage = random.uniform(50.0, 75.0) + (quiz_id * 5) 
+            else:
+                # Aluno em risco (notas baixas e a descer)
+                percentage = random.uniform(20.0, 50.0) - (quiz_id * 3)
+            
+            # Garantir limites entre 0 e 100
+            percentage = max(0.0, min(100.0, percentage))
+            grade = round((percentage / 100.0) * max_grade, 2)
+
+            historico = MoodleUserQuizHistory(
+                attempt_id=attempt_counter + quiz_id,
+                course_id=course_id,
+                user_moodle_id=student,
+                quiz_id=quiz_id,
+                grade=grade,
+                max_grade=max_grade,
+                percentage=round(percentage, 1),
+                timestamp=quiz_date
+            )
+            db.session.add(historico)
+
+            # --- 2. Simular Proficiência por Tópico (StudentTopicMastery) ---
+            for topic_id in topics:
+                # Gerar métricas com base no perfil do aluno para este tópico específico
+                if perfil == "excelente":
+                    total_attempts = random.randint(4, 6)
+                    total_errors = random.randint(0, 1)
+                    mastery_score = random.uniform(85.0, 100.0)
+                    current_streak = random.randint(3, 5)
+                    last_answer_correct = True
+                    status = "mastered"
+                elif perfil == "mediano":
+                    total_attempts = random.randint(5, 8)
+                    total_errors = random.randint(2, 4)
+                    mastery_score = random.uniform(60.0, 84.0)
+                    current_streak = random.randint(1, 2)
+                    last_answer_correct = random.choice([True, False])
+                    status = "improving"
+                else:
+                    # Aluno com dificuldades (Struggling)
+                    total_attempts = random.randint(6, 10)
+                    total_errors = random.randint(5, 9)
+                    mastery_score = random.uniform(10.0, 45.0)
+                    current_streak = 0
+                    last_answer_correct = False
+                    status = "struggling"
+
+                # Criar o registo de proficiência para o cruzamento atual (Quiz / Tópico / Aluno)
+                mastery = StudentTopicMastery(
+                    course_id=course_id,
+                    quiz_id=quiz_id,
+                    user_moodle_id=student,
+                    topic_id=topic_id,
+                    total_attempts=total_attempts,
+                    total_errors=total_errors,
+                    mastery_score=round(mastery_score, 1),
+                    current_streak=current_streak,
+                    last_answer_correct=last_answer_correct,
+                    status=status,
+                    last_updated=quiz_date
+                )
+                db.session.add(mastery)
+
+    # Gravar tudo na Base de Dados
+    try:
+        db.session.commit()
+        print("Dados de teste para o Professor gerados com sucesso!")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao salvar dados de teste: {e}")
+    
+
+
     print("A iniciar a população do MoodleUsers e MoodleUserHistory para SCI...")
     
     # 1. Gerar os Utilizadores do Moodle
@@ -135,7 +253,8 @@ def populate_database(course_id=2):
     except Exception as e:
         db.session.rollback()
         print(f"Erro ao commitar transação: {e}")
-
+        
+    
 def session_init_rasa(user_email, user_firstname, user_role):
     # 2. "Injetar" o papel do utilizador no Rasa via Tracker API
     try:

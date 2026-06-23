@@ -437,6 +437,14 @@ nlu:
     - Give me a list of students in danger of failing the topics.
     - How is the evolution of the quiz scores this week?
     - Show me the student mastery levels per topic.
+    - compare the quiz performance from yesterday to today's responses.
+    - compare quiz scores evolution from last week to this one.
+    - compare quiz performance from latter interactions to current ones
+    - is the class performing well?
+    - is the class performing well on quizzes?
+    - are the students doing the quizes?
+    - compare students performance evolution through last month
+    
 
 - intent: ask_course_info
   examples: |
