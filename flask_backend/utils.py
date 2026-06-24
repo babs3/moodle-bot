@@ -17,6 +17,7 @@ import re
 import shutil
 from yt_dlp import YoutubeDL
 from faster_whisper import WhisperModel
+from sqlalchemy import select
 from models import *
 from seed_db import qa_bank
 
@@ -27,117 +28,122 @@ YOUTUBE_REGEX = r'(?:youtube\.com\/embed\/|youtu\.be\/|youtube\.com\/watch\?v=)(
 # --- SCRIPT DE POPULAÇÃO ---
 def populate_database(course_id=2):
 
-    flag = False
-    if flag: 
-        print("A iniciar a população do MoodleUsers e MoodleUserHistory para SCI...")
+    print("A iniciar a população do MoodleUsers e MoodleUserHistory para SCI...")
+    # 1. Limpar dados anteriores de teste para não duplicar (opcional, mas recomendado)
+    try:
+        MoodleUsers.query.delete()
+        MoodleUserHistory.query.delete()
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    
+    # 1. Gerar os Utilizadores do Moodle
+    users = []
+    base_moodle_id = 2024000
+    
+    # Criar 16 utilizadores
+    for i in range(16):
+        moodle_id = base_moodle_id + random.randint(100, 999) + i
+        # Garantir unicidade caso o random repita
+        while any(u.moodle_id == moodle_id for u in users):
+            moodle_id += 1
+            
+        student_email = f"up2024{10000 + i}@fe.up.pt"
         
-        # 1. Gerar os Utilizadores do Moodle
-        users = []
-        base_moodle_id = 2024000
+        user_record = MoodleUsers(moodle_id=moodle_id, email=student_email)
+        users.append(user_record)
+        db.session.add(user_record)
         
-        # Criar 16 utilizadores
-        for i in range(16):
-            moodle_id = base_moodle_id + random.randint(100, 999) + i
-            # Garantir unicidade caso o random repita
-            while any(u.moodle_id == moodle_id for u in users):
-                moodle_id += 1
+    try:
+        db.session.flush()  # Garante os ids para as chaves estrangeiras
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao criar utilizadores: {e}")
+        return
+
+    # 2. Configurar o calendário letivo realista (Setembro de 2024 a Janeiro de 2025)
+    start_date = datetime(2024, 9, 16, 9, 0, 0)
+    
+    # Padrão comportamental: Estudantes divididos por nível de atividade
+    # Tipo 0: Heavy users (fazem muitas perguntas), Tipo 1: Moderados, Tipo 2: Ocasionais
+    user_profiles = {u.moodle_id: random.choice([0, 1, 2]) for u in users}
+
+    history_records_count = 0
+    target_rows = 85  # Garante que ultrapassa o mínimo de 80 rows solicitadas
+
+    # Gerar interações fluindo ao longo das 14 semanas letivas de SCI
+    while history_records_count < target_rows:
+        for week in range(1, 15):
+            if history_records_count >= target_rows:
+                break
                 
-            student_email = f"up2024{10000 + i}@fe.up.pt"
+            # Determinar a data da semana corrente
+            week_start_date = start_date + timedelta(weeks=week-1)
             
-            user_record = MoodleUsers(moodle_id=moodle_id, email=student_email)
-            users.append(user_record)
-            db.session.add(user_record)
-            
-        try:
-            db.session.flush()  # Garante os ids para as chaves estrangeiras
-        except Exception as e:
-            db.session.rollback()
-            print(f"Erro ao criar utilizadores: {e}")
-            return
-
-        # 2. Configurar o calendário letivo realista (Setembro de 2024 a Janeiro de 2025)
-        start_date = datetime(2024, 9, 16, 9, 0, 0)
-        
-        # Padrão comportamental: Estudantes divididos por nível de atividade
-        # Tipo 0: Heavy users (fazem muitas perguntas), Tipo 1: Moderados, Tipo 2: Ocasionais
-        user_profiles = {u.moodle_id: random.choice([0, 1, 2]) for u in users}
-
-        history_records_count = 0
-        target_rows = 85  # Garante que ultrapassa o mínimo de 80 rows solicitadas
-
-        # Gerar interações fluindo ao longo das 14 semanas letivas de SCI
-        while history_records_count < target_rows:
-            for week in range(1, 15):
+            # Picos de frequência baseados no plano real do PDF:
+            # Semana 3-4 (Preparação da Apresentação), Semana 7 (Mini-Exam 1), Semana 12-13 (Mini-Exam 2 e Fecho)
+            if week in [3, 4, 7, 12, 13]:
+                base_questions_this_week = random.randint(5, 8)
+            else:
+                base_questions_this_week = random.randint(2, 4)
+                
+            for _ in range(base_questions_this_week):
                 if history_records_count >= target_rows:
                     break
                     
-                # Determinar a data da semana corrente
-                week_start_date = start_date + timedelta(weeks=week-1)
+                # Selecionar um aluno aleatório
+                active_user = random.choice(users)
+                profile = user_profiles[active_user.moodle_id]
                 
-                # Picos de frequência baseados no plano real do PDF:
-                # Semana 3-4 (Preparação da Apresentação), Semana 7 (Mini-Exam 1), Semana 12-13 (Mini-Exam 2 e Fecho)
-                if week in [3, 4, 7, 12, 13]:
-                    base_questions_this_week = random.randint(5, 8)
+                # Filtrar probabilidade do perfil interagir (Heavy vs Ocasional)
+                if profile == 2 and random.random() > 0.3:
+                    continue  # Alunos ocasionais saltam interações frequentemente
+                    
+                # Escolher aleatoriamente um grupo de Q&A do banco de dados (reproduzindo o RAG)
+                pdf_group = random.choice(qa_bank)
+                selected_pdf = pdf_group["pdf"]
+                q_text, a_text = random.choice(pdf_group["qa"])
+                
+                # Gerar carimbo de data/hora realista dentro dessa semana letiva
+                days_offset = random.randint(0, 4)  # Dias de semana (Segunda a Sexta)
+                hours_offset = random.randint(9, 18)  # Horário laboral e letivo
+                minutes_offset = random.randint(0, 59)
+                
+                interaction_timestamp = week_start_date + timedelta(
+                    days=days_offset, hours=hours_offset, minutes=minutes_offset
+                )
+                
+                # Simular tempos de resposta do bot (geralmente rápidos, < 5 segundos)
+                # Ocasionalmente mais lentos para simular carga ou latência da API
+                if random.random() > 0.9:
+                    time_taken = f"{random.uniform(5.1, 12.4):.3f}s"
                 else:
-                    base_questions_this_week = random.randint(2, 4)
+                    time_taken = f"{random.uniform(0.8, 3.2):.3f}s"
                     
-                for _ in range(base_questions_this_week):
-                    if history_records_count >= target_rows:
-                        break
-                        
-                    # Selecionar um aluno aleatório
-                    active_user = random.choice(users)
-                    profile = user_profiles[active_user.moodle_id]
-                    
-                    # Filtrar probabilidade do perfil interagir (Heavy vs Ocasional)
-                    if profile == 2 and random.random() > 0.3:
-                        continue  # Alunos ocasionais saltam interações frequentemente
-                        
-                    # Escolher aleatoriamente um grupo de Q&A do banco de dados (reproduzindo o RAG)
-                    pdf_group = random.choice(qa_bank)
-                    selected_pdf = pdf_group["pdf"]
-                    q_text, a_text = random.choice(pdf_group["qa"])
-                    
-                    # Gerar carimbo de data/hora realista dentro dessa semana letiva
-                    days_offset = random.randint(0, 4)  # Dias de semana (Segunda a Sexta)
-                    hours_offset = random.randint(9, 18)  # Horário laboral e letivo
-                    minutes_offset = random.randint(0, 59)
-                    
-                    interaction_timestamp = week_start_date + timedelta(
-                        days=days_offset, hours=hours_offset, minutes=minutes_offset
-                    )
-                    
-                    # Simular tempos de resposta do bot (geralmente rápidos, < 5 segundos)
-                    # Ocasionalmente mais lentos para simular carga ou latência da API
-                    if random.random() > 0.9:
-                        time_taken = f"{random.uniform(5.1, 12.4):.3f}s"
-                    else:
-                        time_taken = f"{random.uniform(0.8, 3.2):.3f}s"
-                        
-                    # Determinar se a pergunta foi complexa o suficiente para transitar para o Tutor Humano
-                    # Geralmente ocorre se houver termos fora de contexto ou dúvidas de avaliação pessoal
-                    is_tutor = random.random() < 0.12  # ~12% de taxa de escalonamento para estatísticas do prof.
+                # Determinar se a pergunta foi complexa o suficiente para transitar para o Tutor Humano
+                # Geralmente ocorre se houver termos fora de contexto ou dúvidas de avaliação pessoal
+                is_tutor = random.random() < 0.12  # ~12% de taxa de escalonamento para estatísticas do prof.
 
-                    history_entry = MoodleUserHistory(
-                        course_id=course_id,
-                        user_moodle_id=active_user.moodle_id,
-                        question=q_text,
-                        response=a_text,
-                        pdfs=selected_pdf,
-                        is_tutor_interaction=is_tutor,
-                        time_to_respond=time_taken,
-                        timestamp=interaction_timestamp
-                    )
-                    
-                    db.session.add(history_entry)
-                    history_records_count += 1
+                history_entry = MoodleUserHistory(
+                    course_id=course_id,
+                    user_moodle_id=active_user.moodle_id,
+                    question=q_text,
+                    response=a_text,
+                    pdfs=selected_pdf,
+                    is_tutor_interaction=is_tutor,
+                    time_to_respond=time_taken,
+                    timestamp=interaction_timestamp
+                )
+                
+                db.session.add(history_entry)
+                history_records_count += 1
 
-        try:
-            db.session.commit()
-            print(f"Sucesso! Criados {len(users)} utilizadores e {history_records_count} registos de histórico com carimbos temporais reais do curso de SCI.")
-        except Exception as e:
-            db.session.rollback()
-            print(f"Erro ao commitar transação: {e}")
+    try:
+        db.session.commit()
+        print(f"Sucesso! Criados {len(users)} utilizadores e {history_records_count} registos de histórico com carimbos temporais reais do curso de SCI.")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao commitar transação: {e}")
             
     print("A iniciar a população do MoodleUserQuizHistory e StudentTopicMastery...")
     # 1. Limpar dados anteriores de teste para não duplicar (opcional, mas recomendado)
@@ -149,9 +155,22 @@ def populate_database(course_id=2):
         db.session.rollback()
 
     # IDs de exemplo (Garante que os IDs 101 a 105 existem em moodle_users)
-    student_ids = [2, 3, 5]
     course_id = 2
-    topics = [1, 2, 3]
+    
+    users = db.session.execute(select(MoodleUsers)).scalars().all()
+    student_ids = []
+    i = 0
+    for user in users:
+        if i == 3:
+            continue
+        student_ids.append(user.moodle_id)
+        i += 1
+    
+    topics = []
+    topics_db = db.session.execute(select(Topics)).scalars().all()
+    for topic in topics_db:
+        topics.append(topic.id)
+        
     
     # Configuração dos 3 Quizzes com datas passadas para gerar evolução temporal
     quizzes_config = [

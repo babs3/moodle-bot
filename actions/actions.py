@@ -638,8 +638,6 @@ def action_process(dispatcher, tracker, payload):
             SlotSet("user_email", user_email),  # Store the sender ID
             SlotSet("user_id", user_id),  # Store the user ID
             SlotSet("input_time", input_time),
-            SlotSet("concept", concept),
-            SlotSet("context", context),
             SlotSet("complex_tokens", complex_tokens),
             SlotSet("simple_tokens", simple_tokens)
             ]
@@ -752,8 +750,6 @@ You are a precise **academic assistant and course coordinator**. Your task is to
         SlotSet("user_email", user_email),  # Store the sender ID
         SlotSet("user_id", user_id),  # Store the user ID
         SlotSet("input_time", input_time),
-        SlotSet("concept", concept),
-        SlotSet("context", context),
         SlotSet("complex_tokens", complex_tokens),
         SlotSet("simple_tokens", simple_tokens)
         ]
@@ -975,7 +971,7 @@ class ActionGetSummary(Action):
 
         return action_process(dispatcher, tracker, payload)
         
-# === ACTION 4: COMPARE === #
+# === ACTION 5: COMPARE === #
 class ActionGetComparison(Action):
     def name(self):
         return "action_get_comparison"
@@ -1048,7 +1044,6 @@ class ActionGetClassMaterialLocation(Action):
         return "action_get_class_material_location"
 
     def run(self, dispatcher, tracker, domain):
-        return
 
         bot_response = tracker.get_slot("bot_response")
         input_time = tracker.get_slot("input_time")
