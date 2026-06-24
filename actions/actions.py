@@ -483,7 +483,11 @@ def action_process(dispatcher, tracker, payload):
                     
                     for token in complex_tokens_tmp:
                         simple_tokens.append(token)
-                    complex_tokens.append(" ".join(complex_tokens_tmp))                
+                    complex_tokens.append(" ".join(complex_tokens_tmp))  
+                else:
+                    complex_tokens.append(concept)
+                    for token in concept.split():
+                        simple_tokens.append(token)              
                 
                 if add_concept_as_complex:                      
                     complex_tokens_split = tokenize_and_clean_text(concept.lower())
@@ -523,7 +527,10 @@ def action_process(dispatcher, tracker, payload):
                      
                     for token in complex_tokens_tmp: 
                         simple_tokens.append(token)
-                    complex_tokens.append(" ".join(complex_tokens_tmp))                
+                    complex_tokens.append(" ".join(complex_tokens_tmp))   
+                else:
+                    complex_tokens.append(concept)
+                    simple_tokens.append(token)             
                 
                 if add_concept_as_simple:
                     complex_tokens = []
@@ -621,7 +628,7 @@ def action_process(dispatcher, tracker, payload):
         
     selected_results = hybrid_search(vector_docs, vector_metadata, normalized_vector_scores, bm25_docs, bm25_meta, normalized_bm25_scores, alpha)
     
-    return
+    
     if len(selected_results) == 0:
         print("\n🚨  No relevant materials found!")
         return  [

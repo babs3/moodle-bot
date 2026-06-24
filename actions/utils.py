@@ -638,7 +638,7 @@ def dense_vector_search(intent, complex_tokens, simple_tokens, context, query, c
         if complex_3grams != []:
             query = intent + " " + " ".join(complex_3grams)
         elif complex_2grams != []:
-            query = intent + " " + " ".join(complex_tokens) 
+            query = intent + " " + " ".join(complex_2grams) 
         
             # se existir acronimos nos simple tokens, adiciona-os ao início da query, seguido dos complex tokens
             #acronimos = [token for token in simple_tokens if token.isupper()]
