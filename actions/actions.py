@@ -91,6 +91,7 @@ Data: {data_snippet}
 - Identify the most critical PDF/Topic and provide one brief action.
 
 ### RESPONSE (HTML format)
+(Start directly with your analysis. If a chart is needed, end the response with <chart>{{your_json}}</chart>)
 """
             
             generation_config = {
@@ -165,7 +166,29 @@ You are a Concise Educational Data Analyst specializing in Longitudinal Student 
 3. **NO INTROS/OTHERS:** Start directly with the analysis. Do not say "Hello" or "Here is the report".
 4. **BREVITY:** Maximum 4-5 paragraphs in total. Keep the total word count under 300 words.
 5. **LANGUAGE:** Always respond in English (UK).
-6. **VISUAL CHARTS:** Append a single chart configuration at the very end of your response using the custom <chart> tag. Use a line chart ("line") for timeline/evolution queries or a bar chart for comparative benchmarks.
+6. **VISUAL CHARTS:** If the data benefits from a visual aid (e.g. showing the most consulted PDFs or the volume of questions per topic), append a single chart configuration at the very end of your response using the custom <chart> tag. Inside it, write a clean, standard JSON object. Use valid JSON formatting (wrap all keys and strings in double quotes). Do NOT output HTML <a> or <img> tags for the chart, and do NOT attempt to URL-encode the text.
+
+Example format (Bar chart for most active files/topics):
+<chart>
+{{
+  "type": "bar",
+  "data": {{
+    "labels": ["Syllabus.pdf", "Lecture_1.pdf", "Lab_2.pdf"],
+    "datasets": [{{
+      "label": "Questions Asked",
+      "data": [12, 28, 5],
+      "backgroundColor": "#3498db"
+    }}]
+  }},
+  "options": {{
+    "legend": {{ "display": false }},
+    "title": {{ "display": true, "text": "Top Consulted Materials" }},
+    "scales": {{
+      "yAxes": [{{ "ticks": {{ "beginAtZero": true }} }}]
+    }}
+  }}
+}}
+</chart>
 
 ### CONTEXT
 - Conceptual Data (Current Bottlenecks): {analysis_data}
@@ -178,6 +201,7 @@ You are a Concise Educational Data Analyst specializing in Longitudinal Student 
 - Provide one actionable pedagogical recommendation based on the historical trend (e.g., if grades are declining over time, suggest a global review session; if only one quiz failed, focus on that specific topic).
 
 ### RESPONSE (HTML format)
+(Start directly with your analysis. If a chart is needed, end the response with <chart>{{your_json}}</chart>)
 """
                 generation_config = {
                     "temperature": 0.2,
