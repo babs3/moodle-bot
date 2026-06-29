@@ -55,6 +55,9 @@ def populate_database(course_id=2):
         db.session.add(user_record)
         
     try:
+        user_record = MoodleUsers(moodle_id=2, email="example.email.com")
+        users.append(user_record)
+        db.session.add(user_record)
         db.session.flush()  # Garante os ids para as chaves estrangeiras
     except Exception as e:
         db.session.rollback()

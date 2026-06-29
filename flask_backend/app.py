@@ -153,7 +153,7 @@ def chat():
         if info_utilizador:
             cache.set(cache_key, info_utilizador, timeout=600) # Guarda por 10 minutos
     else:
-        app.logger.info(f"Cache HIT para o utilizador {user_id}. Dados carregados da memória.")
+        app.logger.info(f"Cache HIT para o utilizador {user_id}. Dados carregados da memória:\n - {info_utilizador}")
     
     user_firstname = info_utilizador.get("name") if info_utilizador else f"user_{user_id}"     
     print(f"📮  --> Received message for {user_firstname} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
@@ -996,19 +996,22 @@ def get_quiz_history(course_id):
         course_id=course_id
     ).all()
     
-    quiz_data = MoodleQuizAnalysis.query.filter_by(
+    quiz_data = MoodleQuizData.query.filter_by(
         course_id=course_id
     ).all()
+    #print(f"Quiz Data: {quiz_data}")
     
     # 3. Criar um dicionário para mapear quiz_id -> quiz_name
     # Exemplo resultante: {123: "Quiz de Programação", 124: "Teste Final"}
     quiz_name_map = {q.quiz_id: q.quiz_name for q in quiz_data}
+    print(f"quiz_name_map: {quiz_name_map}")
     
     # 4. Construir a resposta JSON integrando o nome mapeado
     response_data = []
     for h in history:
         # Usa .get() para evitar erros caso um quiz_id não exista no quiz_data
         quiz_name = quiz_name_map.get(h.quiz_id, "Quiz Desconhecido")
+        #print(f"---> quiz_id: {h.quiz_id}; quiz_name: {quiz_name}")
         
         response_data.append({
             "user_id": h.user_moodle_id,
