@@ -294,7 +294,7 @@ def session_init_rasa(user_email, user_firstname, user_role):
 def fill_student_topic_mastery(acertos, course_id, user_id, quiz_id):
     for acerto in acertos:  
         question = acerto.get('question', 'N/A')
-        question_data = MoodleQuizData.query.filter_by(question=question).first()
+        question_data = get_quiz_history.query.filter_by(question=question).first()
         topic_id = question_data.topic_id if question_data else None
         
         # popular a StudentTopicMastery 
@@ -946,7 +946,7 @@ def criar_topicos_para_perguntas(pergunta_id_texto):
     return lista_perguntas_final
 
 
-def popular_db(course_id, quiz_id, perguntas):
+def popular_db(course_id, quiz_id, quiz_name, perguntas):
     for p in perguntas:
         # ir buscar id do topico à tabela de tópicos, usando o nome do tópico que o Gemini nos deu
         topic = Topics.query.filter_by(name=p.get('topic')).first()
@@ -962,6 +962,7 @@ def popular_db(course_id, quiz_id, perguntas):
         nova_questao = MoodleQuizData(
             course_id=course_id,
             quiz_id=quiz_id,
+            quiz_name=quiz_name,
             question=p.get('question'),
             topic_id=topic_id,
             question_feedback=p.get('feedback', "")

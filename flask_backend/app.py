@@ -995,7 +995,32 @@ def get_quiz_history(course_id):
     history = MoodleUserQuizHistory.query.filter_by(
         course_id=course_id
     ).all()
-    return jsonify([{"user_id": h.user_moodle_id, "quiz_id": h.quiz_id, "grade": h.grade, "max_grade": h.max_grade, "percentage": h.percentage, "timestamp": h.timestamp} for h in history])
+    
+    quiz_data = MoodleQuizAnalysis.query.filter_by(
+        course_id=course_id
+    ).all()
+    
+    # 3. Criar um dicionário para mapear quiz_id -> quiz_name
+    # Exemplo resultante: {123: "Quiz de Programação", 124: "Teste Final"}
+    quiz_name_map = {q.quiz_id: q.quiz_name for q in quiz_data}
+    
+    # 4. Construir a resposta JSON integrando o nome mapeado
+    response_data = []
+    for h in history:
+        # Usa .get() para evitar erros caso um quiz_id não exista no quiz_data
+        quiz_name = quiz_name_map.get(h.quiz_id, "Quiz Desconhecido")
+        
+        response_data.append({
+            "user_id": h.user_moodle_id,
+            "quiz_id": h.quiz_id,
+            "quiz_name": quiz_name,  # Nome recuperado do mapeamento
+            "grade": h.grade,
+            "max_grade": h.max_grade,
+            "percentage": h.percentage,
+            "timestamp": h.timestamp
+        })
+    
+    return jsonify(response_data)
 
 @app.route('/api/get_llm_classroom_analysis/<course_id>', methods=['GET'])
 def get_llm_classroom_analysis(course_id):
@@ -1236,7 +1261,7 @@ def new_quiz_polling():
                     lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
                     app.logger.info(f"Perguntas processadas pelo Rasa: {lista_final_perguntas}")
 
-                    popular_db(course_id, q_id, lista_final_perguntas)
+                    popular_db(course_id, q_id, q_nome, lista_final_perguntas)
                     
                 # CASO 2: Quiz existe, mas foi editado pelo professor
                 elif q_last_edit_dt > quiz_local.last_updated:
@@ -1248,7 +1273,7 @@ def new_quiz_polling():
                     lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
                     app.logger.info(f"Perguntas processadas pelo Rasa (after reprocessing): {lista_final_perguntas}")
 
-                    popular_db(course_id, q_id, lista_final_perguntas)
+                    popular_db(course_id, q_id, q_nome, lista_final_perguntas)
                     
                 # CASO 3: Quiz existe, mas perguntas foram editadas pelo professor
                 elif questions_hash != quiz_local.questions_hash:
@@ -1260,7 +1285,7 @@ def new_quiz_polling():
                     lista_final_perguntas = criar_topicos_para_perguntas(lista_perguntas) 
                     app.logger.info(f"_Perguntas processadas pelo Rasa (after reprocessing): {lista_final_perguntas}")
                     
-                    popular_db(course_id, q_id, lista_final_perguntas)
+                    popular_db(course_id, q_id, q_nome, lista_final_perguntas)
 
                 # CASO 4: Estão iguais
                 else:

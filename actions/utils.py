@@ -537,12 +537,14 @@ def formatar_historico_para_llm(quiz_history_df):
         return []  # Devolve uma lista vazia para o LLM não rebentar
     
     # 1. Garantir que o timestamp está no formato datetime para ordenar corretamente
-    quiz_history_df['timestamp'] = pd.to_datetime(quiz_history_df['timestamp'])
+    # Adicionámos 'errors="coerce"' para o caso de algum timestamp vir corrompido ou nulo
+    quiz_history_df['timestamp'] = pd.to_datetime(quiz_history_df['timestamp'], errors='coerce')
+    
     # 2. Criar uma coluna booleana para identificar quem reprovou (nota < 50%)
     quiz_history_df['failed'] = quiz_history_df['percentage'] < 50.0
     
-    # 3. Agrupar por quiz_id e calcular as métricas necessárias
-    grouped = quiz_history_df.groupby('quiz_id').agg(
+    # 3. Agrupar por quiz_name e calcular as métricas necessárias
+    grouped = quiz_history_df.groupby('quiz_name').agg(
         class_average_percentage=('percentage', 'mean'),
         total_students_completed=('user_id', 'count'),
         students_failed_count=('failed', 'sum'),
@@ -559,7 +561,7 @@ def formatar_historico_para_llm(quiz_history_df):
     # Removemos a coluna auxiliar 'first_attempt_time' antes de exportar
     resultado_final = grouped.drop(columns=['first_attempt_time']).to_dict(orient='records')
     
-    return resultado_final # retorna em formato de ...
+    return resultado_final
 
 def filtrar_e_expandir_tokens(complex_tokens):
     lista_final = []
