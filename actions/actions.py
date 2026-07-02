@@ -1013,41 +1013,6 @@ class ActionGetComparison(Action):
         }
 
         return action_process(dispatcher, tracker, payload)
-
-class ActionGetCourseInfo(Action):
-    def name(self):
-        return "action_get_course_info"
-
-    def run(self, dispatcher, tracker, domain):
-        
-        print("\n📊  Generating bot 'action_get_course_info' response...")
-    
-        # Extract variables from chat memory
-        user_message = tracker.latest_message.get("text")
-        user_email = tracker.sender_id  # ✅ Retrieves the "sender" field
-        user_id = tracker.latest_message.get("metadata", {}).get("user_id")
-        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
-        input_time = tracker.latest_message.get("metadata", {}).get("input_time")
-        #print(f"🕓  latest_message INPUT TIME: {input_time}")
-        authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
-        #print(f"📚  Authorized resources from metadata: {authorized_resources}")
-        length_preference = tracker.latest_message.get("metadata", {}).get("length_preference")
-        tone_preference = tracker.latest_message.get("metadata", {}).get("tone_preference")
-
-        payload = {
-            "user_message": user_message,
-            "user_email": user_email,
-            "input_time": input_time,
-            "authorized_resources": authorized_resources,
-            "intent": "course info" ,
-            "user_id": user_id,
-            "course_id": course_id,
-            "length_preference": length_preference,
-            "tone_preference": tone_preference
-        }
-
-        return action_process(dispatcher, tracker, payload)
-    
     
 # === FINAL ACTION: GET PDF NAMES & PAGE LOCATIONS === #
 class ActionGetClassMaterialLocation(Action):

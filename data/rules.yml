@@ -77,14 +77,6 @@ rules:
   - action: action_get_comparison
   - action: action_get_class_material_location
 
-- rule: Handle course info request
-  condition:
-  - slot_was_set:
-      - user_role: student
-  steps:
-  - intent: ask_course_info
-  - action: action_get_course_info
-
 - rule: Show topics available for selection
   condition:
   - slot_was_set:

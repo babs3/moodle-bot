@@ -445,7 +445,6 @@ nlu:
     - are the students doing the quizes?
     - compare students performance evolution through last month   
 
-- intent: ask_course_info
   examples: |
     - What are the office hours for this course?
     - What are the main topics covered in this course?
