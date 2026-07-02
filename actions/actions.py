@@ -263,87 +263,6 @@ Example format (Bar chart for most active files/topics):
         
         return []
 
-class ActionCallLLMWithContext(Action):
-    def name(self) -> str:
-        return "action_call_llm_with_context"
-
-    def run(self, dispatcher, tracker, domain):
-        # Esta ação pode ser usada para chamadas genéricas ao LLM com contexto do histórico de conversa
-        # O prompt e a formatação da resposta podem ser adaptados conforme necessário
-        print("\n📊  Generating bot 'action_call_llm_with_context' response...")
-        
-        user_email = tracker.sender_id
-        user_id = tracker.latest_message.get("metadata", {}).get("user_id")
-        input_time = tracker.latest_message.get("metadata", {}).get("input_time")
-        course_id = tracker.latest_message.get("metadata", {}).get("course_id")
-        teacher_question = tracker.latest_message.get("text")
-        print(f"Teacher question: '{teacher_question}'")
-
-        df = get_user_history(course_id)
-        if df.empty:
-            dispatcher.utter_message(text="There are no questions asked by students yet.")
-            return []      
-        
-        # limit df to the last 50 entries to avoid overloading the prompt
-        data_snippet = df.tail(50).to_string(index=False)
-        
-        # 1. Recuperar os eventos da conversa       
-        ultima_mensagem_user, chat_history = get_chat_history(tracker.events)
-        print(f"\n📜  Complete messages payload for LLM:\n{chat_history}\n")
-        
-        # 3. Criar a diretriz do sistema (Persona + Dados dos Alunos + Regras)
-        # Injetamos o data_snippet diretamente no papel de sistema para o LLM ter como base de conhecimento.
-        system_instruction = f"""
-You are an advanced analytics assistant for professors and academic administrators.
-Your goal is to help professors analyze student behavior, questions, and challenges based on the data provided.
-
-[STUDENT DATA (Last 50 records in the system)]
-{data_snippet}
-
-[BEHAVIORAL INSTRUCTIONS]
-1. HISTORY AND FOLLOW-UP: Use the conversation history to answer follow-up or ambiguous questions. If the professor asks "Who?", "Why?" or "What did he say?", analyze the previous messages to identify the student or concept they are referring to.
-2. ACCURACY: Base your responses strictly on the provided student data. If the information is not available and it's not a contextual follow-up question, kindly indicate that you do not have those details.
-3. FORMAT OF THE RESPONSE: You must structure your response using simple HTML tags so that it is rendered correctly in the interface (use tags like <b>, <br>, <ul>, <li>). Do not use Markdown (like ** or ###).
-"""
-
-        generation_config = {
-            "temperature": 0.2,          # 🛡️ Mantém isto baixo para o bot ser factual e não inventar dados
-            # top_p e top_k omitidos -> O Gemini assume os dele (0.95 e 40)
-        }
-        
-        formatted_response = "Sorry, I couldn't generate a response..."
-        try:
-            g_model = genai.GenerativeModel(
-                model_name=MODEL_NAME,
-                system_instruction=system_instruction,
-                generation_config=generation_config
-            )
-            #response = g_model.generate_content(chat_history)
-
-            # Iniciamos o chat com o passado da conversa
-            chat = g_model.start_chat(history=chat_history)
-
-            # Enviamos a mensagem atual
-            response = chat.send_message(ultima_mensagem_user)
-
-            
-            if hasattr(response, "text") and response.text:
-                print("\n🎯  Gemini Response Generated Successfully!")
-                formatted_response = format_gemini_response(response.text)
-                #print(formatted_response)
-                save_user_progress(course_id, user_email, teacher_question, formatted_response, [], input_time, user_id, False)
-                dispatcher.utter_message(text=formatted_response)
-            else:
-                print("\n ⚠️  Gemini Response is empty.")
-                save_user_progress(course_id, user_email, teacher_question, "Sorry, I couldn't generate a response.", [], input_time, user_id, False)
-                dispatcher.utter_message(text="Sorry, I couldn't generate a response.")
-        except Exception as e:
-            save_user_progress(course_id, user_email, teacher_question, "Sorry, I couldn't process that request.", [], input_time, user_id, False)
-            dispatcher.utter_message(text="Sorry, I couldn't process that request.")
-            print(f"\n❌  Error calling Gemini API: {e}")
-        
-        return []
-
 class ActionSetUsername(Action):
     def name(self) -> str:
         return "action_set_username"
@@ -1095,7 +1014,6 @@ class ActionGetClassMaterialLocation(Action):
 
         #clear the slots
         return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", ""), SlotSet("context", ""), SlotSet("complex_tokens", []), SlotSet("simple_tokens", "")]
-
 
 
 class ActionShowTopicsForSelection(Action):

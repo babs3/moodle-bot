@@ -117,7 +117,7 @@ rules:
     - user_role: teacher
   steps:
   - intent: ask_for_definition
-  - action: action_call_llm_with_context
+  - action: action_get_metrics_from_db
 
 - rule: Teacher Fallback Geral (Rasa não percebeu o intent)
   condition:
@@ -125,4 +125,4 @@ rules:
     - user_role: teacher
   steps:
   - intent: nlu_fallback
-  - action: action_call_llm_with_context
+  - action: action_get_metrics_from_db
