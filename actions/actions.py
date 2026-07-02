@@ -93,7 +93,10 @@ Data: {data_snippet}
 ### RESPONSE (HTML format)
 (Start directly with your analysis. If a chart is needed, end the response with <chart>{{your_json}}</chart>)
 """
-            
+            # 1. Recuperar os eventos da conversa       
+            ultima_mensagem_user, chat_history = get_chat_history(tracker.events)
+            print(f"\n📜  Complete messages payload for LLM:\n{chat_history}\n")
+        
             generation_config = {
                 "temperature": 0.2,
             }
@@ -105,7 +108,14 @@ Data: {data_snippet}
                     system_instruction=system_instruction,
                     generation_config=generation_config
                 )
-                response = g_model.generate_content(teacher_question)
+                #response = g_model.generate_content(teacher_question)
+                print(f"TEACHER QUESTION: {teacher_question}")
+                print(f"> ultima_mensagem_user: {ultima_mensagem_user}")
+                # Iniciamos o chat com o passado da conversa
+                chat = g_model.start_chat(history=chat_history)
+
+                # Enviamos a mensagem atual
+                response = chat.send_message(ultima_mensagem_user)
 
                 if hasattr(response, "text") and response.text:
                     print("\n🎯  Gemini Response Generated Successfully!")
@@ -203,6 +213,10 @@ Example format (Bar chart for most active files/topics):
 ### RESPONSE (HTML format)
 (Start directly with your analysis. If a chart is needed, end the response with <chart>{{your_json}}</chart>)
 """
+                # 1. Recuperar os eventos da conversa       
+                ultima_mensagem_user, chat_history = get_chat_history(tracker.events)
+                print(f"\n📜  Complete messages payload for LLM:\n{chat_history}\n")
+        
                 generation_config = {
                     "temperature": 0.2,
                 }
@@ -214,7 +228,15 @@ Example format (Bar chart for most active files/topics):
                         system_instruction=system_instruction,
                         generation_config=generation_config
                     )
-                    response = g_model.generate_content(teacher_question)
+                    #response = g_model.generate_content(teacher_question)
+                    print(f".TEACHER QUESTION: {teacher_question}")
+                    print(f"> ultima_mensagem_user: {ultima_mensagem_user}")                    
+                    
+                    # Iniciamos o chat com o passado da conversa
+                    chat = g_model.start_chat(history=chat_history)
+
+                    # Enviamos a mensagem atual
+                    response = chat.send_message(ultima_mensagem_user)
 
                     if hasattr(response, "text") and response.text:
                         print("\n🎯  Gemini Response Generated Successfully!")
@@ -265,32 +287,10 @@ class ActionCallLLMWithContext(Action):
         # limit df to the last 50 entries to avoid overloading the prompt
         data_snippet = df.tail(50).to_string(index=False)
         
-        # 1. Recuperar os eventos da conversa
-        events = tracker.events
+        # 1. Recuperar os eventos da conversa       
+        ultima_mensagem_user, chat_history = get_chat_history(tracker.events)
+        print(f"\n📜  Complete messages payload for LLM:\n{chat_history}\n")
         
-        # 2. Filtrar e construir o histórico para o LLM
-        chat_history = []
-        max_turns = 6 # Define quantas mensagens queres que o LLM "lembre"
-        
-        # Vamos andar de trás para a frente no histórico
-        for event in reversed(events):
-            if len(chat_history) >= max_turns:
-                break
-                
-            if event.get("event") == "user":
-                if event.get("text") != "set username trigger":
-                    # Formato Gemini: 'user' + 'parts' com 'text'
-                    chat_history.insert(0, {
-                        "role": "user", 
-                        "parts": [{"text": event.get("text")}]
-                    })
-            elif event.get("event") == "bot":
-                # Formato Gemini: 'model' (e não 'assistant') + 'parts' com 'text'
-                chat_history.insert(0, {
-                    "role": "model", 
-                    "parts": [{"text": event.get("text")}]
-                })
-            
         # 3. Criar a diretriz do sistema (Persona + Dados dos Alunos + Regras)
         # Injetamos o data_snippet diretamente no papel de sistema para o LLM ter como base de conhecimento.
         system_instruction = f"""
@@ -306,8 +306,6 @@ Your goal is to help professors analyze student behavior, questions, and challen
 3. FORMAT OF THE RESPONSE: You must structure your response using simple HTML tags so that it is rendered correctly in the interface (use tags like <b>, <br>, <ul>, <li>). Do not use Markdown (like ** or ###).
 """
 
-        print(f"\n📜  Complete messages payload for LLM:\n{chat_history}\n")
-        
         generation_config = {
             "temperature": 0.2,          # 🛡️ Mantém isto baixo para o bot ser factual e não inventar dados
             # top_p e top_k omitidos -> O Gemini assume os dele (0.95 e 40)
@@ -320,8 +318,15 @@ Your goal is to help professors analyze student behavior, questions, and challen
                 system_instruction=system_instruction,
                 generation_config=generation_config
             )
-            response = g_model.generate_content(chat_history)
+            #response = g_model.generate_content(chat_history)
 
+            # Iniciamos o chat com o passado da conversa
+            chat = g_model.start_chat(history=chat_history)
+
+            # Enviamos a mensagem atual
+            response = chat.send_message(ultima_mensagem_user)
+
+            
             if hasattr(response, "text") and response.text:
                 print("\n🎯  Gemini Response Generated Successfully!")
                 formatted_response = format_gemini_response(response.text)
@@ -686,9 +691,7 @@ def action_process(dispatcher, tracker, payload):
             "detailed": "DETAILED AND THOROUGH. Elaborate on the concept, explain the context or steps if necessary. Do NOT exceed 300 words in your answer."
         }
 
-        if intent != "course info":
-            # 3. Montagem da System Instruction Dinâmica
-            system_instruction = f"""
+        system_instruction = f"""
 ### ROLE
 You are a precise **academic tutor assistant**. Your task is to answer the student's query based strictly on the provided educational course material, adapting your response style to their preferences.
 
@@ -706,26 +709,9 @@ You are a precise **academic tutor assistant**. Your task is to answer the stude
 
 ### RESPONSE (HTML format)
 """
-        else:
-            print(f"\n🔍  Intent is 'course info'. Using a different system instruction focused on administrative and logistical information.")
-            system_instruction = f"""
-### ROLE
-You are a precise **academic assistant and course coordinator**. Your task is to answer the student's query regarding course logistics, administration, or syllabus details based strictly on the provided course documentation (such as the course syllabus, grading policy, or official announcements), adapting your response style to their preferences.
-
-### COURSE DOCUMENTATION CONTEXT
-{raw_text}
-
-### CRITICAL RULES
-1. **NO MARKDOWN:** Do NOT use asterisks (**) or hashtags (#). 
-2. **HTML ONLY:** Use <b>text</b> for bold and <br> for line breaks.
-3. **LENGTH CONTROL:** {length_instructions[length_preference]}
-4. **TONE CONTROL:** {tone_instructions[tone_preference]}
-5. **STRICTNESS:** Base your answer ONLY on the provided course documentation above. Do not extrapolate, assume, or use outside knowledge about university policies.
-6. **FALLBACK:** If the specific administrative info (e.g., a specific deadline or professor's email) is not explicitly mentioned in the provided text, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials."
-7. **LANGUAGE:** Always respond in English (UK).
-
-### RESPONSE (HTML format)
-"""
+        # 1. Recuperar os eventos da conversa       
+        ultima_mensagem_user, chat_history = get_chat_history(tracker.events)
+        print(f"\n📜  Complete messages payload for LLM:\n{chat_history}\n")
         
         # === PREPARE PARAMETERS === #
         generation_config = {
@@ -742,9 +728,10 @@ You are a precise **academic assistant and course coordinator**. Your task is to
                 generation_config=generation_config
             )
             
-            # O input do utilizador leva apenas a pergunta direta
-            user_prompt = f"Student Query: {user_message}"
-            response = g_model.generate_content(user_prompt)
+            # Iniciamos o chat com o passado da conversa
+            chat = g_model.start_chat(history=chat_history)
+            # Enviamos a mensagem atual
+            response = chat.send_message(ultima_mensagem_user)
 
             if hasattr(response, "text") and response.text:
                 print("\n🎯  Gemini Response Generated Successfully!")
@@ -1324,6 +1311,9 @@ Quiz Interaction:
 
 Please provide the HTML feedback analysis adhering strictly to the requested tone, depth, and structure.
 """
+        # 1. Recuperar os eventos da conversa       
+        ultima_mensagem_user, chat_history = get_chat_history(tracker.events)
+        print(f"\n📜  Complete messages payload for LLM:\n{chat_history}\n")
                 
         # === CALL GEMINI API === #
         generation_config = {
@@ -1336,7 +1326,16 @@ Please provide the HTML feedback analysis adhering strictly to the requested ton
                 system_instruction=system_instruction,
                 generation_config=generation_config
             )
-            response = g_model.generate_content(user_prompt)
+            #response = g_model.generate_content(user_prompt)
+            print(f".USER PROMPT: {user_prompt}")
+            print(f"> ultima_mensagem_user: {ultima_mensagem_user}")
+            
+            # Iniciamos o chat com o passado da conversa
+            chat = g_model.start_chat(history=chat_history)
+
+            # Enviamos a mensagem atual
+            response = chat.send_message(ultima_mensagem_user)
+            
             html_feedback = response.text
             
         except Exception as e:

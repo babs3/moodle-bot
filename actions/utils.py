@@ -530,6 +530,43 @@ def get_quiz_history(course_id):
         print("⚠️  Failed to retrieve quiz history data.")
         return {}
 
+def get_chat_history(events):
+    # Vamos encontrar a última mensagem de texto válida do utilizador
+    ultima_mensagem_user = None
+    historico_para_loop = []
+
+    # Corremos os eventos de trás para a frente para isolar a última mensagem
+    for event in reversed(events):
+        if event.get("text") == "/set_username":
+            continue
+        if event.get("event") == "user"  and not ultima_mensagem_user:
+            ultima_mensagem_user = event.get("text")
+        else:
+            # Tudo o resto vai para a lista que vamos usar para o histórico passado
+            historico_para_loop.append(event)
+
+    # 2. Construir o chat_history passado (reutilizando a tua lógica)
+    chat_history = []
+    max_turns = 4 
+
+    # Nota: como 'historico_para_loop' já está invertido, lemos diretamente
+    for event in historico_para_loop:
+        if len(chat_history) >= max_turns:
+            break
+            
+        if event.get("event") == "user":
+            if event.get("text") != "set username trigger":
+                chat_history.insert(0, {
+                    "role": "user", 
+                    "parts": [{"text": event.get("text")}]
+                })
+        elif event.get("event") == "bot":
+            chat_history.insert(0, {
+                "role": "model", 
+                "parts": [{"text": event.get("text")}]
+            })
+    
+    return ultima_mensagem_user, chat_history
 
 def formatar_historico_para_llm(quiz_history_df):
     # quiz_history_df is a dataframe
