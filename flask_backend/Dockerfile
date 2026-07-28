@@ -15,12 +15,12 @@ COPY ./flask_backend/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-RUN python -m spacy download en_core_web_sm
-RUN python -m nltk.downloader -d /app/nltk_data wordnet omw-1.4
-
 ENV FLASK_APP=app.py
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV NLTK_DATA=/app/nltk_data
+
+RUN python -m spacy download en_core_web_sm
+RUN python -m nltk.downloader -d /app/nltk_data wordnet omw-1.4
 
 EXPOSE 8080
 
