@@ -2,7 +2,6 @@
 .gitignore
 .env
 __pycache__/
-flask-backend/
 docker-compose.yml
 materials/
 README.md

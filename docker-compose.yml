@@ -86,9 +86,11 @@ services:
     environment:
       PYTHONPATH: "/app"
       PYTHONUNBUFFERED: "1"
-      FLASK_APP: "app.py"  # Forçamos o Flask a focar-se no ficheiro certo
+      FLASK_APP: "app.py" 
       FLASK_ENV: "development"
-      DB_HOST: db 
+      FLASK_DEBUG: "1"            # 👈 Ativa o Auto-Reload do Flask
+      WATCHPACK_POLLING: "true"   # 👈 Força a deteção de ficheiros guardados no Windows
+      DB_HOST: db
       REDIS_HOST: redis # 💡 Passamos o nome do serviço Redis como Host
       HF_TOKEN: ${HF_TOKEN}
       POSTGRES_USER: ${APP_DATABASE_USER}

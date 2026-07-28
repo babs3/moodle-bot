@@ -297,7 +297,7 @@ def session_init_rasa(user_email, user_firstname, user_role):
 def fill_student_topic_mastery(acertos, course_id, user_id, quiz_id):
     for acerto in acertos:  
         question = acerto.get('question', 'N/A')
-        question_data = get_quiz_history.query.filter_by(question=question).first()
+        question_data = MoodleQuizData.query.filter_by(question=question).first()
         topic_id = question_data.topic_id if question_data else None
         
         # popular a StudentTopicMastery 
@@ -421,13 +421,23 @@ def analisar_desempenho_aluno(quiz_data):
     acertos = []
     # 1. Extrair a nota que o aluno tirou (podes usar 'grade' ou 'sumgrades')
     # Usamos o float() tratando a conversão caso venha como string ou número
-    nota_obtida = float(str(quiz_data.get('grade', 0)).replace(',', '.'))
+    if quiz_data.get('grade', 0) == 'None':
+        nota_obtida = 0.0
+    else:
+        nota_obtida = float(str(quiz_data.get('grade', 0)).replace(',', '.'))
     nota_maxima_total = 0.0
     
     for q in quiz_data.get('questions', []):
         # Convertemos primeiro para string com str(), e só depois fazemos o replace
-        mark_str = str(q.get('mark', '0'))
-        max_mark_str = str(q.get('maxmark', '0'))
+        if q.get('mark', '0') == '':
+            mark_str = '0'
+        else:
+            mark_str = str(q.get('mark', '0'))
+        
+        if q.get('maxmark', '0') == '':
+            max_mark_str = '0'
+        else: 
+            max_mark_str = str(q.get('maxmark', '0'))
 
         mark = float(mark_str.replace(',', '.'))
         max_mark = float(max_mark_str.replace(',', '.'))
@@ -478,6 +488,9 @@ def analisar_desempenho_aluno(quiz_data):
             input_text = soup.find('input', type='text')
             if input_text:
                 resposta_aluno = input_text.get('value', 'Vazio')
+        
+        elif q['type'] in ['essay', 'gapselect']:
+            print(f"---> QUESTION IS OF TYPE '{q['type']}', DO NOT ANALYSE!")
 
         # 3. Extrair a resposta correta (Feedback do Moodle)
         right_answer_div = soup.find('div', class_='rightanswer')
@@ -866,15 +879,16 @@ def obter_perguntas_do_quiz(quiz_id, moodle_url, moodle_token):
     perguntas_com_feedback = []
     if 'questions' in dados_revisao:
         for q in dados_revisao['questions']:
-            texto_pergunta = extrair_conteudo_pergunta(q['html'])
-            feedback_geral = extrair_feedback_geral(q['html']) 
+            if q['type'] in ['multichoice', 'truefalse', 'shortanswer']:
+                texto_pergunta = extrair_conteudo_pergunta(q['html'])
+                feedback_geral = extrair_feedback_geral(q['html']) 
 
-            perguntas_com_feedback.append({
-                'moodle_question_id': q['slot'],
-                'type': q['type'],
-                'texto_pergunta': texto_pergunta,
-                'feedback_geral': feedback_geral
-            })
+                perguntas_com_feedback.append({
+                    'moodle_question_id': q['slot'],
+                    'type': q['type'],
+                    'texto_pergunta': texto_pergunta,
+                    'feedback_geral': feedback_geral
+                })
             
     return perguntas_com_feedback
 
