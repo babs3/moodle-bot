@@ -1196,9 +1196,6 @@ Quiz Interaction:
 
 Please provide the HTML feedback analysis adhering strictly to the requested tone, depth, and structure.
 """
-        # 1. Recuperar os eventos da conversa       
-        ultima_mensagem_user, chat_history = get_chat_history(tracker.events)
-        print(f"\n📜  Complete messages payload for LLM:\n{chat_history}\n")
                 
         # === CALL GEMINI API === #
         generation_config = {
@@ -1211,15 +1208,9 @@ Please provide the HTML feedback analysis adhering strictly to the requested ton
                 system_instruction=system_instruction,
                 generation_config=generation_config
             )
-            #response = g_model.generate_content(user_prompt)
-            print(f".USER PROMPT: {user_prompt}")
-            print(f"> ultima_mensagem_user: {ultima_mensagem_user}")
             
-            # Iniciamos o chat com o passado da conversa
-            chat = g_model.start_chat(history=chat_history)
-
-            # Enviamos a mensagem atual
-            response = chat.send_message(ultima_mensagem_user)
+            # Em vez de chat.send_message(), enviamos o user_prompt diretamente:
+            response = g_model.generate_content(user_prompt)
             
             html_feedback = response.text
             
@@ -1231,7 +1222,7 @@ Please provide the HTML feedback analysis adhering strictly to the requested ton
         
         print(f"\n🔖  --------- Getting class materials location --------- 🔖 ")
 
-        location_results, _ = get_materials_location(selected_results, complex_tokens, simple_tokens, course_id, content_mappings)
+        location_results, _ = get_materials_location(selected_results, complex_tokens, simple_tokens, course_id, content_mappings, authorized_resources)
         location_materials_text = "<span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>" + "</br>".join(location_results) + "</span></i>"
         
         if not location_results:

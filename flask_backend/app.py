@@ -876,7 +876,21 @@ def tutor_toggle():
                     temas.append("<strong>" + topic.name + "</strong>")
             if temas:
                 msg = f"Hello! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}.  Would you like to review these points with me?<br/>"
-                    
+        else: 
+            temas_id = list(set([p.topic_id for p in TutorProgress.query.filter_by(
+                                                                    course_id=course_id, 
+                                                                    user_moodle_id=user_id, 
+                                                                    state="pending")
+                                                                .all()]))
+            temas = []
+            for topic_id in temas_id:
+                topic = Topics.query.filter_by(id=topic_id).first()
+                if topic:
+                    temas.append("<strong>" + topic.name + "</strong>")
+            if temas:
+                msg = f"Hi! I have found some issues in your answers, mainly in the topics: {', '.join(temas[:-1]) + ' and ' + temas[-1] if len(temas) > 1 else temas[0]}.  Would you like to review these points with me?<br/>"           
+    
+    
     cache_key_rasa = f"rasa_topics_{user_id}_{course_id}"
     
     payload = {

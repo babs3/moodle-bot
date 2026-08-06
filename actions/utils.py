@@ -566,10 +566,13 @@ def get_chat_history(events):
                 "parts": [{"text": event.get("text")}]
             })
             
-    # Clean up history: remove parts where 'text' is None or empty
+    # Clean up history: remove parts where 'text' is None, empty, or starts with a command '/'
     clean_messages = []
     for msg in chat_history:
-        valid_parts = [part for part in msg.get('parts', []) if part.get('text') is not None]
+        valid_parts = [
+            part for part in msg.get('parts', []) 
+            if part.get('text') and not part.get('text').strip().startswith('/')
+        ]
         if valid_parts:
             clean_messages.append({'role': msg['role'], 'parts': valid_parts})
             
