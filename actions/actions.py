@@ -1235,12 +1235,19 @@ Please provide the HTML feedback analysis adhering strictly to the requested ton
                 location_materials_text = "<span style='font-size: 11px;'>You can find related information in:</span></br><i><span style='font-size: 10px;'>I couldn't find specific page references for your question.</span></i>"
 
                     
-        update_response = requests.post(f"http://flask-server:8080/api/update_progress_state", params={"ids": ids_list, "new_state": "reviewed"})
-        if update_response.status_code == 200:
-            print(f"✅  Progress entries for topic {topic_name} updated successfully.")
-        else:
-            print(f"❌  Failed to update progress entries for topic. Status code: {update_response.status_code}")
+        # Passamos os dados via JSON body
+        payload = {
+            "ids": ids_list,
+            "new_state": "reviewed"
+        }
 
+        update_response = requests.post("http://flask-server:8080/api/update_progress_state", json=payload)
+
+        if update_response.status_code == 200:
+            print(f"✅  Progress entries updated successfully.")
+        else:
+            print(f"❌  Failed to update progress. Status code: {update_response.status_code}, Response: {update_response.text}")
+        
         buttons = create_topics_buttons(user_id, course_id, moodle_url, moodle_token)
         if not buttons:
             dispatcher.utter_message(text=f"{html_feedback}<br/><br/>{location_materials_text}<br/><br/>You have reviewed all topics! Great job! 🎉")

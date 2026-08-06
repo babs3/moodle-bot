@@ -975,26 +975,28 @@ def get_user_progress_by_topic():
 
 @app.route('/api/update_progress_state', methods=['POST'])
 def update_progress_state():
-    ids = request.args.get('ids', []) # lista de ids
-    new_state = request.args.get('new_state')
+    data = request.get_json() or {}
+    ids = data.get('ids', [])
+    new_state = data.get('new_state')
+    
     print(f"Updating progress state for IDs: {ids} to new state: {new_state}")
 
     if not ids or not new_state:
         return jsonify({"error": "Missing parameters"}), 400
 
-    for id in ids:
-        progress = TutorProgress.query.filter_by(
-            id=id
-        ).first()
-        
-        if not progress:
-            return jsonify({"error": "Progress record not found"}), 404
-        
-        progress.state = new_state
+    # Atualiza todos os registos cuja ID esteja na lista 'ids'
+    # Esta abordagem com .filter() é mais eficiente do que fazer um loop individual
+    updated_count = TutorProgress.query.filter(TutorProgress.id.in_(ids)).update(
+        {TutorProgress.state: new_state}, 
+        synchronize_session=False
+    )
+    
+    if updated_count == 0:
+        return jsonify({"error": "No progress records found for given IDs"}), 404
         
     db.session.commit()
     
-    return jsonify({"message": "Progress state updated successfully"})
+    return jsonify({"message": f"{updated_count} progress state(s) updated successfully"}), 200
 
 @app.route('/api/get_user_history/<course_id>', methods=['GET'])
 def get_user_history(course_id):
