@@ -491,6 +491,7 @@ def analisar_desempenho_aluno(quiz_data):
         
         elif q['type'] in ['essay', 'gapselect']:
             print(f"---> QUESTION IS OF TYPE '{q['type']}', DO NOT ANALYSE!")
+            continue
 
         # 3. Extrair a resposta correta (Feedback do Moodle)
         right_answer_div = soup.find('div', class_='rightanswer')

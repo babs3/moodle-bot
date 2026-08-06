@@ -623,7 +623,7 @@ You are a precise **academic tutor assistant**. Your task is to answer the stude
 3. **LENGTH CONTROL:** {length_instructions[length_preference]}
 4. **TONE CONTROL:** {tone_instructions[tone_preference]}
 5. **STRICTNESS:** Base your answer ONLY on the provided course material above. Do not extrapolate or use outside knowledge.
-6. **FALLBACK:** If you cannot find the relevant information to answer the query within the provided course material, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials." (Do not apply tone or length rules to this fallback phrase).
+6. **FALLBACK:** If you cannot find the relevant information to answer the query within the provided course material, you must reply exactly with this phrase: "I couldn't find relevant content in the course materials!" (Do not apply tone or length rules to this fallback phrase).
 7. **LANGUAGE:** Always respond in English (UK).
 
 ### RESPONSE (HTML format)
@@ -949,6 +949,8 @@ class ActionGetClassMaterialLocation(Action):
         user_message = tracker.get_slot("user_query")
         tutor_mode = tracker.latest_message.get("metadata", {}).get("tutor_mode", False)
         content_mappings = tracker.latest_message.get("metadata", {}).get("content_mappings", {})
+        authorized_resources = tracker.latest_message.get("metadata", {}).get("authorized_resources", [])
+        
         #print(f"tutor_mode in ActionGetClassMaterialLocation: {tutor_mode}")
         
         print(f"\n📊  Generating bot 'action_get_class_material_location' response..."
@@ -958,7 +960,7 @@ class ActionGetClassMaterialLocation(Action):
             dispatcher.utter_message(text="You don't have access to any class materials yet. Please check with your instructor to gain access to the course materials and try again.")
             return [SlotSet("materials_location", []), SlotSet("bot_response", []), SlotSet("sender_id", ""), SlotSet("user_query", ""), SlotSet("input_time", ""), SlotSet("concept", ""), SlotSet("context", "")]
 
-        if bot_response == "no_response":
+        if bot_response == "no_response" or bot_response == "I couldn't find relevant content in the course materials!":
             response = f"I couldn't find any relevant content on this topic in the course materials. Please try again."
             save_user_progress(course_id, user_email, user_message, response, [], input_time, user_id, tutor_mode)
             dispatcher.utter_message(text=response)
@@ -986,7 +988,7 @@ class ActionGetClassMaterialLocation(Action):
         else: # get materials location:
             complex_tokens = tracker.get_slot("complex_tokens") or []
             simple_tokens = tracker.get_slot("simple_tokens") or []
-            location_results, pdfs_insights = get_materials_location(selected_results, complex_tokens, simple_tokens, course_id, content_mappings)
+            location_results, pdfs_insights = get_materials_location(selected_results, complex_tokens, simple_tokens, course_id, content_mappings, authorized_resources)
 
             if location_results:
                 response = save_user_progress(course_id, user_email, user_message, bot_response, ", ".join(pdfs_insights), input_time, user_id, tutor_mode)

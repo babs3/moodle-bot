@@ -565,8 +565,17 @@ def get_chat_history(events):
                 "role": "model", 
                 "parts": [{"text": event.get("text")}]
             })
+            
+    # Clean up history: remove parts where 'text' is None or empty
+    clean_messages = []
+    for msg in chat_history:
+        valid_parts = [part for part in msg.get('parts', []) if part.get('text') is not None]
+        if valid_parts:
+            clean_messages.append({'role': msg['role'], 'parts': valid_parts})
+            
+    print(f"..ULTIMA MENSAGEM DO USER:  {ultima_mensagem_user}")
     
-    return ultima_mensagem_user, chat_history
+    return ultima_mensagem_user, clean_messages
 
 def formatar_historico_para_llm(quiz_history_df):
     # quiz_history_df is a dataframe
@@ -859,6 +868,7 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
     if valid_tokens:
         print(f"\n🔍  Valid Simple Tokens for BM25 search: {valid_tokens}")
         bm25_scores_simple = bm25_simple.get_scores(valid_tokens)
+        print(f"HERE: bm25_scores_simple--> {bm25_scores_simple}")
     elif fallback_tokens:
         print("⚠️  No valid simple tokens found. Using fallback tokens for BM25 search.")
         bm25_scores_simple = bm25_simple.get_scores(fallback_tokens)
@@ -872,11 +882,13 @@ def hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, cour
     # Em vez de agregar pela chave `doc_text` (que era o texto do Filho), 
     # vamos agregar pelo identificador único do Pai `(file, page)`.
     combined_parents = {}
+    print(f"HERE: authorized_resources... {authorized_resources}")
 
     # 1. Processar os scores simples (vindos dos sub-chunks Filhos)
     for i, score in enumerate(bm25_scores_simple):
         meta = bm25_metadata[i]
         if meta['file'] in authorized_resources:
+            print(f"✅ Aceite: '{meta['file']}' com score {score}")
             file_page_combo = (meta['file'], meta['page'])
             parent_text = meta["parent_text"] # Recuperamos o Pai real aqui!
             
@@ -1181,13 +1193,13 @@ def normalize_topic(new_topic, threshold=0.85):
     return new_topic  # Return the new topic if no close match was found
 
 
-def get_materials_location(selected_results, complex_tokens, simple_tokens, course_id, content_mappings):
+def get_materials_location(selected_results, complex_tokens, simple_tokens, course_id, content_mappings, authorized_resources):
     location_results = []
     document_entries = []  # Store documents before sorting
     pdfs_insights = []
     bm25_results = []
     
-    bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, [], course_id, 1.0)  # Get BM25 results with alpha=1.0 for complex keyword search only
+    bm25_docs, bm25_meta, normalized_bm25_scores = hybrid_bm25_search(complex_tokens, simple_tokens, authorized_resources, course_id, 1.0)  # Get BM25 results with alpha=1.0 for complex keyword search only
     for doc, meta, score in zip(bm25_docs, bm25_meta, normalized_bm25_scores):
         bm25_results.append((doc, meta, score))
     
