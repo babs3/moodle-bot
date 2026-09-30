@@ -129,15 +129,18 @@ def chat():
     user_message = data.get('message', '')
     length_preference = data.get('length_preference', 'detailed') # Pode ser "detailed" ou "concise"
     tone_preference = data.get('tone_preference', 'empathetic') # Pode ser "encouraging" ou "neutral"
-    moodle_token = data.get('token')
-    moodle_url = data.get('moodle_url')
     isTutorMode = data.get('tutor_mode', False)
     is_button = data.get('is_button', False)
     print(f"Received chat request: message='{user_message}', tutor_mode={isTutorMode}, is_button={is_button}")
     is_teacher = data.get('is_teacher', False)
+
+    # get client from db for course_id
+    client = ClientConfig.query.filter_by(course_id=course_id).first()
+    moodle_token = decrypt_token(client.moodle_token) if client else None
+    moodle_url = client.moodle_url if client else None
     if moodle_url == "http://localhost":
         moodle_url = "http://host.docker.internal"
-        
+
     if user_message == '': # Se a mensagem for vazia ou só espaços, não enviamos para o Rasa
         app.logger.warning("Received empty message. Ignoring.")
         return jsonify([{"text": "I didn't receive any message. Please try sending your message again."}])
@@ -156,7 +159,7 @@ def chat():
         app.logger.info(f"Cache HIT para o utilizador {user_id}. Dados carregados da memória:\n - {info_utilizador}")
     
     user_firstname = info_utilizador.get("name") if info_utilizador else f"user_{user_id}"     
-    print(f"📮  --> Received message for {user_firstname} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
+    print(f"📮  --> Received message for {user_firstname} in course_id: {course_id} with Moodle URL: {moodle_url}")
     
     # Busca os dados reais no Moodle
     user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
@@ -524,6 +527,9 @@ def populate_with_moodle_contents(course_id):
     
     auth_header = request.headers.get('Authorization')
     moodle_token = auth_header.split(" ")[1] if auth_header else None
+    if not moodle_token:
+        return jsonify({"error": "Moodle token em falta"}), 401
+    encrypted_token = encrypt_token(moodle_token)
     
     # 2. Pegamos o URL do corpo do JSON
     data = request.get_json()
@@ -532,7 +538,7 @@ def populate_with_moodle_contents(course_id):
     if moodle_url == "http://localhost":
         moodle_url = "http://host.docker.internal"
 
-    print(f"Sync solicitado: Curso {course_id} | URL: {moodle_url} | Token: {moodle_token[:10]}...")
+    print(f"Sync solicitado: Curso {course_id} | URL: {moodle_url}")
     
     # IMPORTANTE: Guardar ou atualizar o token deste curso na DB para o polling saber usá-lo depois
     client = ClientConfig.query.filter_by(course_id=course_id).first()
@@ -540,12 +546,12 @@ def populate_with_moodle_contents(course_id):
     if not client:
         client = ClientConfig(
             course_id=course_id, 
-            moodle_token=moodle_token,
+            moodle_token=encrypted_token,
             moodle_url=moodle_url
         )
         db.session.add(client)
     else:
-        client.moodle_token = moodle_token # Atualiza se o cliente mudou o token
+        client.moodle_token = encrypted_token # Atualiza se o cliente mudou o token
         client.moodle_url = moodle_url # Atualiza se o cliente mudou a URL
     db.session.commit()
     
@@ -588,9 +594,12 @@ def tutor_toggle():
     user_id = data.get('user_id')
     is_active = data.get('active')
     course_id = data.get('course_id')
-    moodle_token = data.get('token')
-    moodle_url = data.get('moodle_url')
     is_teacher = data.get('is_teacher', False)
+    
+    # get client from db for course_id
+    client = ClientConfig.query.filter_by(course_id=course_id).first()
+    moodle_token = decrypt_token(client.moodle_token) if client else None
+    moodle_url = client.moodle_url if client else None
     if moodle_url == "http://localhost":
         moodle_url = "http://host.docker.internal"
         
@@ -609,7 +618,7 @@ def tutor_toggle():
     # Busca os dados reais no Moodle
     user_email = info_utilizador.get("email") if info_utilizador else "EMAIL@EXAMPLE.COM"
     username = info_utilizador.get("name") if info_utilizador else "there"
-    print(f"📮  --> Received message for {username} in course_id: {course_id} with Moodle URL: {moodle_url} and token: {moodle_token[:10]}...")
+    print(f"📮  --> Received message for {username} in course_id: {course_id} with Moodle URL: {moodle_url}")
     
     session_init_rasa(user_email, username, "teacher" if is_teacher else "student") # Define o papel do utilizador para personalizar as respostas do Rasa
 
@@ -1220,15 +1229,15 @@ def new_quiz_polling():
     function = "core_course_get_courses"
     
     # 1. Buscar todos os tokens ativos na tua DB
-    clientes = ClientConfig.query.all() 
-    if not clientes:
+    clients = ClientConfig.query.all() 
+    if not clients:
         app.logger.warning("Nenhum cliente encontrado na base de dados para o polling de quizzes.")
         return None
 
-    for cliente in clientes:
-        token = cliente.moodle_token
-        moodle_url = cliente.moodle_url
-        print(f"Polling para course_id {cliente.course_id} usando token {token[:10]}...") # Log para debug, mostra só os primeiros caracteres do token por segurança
+    for client in clients:
+        token = decrypt_token(client.moodle_token)
+        moodle_url = client.moodle_url
+        print(f"Polling para course_id {client.course_id}.") # Log para debug, mostra só os primeiros caracteres do token por segurança
         #print(f"URL do Moodle para polling: {moodle_url}")
         
         # 2. Fazer o polling para ESTE cliente específico

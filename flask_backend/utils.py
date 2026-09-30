@@ -20,6 +20,7 @@ from faster_whisper import WhisperModel
 from sqlalchemy import select
 from models import *
 from seed_db import qa_bank
+from cryptography.fernet import Fernet
 
 RASA_URL = "http://rasa:5005/webhooks/rest/webhook"
 # Expressão regular global para capturar IDs do YouTube
@@ -158,7 +159,7 @@ def populate_database(course_id=2):
         db.session.rollback()
 
     # IDs de exemplo (Garante que os IDs 101 a 105 existem em moodle_users)
-    course_id = 2
+    course_id = 2 # TODO: Ajustar para o ID real do curso
     
     users = db.session.execute(select(MoodleUsers)).scalars().all()
     student_ids = []
@@ -277,8 +278,36 @@ def populate_database(course_id=2):
         db.session.rollback()
         print(f"Erro ao salvar dados de teste: {e}")
     
-        
-    
+
+def _get_encryption_key():
+    key = os.environ.get("ENGIBOT_TOKEN_ENCRYPTION_KEY")
+
+    if not key:
+        raise RuntimeError(
+            "ENGIBOT_TOKEN_ENCRYPTION_KEY não está definida."
+        )
+
+    return key.encode()
+
+
+def encrypt_token(token):
+    """Encripta um token Moodle para armazenamento seguro na BD."""
+    if not token:
+        return None
+
+    fernet = Fernet(_get_encryption_key())
+    return fernet.encrypt(token.encode()).decode()
+
+
+def decrypt_token(encrypted_token):
+    """Desencripta um token Moodle armazenado na BD."""
+    if not encrypted_token:
+        return None
+
+    fernet = Fernet(_get_encryption_key())
+    return fernet.decrypt(encrypted_token.encode()).decode()
+
+
 def session_init_rasa(user_email, user_firstname, user_role):
     # 2. "Injetar" o papel do utilizador no Rasa via Tracker API
     try:

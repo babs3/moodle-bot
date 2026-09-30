@@ -28,3 +28,4 @@ redis
 ffmpeg-python
 faster-whisper
 yt-dlp
+cryptography
