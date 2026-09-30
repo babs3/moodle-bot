@@ -126,3 +126,12 @@ rules:
   steps:
   - intent: nlu_fallback
   - action: action_get_metrics_from_db
+
+- rule: Handle NLU fallback - students
+  condition:
+  - slot_was_set:
+    - user_role: student
+  steps:
+    - intent: nlu_fallback
+    - action: action_get_explanation
+    - action: action_get_class_material_location

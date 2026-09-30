@@ -18,6 +18,7 @@ intents:
   - ask_course_info
   - show_topics
   - analyze_progress
+  - nlu_fallback
 
 entities:
   - concept

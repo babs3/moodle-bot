@@ -6,6 +6,10 @@
       "2": "I-concept",
       "3": "L-concept",
       "4": "U-concept",
+      "5": "B-context",
+      "6": "I-context",
+      "7": "L-context",
+      "8": "U-context",
       "0": "O"
     },
     "tags_to_ids": {
@@ -13,8 +17,12 @@
       "I-concept": 2,
       "L-concept": 3,
       "U-concept": 4,
+      "B-context": 5,
+      "I-context": 6,
+      "L-context": 7,
+      "U-context": 8,
       "O": 0
     },
-    "num_tags": 5
+    "num_tags": 9
   }
 ]

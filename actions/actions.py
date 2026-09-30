@@ -478,7 +478,7 @@ def action_process(dispatcher, tracker, payload):
                     complex_tokens.append(" ".join(complex_tokens_tmp))   
                 else:
                     complex_tokens.append(concept)
-                    simple_tokens.append(token)             
+                    simple_tokens.append(concept)             
                 
                 if add_concept_as_simple:
                     complex_tokens = []
