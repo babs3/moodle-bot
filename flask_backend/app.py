@@ -1,6 +1,6 @@
 import os
 #print(f"📂  Conteúdo da pasta /app: {os.listdir('/app')}")
-from flask import request
+from flask import request, jsonify
 from datetime import datetime, timezone, timedelta
 import json
 import time
@@ -11,6 +11,8 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_caching import Cache
 from collections import defaultdict
+import hmac
+from functools import wraps
 from utils import *
 from models import *
 from knowledge_engine import *
@@ -116,7 +118,44 @@ def wait_for_rasa():
         
         app.logger.info("Rasa ainda a carregar... a tentar novamente em 5 segundos")
         time.sleep(5)
-        
+      
+def authenticate_moodle_plugin():
+    """Verifica se o pedido contém o segredo da integração Moodle."""
+
+    expected_secret = os.environ.get("ENGIBOT_API_SECRET")
+
+    if not expected_secret:
+        app.logger.error("ENGIBOT_API_SECRET não configurado")
+        return False
+
+    authorization = request.headers.get("Authorization", "")
+
+    if not authorization.startswith("Bearer "):
+        return False
+
+    received_secret = authorization[len("Bearer "):]
+
+    return hmac.compare_digest(
+        received_secret,
+        expected_secret
+    )
+
+
+def require_moodle_auth(f):
+    """Decorator que exige autenticação nas rotas Flask."""
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+
+        if not authenticate_moodle_plugin():
+            return jsonify({
+                "error": "Unauthorized"
+            }), 401
+
+        return f(*args, **kwargs)
+
+    return decorated_function
+  
 @app.route('/')
 def index():        
     return "Flask está a correr na porta 8082!"
@@ -336,6 +375,7 @@ def chat():
 
 
 @app.route('/process_knowledge', methods=['POST'])
+@require_moodle_auth
 def process_knowledge():
     files = request.files.getlist('files[]')
     video_files = request.files.getlist('video_files[]')
@@ -577,6 +617,7 @@ def populate_with_moodle_contents(course_id):
     return jsonify({"message": "Sincronização iniciada."}), 202
 
 @app.route('/list_knowledge/<int:course_id>', methods=['GET'])
+@require_moodle_auth
 def list_knowledge(course_id):
     # Procura na base de dados do Flask/PostgreSQL
     files = KnowledgeFiles.query.filter_by(course_id=course_id).all()
@@ -589,6 +630,7 @@ def list_knowledge(course_id):
     ])
     
 @app.route('/tutor_toggle', methods=['POST'])
+@require_moodle_auth
 def tutor_toggle():
     data = request.json
     user_id = data.get('user_id')
@@ -922,10 +964,12 @@ def tutor_toggle():
 def get_user_progress():
     user_id = request.args.get('user_id')
     course_id = request.args.get('course_id')
-    moodle_url = request.args.get('moodle_url')
-    moodle_token = request.args.get('moodle_token')
     all_questions = request.args.get('all_questions', 'false').lower() == 'true' # Se for true, traz todas as questões, se for false, só as pendentes
     
+    # get client from db for course_id
+    client = ClientConfig.query.filter_by(course_id=course_id).first()
+    moodle_token = decrypt_token(client.moodle_token) if client else None
+    moodle_url = client.moodle_url if client else None
     # Validação simples de segurança se os parâmetros não vierem
     if not user_id or not course_id:
         return jsonify({"error": "Missing parameters"}), 400
@@ -1136,7 +1180,6 @@ def get_llm_classroom_analysis(course_id):
 
     return jsonify(llm_payload)
 
-
 @app.route("/api/get_topics", methods=["GET"])
 def get_topics():
     topics = Topics.query.all()
@@ -1203,6 +1246,7 @@ def save_student_moodle_messages():
     return jsonify({"message": "Moodle progress saved"}), 200
 
 @app.route('/delete_knowledge', methods=['POST'])
+@require_moodle_auth
 def remove_knowledge():
     data = request.json
     #print(f"Received request to delete knowledge with data: {data}")
