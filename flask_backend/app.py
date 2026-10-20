@@ -148,6 +148,44 @@ def require_moodle_auth(f):
     def decorated_function(*args, **kwargs):
 
         if not authenticate_moodle_plugin():
+
+            # Logs temporários para diagnosticar falhas de autenticação.
+            authorization = request.headers.get("Authorization", "")
+            expected_secret = os.environ.get("ENGIBOT_API_SECRET")
+
+            app.logger.warning(
+                "[AUTH DEBUG] Endpoint: %s | Método: %s",
+                request.path,
+                request.method
+            )
+
+            app.logger.warning(
+                "[AUTH DEBUG] Authorization presente: %s",
+                bool(authorization)
+            )
+
+            app.logger.warning(
+                "[AUTH DEBUG] Bearer válido: %s",
+                authorization.startswith("Bearer ")
+            )
+
+            app.logger.warning(
+                "[AUTH DEBUG] Secret Flask configurado: %s",
+                bool(expected_secret)
+            )
+
+            app.logger.warning(
+                "[AUTH DEBUG] Secret corresponde: %s",
+                (
+                    bool(expected_secret)
+                    and authorization.startswith("Bearer ")
+                    and hmac.compare_digest(
+                        authorization[len("Bearer "):],
+                        expected_secret
+                    )
+                )
+            )
+
             return jsonify({
                 "error": "Unauthorized"
             }), 401
@@ -377,13 +415,31 @@ def chat():
 @app.route('/process_knowledge', methods=['POST'])
 @require_moodle_auth
 def process_knowledge():
-    files = request.files.getlist('files[]')
-    video_files = request.files.getlist('video_files[]')
+    #files = request.files.getlist('files[]')
+    files = []
+    for field_name, file in request.files.items(multi=True):
+        if (
+            field_name == 'files[]'
+            or re.fullmatch(r'files\[\d+\]', field_name)
+        ):
+            files.append(file)
+            
+    #video_files = request.files.getlist('video_files[]')
     course_id = request.form.get('course_id')
-    api_key = request.form.get('api_key')
+    #api_key = request.form.get('api_key')
 
     if not files or not course_id:
         return jsonify({"error": "Dados insuficientes"}), 400
+    
+    app.logger.info(
+        "Campos multipart recebidos: %s",
+        list(request.files.keys())
+    )
+
+    app.logger.info(
+        "Número de PDFs recebidos: %s",
+        len(files)
+    )
 
     # 1. Criar pasta temporária para processamento
     temp_dir = f"temp_processing_{course_id}"
