@@ -21,6 +21,7 @@ from sqlalchemy import select
 from models import *
 from seed_db import qa_bank
 from cryptography.fernet import Fernet
+from urllib.parse import urlparse
 
 RASA_URL = "http://rasa:5005/webhooks/rest/webhook"
 # Expressão regular global para capturar IDs do YouTube

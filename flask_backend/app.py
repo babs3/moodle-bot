@@ -41,6 +41,8 @@ jwt = JWTManager(app)
 
 # No topo do ficheiro, cria um set para guardar os cursos em processamento
 active_syncs = set()
+# Protege as operações sobre active_syncs entre threads.
+active_syncs_lock = threading.Lock()
 
 
 PANOPTO_SERVER = os.getenv("PANOPTO_SERVER")
@@ -518,9 +520,9 @@ def background_sync(app, course_id, pdf_folder, moodle_token, moodle_url):
             for section in sections:
                 for module in section.get('modules', []):
                     
-                    # ==========================================
-                    # FLUXO A: DETEÇÃO DE PDFs (O teu código original)
-                    # ==========================================
+                    # ========================= #
+                    # FLUXO A: DETEÇÃO DE PDFs  #
+                    # ========================= #
                     if module.get('modname') == 'resource':
                         for content in module.get('contents', []):
                             if content.get('mimetype') == 'application/pdf':
@@ -610,67 +612,231 @@ def background_sync(app, course_id, pdf_folder, moodle_token, moodle_url):
                 shutil.rmtree(pdf_folder, ignore_errors=True)
                 print(f"Pasta temporária {pdf_folder} limpa com sucesso.")
 
-         
+
 @app.route('/populate_with_moodle_contents/<int:course_id>', methods=['POST'])
+@require_moodle_auth
 def populate_with_moodle_contents(course_id):
-    # 1. Trancar imediatamente se já houver um sync ativo (Prevenção de concorrência)
-    if course_id in active_syncs:
-        print(f"Sync rejeitado: Curso {course_id} já está a ser processado.")
-        return jsonify({"message": "Sincronização já em curso para este curso."}), 200
-    
-    # Registamos logo que este curso está ocupado
-    active_syncs.add(course_id) # Ou active_syncs[course_id] = True dependendo do tipo
-    
-    auth_header = request.headers.get('Authorization')
-    moodle_token = auth_header.split(" ")[1] if auth_header else None
-    if not moodle_token:
-        return jsonify({"error": "Moodle token em falta"}), 401
-    encrypted_token = encrypt_token(moodle_token)
-    
-    # 2. Pegamos o URL do corpo do JSON
-    data = request.get_json()
-    # Se por algum motivo o JSON falhar, usamos o teu localhost como fallback (útil para dev)
+    """
+    Inicializa a integração de um curso Moodle com o EngiBot.
+
+    1. Autentica o pedido através de @require_moodle_auth.
+    2. Recebe o Moodle WS Token e o URL do Moodle.
+    3. Guarda o token encriptado na base de dados.
+    4. Verifica se o curso já possui documentos processados.
+    5. Se necessário, inicia a sincronização em background.
+
+    A autenticação da integração utiliza ENGIBOT_API_SECRET.
+    A consulta dos Web Services utiliza o Moodle WS Token.
+    """
+
+    # 1. Ler os dados enviados pelo plugin Moodle.
+    # O header Authorization já foi validado pelo decorator.
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            "error": "Invalid JSON payload"
+        }), 400
+
+    moodle_token = data.get('moodle_token')
     moodle_url = data.get('moodle_url')
-    if moodle_url == "http://localhost":
+
+    # 2. Validar os parâmetros recebidos.
+    if not isinstance(moodle_token, str) or not moodle_token.strip():
+        return jsonify({
+            "error": "Moodle Web Services Token em falta"
+        }), 400
+
+    if not isinstance(moodle_url, str) or not moodle_url.strip():
+        return jsonify({
+            "error": "Moodle URL em falta"
+        }), 400
+
+    moodle_token = moodle_token.strip()
+    moodle_url = moodle_url.strip()
+
+    parsed_url = urlparse(moodle_url)
+
+    if (
+        parsed_url.scheme not in ('http', 'https')
+        or not parsed_url.hostname
+        or parsed_url.username is not None
+        or parsed_url.password is not None
+    ):
+        return jsonify({
+            "error": "Moodle URL inválido"
+        }), 400
+
+    # 3. Adaptar o URL para o ambiente Docker local.
+    # Dentro de um container, localhost refere-se ao próprio container.
+    # host.docker.internal permite contactar o Moodle instalado no host.
+    if moodle_url.rstrip('/') == "http://localhost":
         moodle_url = "http://host.docker.internal"
 
-    print(f"Sync solicitado: Curso {course_id} | URL: {moodle_url}")
-    
-    # IMPORTANTE: Guardar ou atualizar o token deste curso na DB para o polling saber usá-lo depois
-    client = ClientConfig.query.filter_by(course_id=course_id).first()
-    print(f"Cliente encontrado na DB para course_id {course_id}: {client}")
-    if not client:
-        client = ClientConfig(
-            course_id=course_id, 
-            moodle_token=encrypted_token,
-            moodle_url=moodle_url
-        )
-        db.session.add(client)
-    else:
-        client.moodle_token = encrypted_token # Atualiza se o cliente mudou o token
-        client.moodle_url = moodle_url # Atualiza se o cliente mudou a URL
-    db.session.commit()
-    
-    # 2. Verificamos se já existem conteúdos na DB para este curso
-    conteudo_existente = KnowledgeFiles.query.filter_by(course_id=course_id).first()
-    
-    if conteudo_existente:
-        print(f"Sincronização abortada: O curso {course_id} já tem dados.")
-        return jsonify({
-            "message": "O curso já tem conteúdos na Knowledge Base. Nada a fazer.",
-            "status": "already_populated"
-        }), 200
-
-    pdf_folder = os.path.join('temp_uploads', str(course_id))
-    
-    # Passamos a app_instance para a thread
-    thread = threading.Thread(
-        target=background_sync, 
-        args=(app, course_id, pdf_folder, moodle_token, moodle_url) # <--- Adicionado app_instance
+    app.logger.info(
+        "[SYNC] Pedido recebido para o curso %s | Moodle: %s",
+        course_id,
+        moodle_url
     )
-    thread.start()
 
-    return jsonify({"message": "Sincronização iniciada."}), 202
+    # 4. Verificar se já existe uma sincronização ativa.
+    # O lock evita que duas threads aceitem o mesmo curso
+    # simultaneamente dentro deste processo Flask.
+    with active_syncs_lock:
+
+        if course_id in active_syncs:
+            app.logger.info(
+                "[SYNC] Curso %s já está em sincronização.",
+                course_id
+            )
+
+            return jsonify({
+                "message": "Sincronização já em curso para este curso.",
+                "status": "already_running"
+            }), 200
+
+        active_syncs.add(course_id)
+
+    # Esta flag indica se a responsabilidade de libertar
+    # active_syncs já foi transferida para a thread.
+    thread_started = False
+
+    try:
+        # 5. Encriptar o token Moodle antes de guardar na DB.
+        # Utiliza ENGIBOT_TOKEN_ENCRYPTION_KEY (Fernet).
+        encrypted_token = encrypt_token(moodle_token)
+
+        # 6. Procurar a configuração deste curso na base de dados.
+        client = ClientConfig.query.filter_by(
+            course_id=course_id
+        ).first()
+
+        if client is None:
+
+            # Primeira integração deste curso.
+            client = ClientConfig(
+                course_id=course_id,
+                moodle_token=encrypted_token,
+                moodle_url=moodle_url
+            )
+
+            db.session.add(client)
+
+            app.logger.info(
+                "[SYNC] Criada configuração para o curso %s.",
+                course_id
+            )
+
+        else:
+
+            # Atualizar a configuração existente.
+            # Isto permite atualizar o token Moodle quando necessário.
+            client.moodle_token = encrypted_token
+            client.moodle_url = moodle_url
+
+            app.logger.info(
+                "[SYNC] Configuração atualizada para o curso %s.",
+                course_id
+            )
+
+        db.session.commit()
+
+        # 7. Verificar se já existem PDFs registados para o curso.
+        conteudo_existente = KnowledgeFiles.query.filter_by(
+            course_id=course_id
+        ).first()
+
+        if conteudo_existente:
+
+            app.logger.info(
+                "[SYNC] Curso %s já possui conteúdos.",
+                course_id
+            )
+
+            return jsonify({
+                "message": (
+                    "O curso já tem conteúdos na Knowledge Base. "
+                    "Nada a fazer."
+                ),
+                "status": "already_populated"
+            }), 200
+
+        # 8. Preparar a pasta utilizada pela pipeline de sincronização.
+        pdf_folder = os.path.join(
+            'temp_uploads',
+            str(course_id)
+        )
+
+        # 9. Função auxiliar para executar a sincronização.
+        # O finally garante que o curso deixa de estar marcado
+        # como ativo quando a operação terminar, mesmo em caso de erro.
+        def run_background_sync():
+            try:
+                background_sync(
+                    app,
+                    course_id,
+                    pdf_folder,
+                    moodle_token,
+                    moodle_url
+                )
+
+            except Exception:
+                app.logger.exception(
+                    "[SYNC] Erro na sincronização do curso %s.",
+                    course_id
+                )
+
+            finally:
+                with active_syncs_lock:
+                    active_syncs.discard(course_id)
+
+                app.logger.info(
+                    "[SYNC] Sincronização terminada para o curso %s.",
+                    course_id
+                )
+
+        # 10. Iniciar o processamento numa thread separada.
+        thread = threading.Thread(
+            target=run_background_sync,
+            name=f"engibot-sync-{course_id}"
+        )
+
+        thread.start()
+        thread_started = True
+
+        app.logger.info(
+            "[SYNC] Sincronização iniciada para o curso %s.",
+            course_id
+        )
+
+        # 202 significa que o pedido foi aceite,
+        # não que o processamento já tenha terminado.
+        return jsonify({
+            "message": "Sincronização iniciada.",
+            "status": "started"
+        }), 202
+
+    except Exception:
+
+        db.session.rollback()
+
+        app.logger.exception(
+            "[SYNC] Erro ao inicializar o curso %s.",
+            course_id
+        )
+
+        return jsonify({
+            "error": "Falha ao inicializar sincronização"
+        }), 500
+
+    finally:
+
+        # Se não foi iniciada uma thread, libertar o curso.
+        # Por exemplo: erro, configuração já existente,
+        # ou ausência de necessidade de sincronização.
+        if not thread_started:
+            with active_syncs_lock:
+                active_syncs.discard(course_id)         
 
 @app.route('/list_knowledge/<int:course_id>', methods=['GET'])
 @require_moodle_auth
@@ -1446,7 +1612,6 @@ if __name__ == "__main__":
         populate_database()
         
     # 1. Lançar o Polling em Background para NÃO bloquear o app.run
-    import threading
     def background_tasks():
         wait_for_rasa()
         tarefa_monitor() #TODO: Uncomment
