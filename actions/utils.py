@@ -174,8 +174,15 @@ def save_user_progress(course_id, user_email, user_message, bot_response, pdfs, 
         "time_to_respond": response_timestamp
     }
     
-    requests.post("http://flask-server:8080/api/save_student_moodle_messages", json=data)
-    
+    actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")
+    response = requests.post(
+        "http://flask-server:8080/api/save_student_moodle_messages",
+
+        headers={
+            "Authorization": f"Bearer {actions_secret}"
+        },
+        json=data
+    )
 
 QUESTION_WORDS = {"what", "who", "where", "when", "why", "how", "compare", "differentiate", "list", "give", "show", "are there", "could you", "explain", "define", "meaning of", "examples of", "definition of", "what is", "what are", "can you", "do you know", "tell me about", "describe", "summarize", "elaborate on", "details about", "information on", "clarify", "expand on", "insights on", "break down", "illustrate with examples", "provide examples of", "what do you know about", "how does", "why is", "what's the difference between", "what's the meaning of", "what's an example of", "can you explain", "can you define", "can you give me examples of", "could you explain", "could you define", "could you give me examples of"}
 
@@ -499,7 +506,15 @@ def treat_pdf_name(pdf_name):
 
 # Function to fetch student progress for a teacher’s classes
 def get_user_history(course_id):
-    response = requests.get(f"http://flask-server:8080/api/get_user_history/{course_id}")
+    actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")
+
+    response = requests.get(
+        f"http://flask-server:8080/api/get_user_history/{course_id}",
+        headers={
+            "Authorization": f"Bearer {actions_secret}"
+        }
+    )
+    
     if response.status_code == 200:
         progress_data = response.json()
         #print(f"📊  User progress data retrieved: {progress_data}")
@@ -509,7 +524,15 @@ def get_user_history(course_id):
         return pd.DataFrame()    
     
 def get_llm_classroom_analysis(course_id):
-    response = requests.get(f"http://flask-server:8080/api/get_llm_classroom_analysis/{course_id}")
+    
+    actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")
+    response = requests.get(
+        f"http://flask-server:8080/api/get_llm_classroom_analysis/{course_id}",
+        headers={
+            "Authorization": f"Bearer {actions_secret}"
+        }
+    )
+    
     if response.status_code == 200:
         analysis_data = response.json()
         print(f"📊  LLM classroom analysis retrieved: \n{analysis_data}")
@@ -519,7 +542,15 @@ def get_llm_classroom_analysis(course_id):
         return {}
     
 def get_quiz_history(course_id):
-    response = requests.get(f"http://flask-server:8080/api/get_quiz_history/{course_id}")
+    actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")
+    
+    response = requests.get(
+        f"http://flask-server:8080/api/get_quiz_history/{course_id}",
+        headers={
+            "Authorization": f"Bearer {actions_secret}"
+        }
+    )
+    
     if response.status_code == 200:
         quiz_data = response.json()
         print(f"📊  Quiz history data retrieved:")
@@ -1160,7 +1191,15 @@ def generate_topic(question, correct_answer, course_fullname="Ciber-physical Sys
 
 def normalize_topic(new_topic, threshold=0.85):
     # get available topics from the database
-    response = requests.get("http://flask-server:8080/api/get_topics")
+    actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")
+    
+    response = requests.get(
+        "http://flask-server:8080/api/get_topics",
+
+        headers={
+            "Authorization": f"Bearer {actions_secret}"
+        }
+    )
     if response.status_code == 200:
         # Só aqui é que convertes para JSON
         available_topics = response.json() 
@@ -1173,7 +1212,15 @@ def normalize_topic(new_topic, threshold=0.85):
     #print(f"\n🔍  Available topics: {available_topics}")        
     if not available_topics:
         # save the first topic if there are no topics in the database
-        requests.post("http://flask-server:8080/api/save_topic", json={"topic_name": new_topic})
+        actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")   
+        response = requests.post(
+            "http://flask-server:8080/api/save_topic",
+    
+            headers={
+                "Authorization": f"Bearer {actions_secret}"
+            },
+            json={"topic_name": new_topic}
+        )
         return new_topic
     
     available_topics_names = [t['name'] for t in available_topics]
@@ -1192,7 +1239,16 @@ def normalize_topic(new_topic, threshold=0.85):
             return available_topics_names[best_idx]  # Use existing normalized topic
     
     print(f"\n ➕  No close match found for topic '{new_topic}'. Saving as new topic.")
-    requests.post("http://flask-server:8080/api/save_topic", json={"topic_name": new_topic})
+
+    actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")   
+    response = requests.post(
+        "http://flask-server:8080/api/save_topic",
+
+        headers={
+            "Authorization": f"Bearer {actions_secret}"
+        },
+        json={"topic_name": new_topic}
+    )
     return new_topic  # Return the new topic if no close match was found
 
 
@@ -1260,7 +1316,15 @@ def update_materials_location(selected_results, content_mappings):
     return location_results, pdfs_insights  # Return both the formatted results and the list of PDFs
 
 def get_topics_from_ids(topics_ids):
-    topics = requests.get(f"http://flask-server:8080/api/get_topics_from_ids", json={"topics_ids": topics_ids})
+    actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")
+    topics = requests.get(
+        "http://flask-server:8080/api/get_topics_from_ids",
+
+        headers={
+            "Authorization": f"Bearer {actions_secret}"
+        },
+        json={"topics_ids": topics_ids}
+    )
     if topics.status_code == 200:
         topics_list = topics.json()
         print(f"📚  Topics retrieved: {topics_list}")
@@ -1271,8 +1335,35 @@ def get_topics_from_ids(topics_ids):
     
     
 def create_topics_buttons(user_id, course_id, moodle_url, moodle_token):
-    # get user progress
-    progress = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id, "all_questions": False, "moodle_url": moodle_url, "moodle_token": moodle_token})
+
+    # Credencial privada de autenticação do Action Server.
+    actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")
+
+    if not actions_secret:
+        raise RuntimeError(
+            "ENGIBOT_ACTIONS_API_SECRET não configurado"
+        )
+
+    # Pedido autenticado ao Flask.
+    response = requests.get(
+        "http://flask-server:8080/api/get_user_progress",
+
+        headers={
+            "Authorization": f"Bearer {actions_secret}"
+        },
+
+        params={
+            "user_id": user_id,
+            "course_id": course_id,
+            "all_questions": "false"
+        },
+
+        timeout=10
+    )
+
+    # Lançar erro em caso de resposta HTTP 4xx/5xx.
+    response.raise_for_status()
+
     if progress.status_code == 200:
         progress_data = progress.json()
         print(f"📊  User progress data retrieved: {progress_data}")
@@ -1282,7 +1373,21 @@ def create_topics_buttons(user_id, course_id, moodle_url, moodle_token):
         
     if progress_data == []:
         print(f"⚠️  all questions were already reviewd")
-        progress_data = requests.get(f"http://flask-server:8080/api/get_user_progress", params={"user_id": user_id, "course_id": course_id, "all_questions": True, "moodle_url": moodle_url, "moodle_token": moodle_token})
+        actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")     
+        response = requests.get(
+            "http://flask-server:8080/api/get_user_progress",
+    
+            headers={
+                "Authorization": f"Bearer {actions_secret}"
+            },
+            params={
+                "user_id": user_id, 
+                "course_id": course_id, 
+                "all_questions": True, 
+                "moodle_url": moodle_url, 
+                "moodle_token": moodle_token
+            }
+        )
         return []
     
     # A tua lista de tópicos (pode vir de uma BD, API ou slot)

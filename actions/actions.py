@@ -1059,16 +1059,41 @@ class ActionAnalyzeProgress(Action):
             dispatcher.utter_message(text="I couldn't identify the topic.")
             return []
         
-        topic = requests.get(f"http://flask-server:8080/api/get_topics_from_ids", json={"topics_ids": [topic_id]})
+        actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")
+        topic = requests.get(
+            "http://flask-server:8080/api/get_topics_from_ids",
+    
+            headers={
+                "Authorization": f"Bearer {actions_secret}"
+            },
+            json={"topics_ids": [topic_id]}
+        )
         topic_name = topic.json()[0].get("name", "the selected topic") if topic.status_code == 200 else "the selected topic"
         print(f"📚  User selected topic ID: {topic_id}, name: {topic_name}")
         
-        progress = requests.get(f"http://flask-server:8080/api/get_user_progress_by_topic", params={"user_id": user_id, "course_id": course_id, "topic_id": topic_id})
-        if progress.status_code == 200:
-            progress_data = progress.json()
+        actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")
+
+        if not actions_secret:
+            raise RuntimeError("ENGIBOT_ACTIONS_API_SECRET não configurado")
+
+        response = requests.get(
+            "http://flask-server:8080/api/get_user_progress_by_topic",
+            headers={
+                "Authorization": f"Bearer {actions_secret}"
+            },
+            params={
+                "user_id": user_id,
+                "course_id": course_id,
+                "topic_id": topic_id
+            },
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            progress_data = response.json()
             print(f"📊  User progress data for topic {topic_name} retrieved: {progress_data}")
         else:
-            print(f"❌  Failed to retrieve user progress for topic. Status code: {progress.status_code}")
+            print(f"❌  Failed to retrieve user progress for topic. Status code: {response.status_code}")
             progress_data = {}
             return []
         
@@ -1241,8 +1266,15 @@ Please provide the HTML feedback analysis adhering strictly to the requested ton
             "new_state": "reviewed"
         }
 
-        update_response = requests.post("http://flask-server:8080/api/update_progress_state", json=payload)
+        actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")
 
+        update_response = requests.post(
+            "http://flask-server:8080/api/update_progress_state",
+            headers={
+                "Authorization": f"Bearer {actions_secret}"
+            },
+            json=payload
+        )
         if update_response.status_code == 200:
             print(f"✅  Progress entries updated successfully.")
         else:

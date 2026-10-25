@@ -196,11 +196,52 @@ def require_moodle_auth(f):
 
     return decorated_function
   
+def require_actions_auth(f):
+    """
+    Autentica pedidos HTTP enviados pelo Rasa Action Server.
+
+    Utiliza uma credencial privada partilhada entre
+    os containers Rasa Actions e Flask.
+    """
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+
+        expected_secret = os.environ.get(
+            "ENGIBOT_ACTIONS_API_SECRET"
+        )
+
+        # Falhar de forma segura caso a variável não esteja configurada.
+        if not expected_secret:
+            app.logger.error(
+                "ENGIBOT_ACTIONS_API_SECRET não configurado"
+            )
+            return jsonify({"error": "Service unavailable"}), 503
+
+        authorization = request.headers.get("Authorization", "")
+
+        if not authorization.startswith("Bearer "):
+            return jsonify({"error": "Unauthorized"}), 401
+
+        received_secret = authorization[len("Bearer "):]
+
+        # Comparação resistente a ataques de timing.
+        if not hmac.compare_digest(
+            received_secret,
+            expected_secret
+        ):
+            return jsonify({"error": "Unauthorized"}), 401
+
+        return f(*args, **kwargs)
+
+    return decorated_function
+
 @app.route('/')
 def index():        
     return "Flask está a correr na porta 8082!"
 
 @app.route('/chat', methods=['POST'])
+@require_moodle_auth
 def chat():    
     data = request.json
     user_id = data.get('user_id')    
@@ -1183,15 +1224,32 @@ def tutor_toggle():
             
 
 @app.route('/api/get_user_progress', methods=['GET'])
+@require_actions_auth
 def get_user_progress():
-    user_id = request.args.get('user_id')
-    course_id = request.args.get('course_id')
-    all_questions = request.args.get('all_questions', 'false').lower() == 'true' # Se for true, traz todas as questões, se for false, só as pendentes
-    
-    # get client from db for course_id
-    client = ClientConfig.query.filter_by(course_id=course_id).first()
-    moodle_token = decrypt_token(client.moodle_token) if client else None
+    user_id = request.args.get('user_id', type=int)
+    course_id = request.args.get('course_id', type=int)
+
+    all_questions = (
+        request.args.get('all_questions', 'false').lower() == 'true'
+    )
+
+    if user_id is None or course_id is None:
+        return jsonify({
+            "error": "Missing or invalid parameters"
+        }), 400
+
+    # Só depois consultar a base de dados.
+    client = ClientConfig.query.filter_by(
+        course_id=course_id
+    ).first()
+
+    moodle_token = (
+        decrypt_token(client.moodle_token)
+        if client else None
+    )
+
     moodle_url = client.moodle_url if client else None
+
     # Validação simples de segurança se os parâmetros não vierem
     if not user_id or not course_id:
         return jsonify({"error": "Missing parameters"}), 400
@@ -1205,6 +1263,7 @@ def get_user_progress():
         quiz_id = progress[0].quiz_id if progress else None
         if quiz_id:
             # update da analise
+            # TODO: a rota atual modifica MoodleQuizAnalysis.state quando all_questions=true. Recomendo separar essa atualização num endpoint POST, porque GET deve ser reservado a operações de leitura.
             analise = MoodleQuizAnalysis.query.filter_by(
                 course_id=course_id,
                 user_moodle_id=user_id, 
@@ -1231,24 +1290,46 @@ def get_user_progress():
     return jsonify([{"quiz_id": p.quiz_id, "question": p.question, "topic_id": p.topic_id, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
 
 @app.route('/api/get_user_progress_by_topic', methods=['GET'])
+@require_actions_auth
 def get_user_progress_by_topic():
-    user_id = request.args.get('user_id')
-    course_id = request.args.get('course_id')
-    topic_id = request.args.get('topic_id')
+    """
+    Devolve as questões pendentes de um estudante num tópico.
 
-    if not user_id or not topic_id or not course_id:
-        return jsonify({"error": "Missing parameters"}), 400
+    O acesso HTTP é autenticado através da credencial
+    partilhada entre o Rasa Action Server e o Flask.
+    """
 
+    # Ler e validar os parâmetros.
+    user_id = request.args.get('user_id', type=int)
+    course_id = request.args.get('course_id', type=int)
+    topic_id = request.args.get('topic_id', type=int)
+
+    if user_id is None or course_id is None or topic_id is None:
+        return jsonify({
+            "error": "Missing or invalid parameters"
+        }), 400
+
+    # Consultar as questões pendentes do estudante.
     progress = TutorProgress.query.filter_by(
         course_id=course_id,
         user_moodle_id=user_id,
         topic_id=topic_id,
         state="pending"
     ).all()
-        
-    return jsonify([{"id": p.id, "state": p.state, "question": p.question, "student_answer": p.student_answer, "correct_answer": p.correct_answer} for p in progress])
 
+    return jsonify([
+        {
+            "id": p.id,
+            "state": p.state,
+            "question": p.question,
+            "student_answer": p.student_answer,
+            "correct_answer": p.correct_answer
+        }
+        for p in progress
+    ])
+    
 @app.route('/api/update_progress_state', methods=['POST'])
+@require_actions_auth
 def update_progress_state():
     data = request.get_json() or {}
     ids = data.get('ids', [])
@@ -1259,8 +1340,6 @@ def update_progress_state():
     if not ids or not new_state:
         return jsonify({"error": "Missing parameters"}), 400
 
-    # Atualiza todos os registos cuja ID esteja na lista 'ids'
-    # Esta abordagem com .filter() é mais eficiente do que fazer um loop individual
     updated_count = TutorProgress.query.filter(TutorProgress.id.in_(ids)).update(
         {TutorProgress.state: new_state}, 
         synchronize_session=False
@@ -1274,6 +1353,7 @@ def update_progress_state():
     return jsonify({"message": f"{updated_count} progress state(s) updated successfully"}), 200
 
 @app.route('/api/get_user_history/<course_id>', methods=['GET'])
+@require_actions_auth
 def get_user_history(course_id):
     history = MoodleUserHistory.query.filter_by(
         course_id=course_id,
@@ -1282,6 +1362,7 @@ def get_user_history(course_id):
     return jsonify([{"user_id": h.user_moodle_id, "question": h.question, "pdfs": h.pdfs, "timestamp": h.timestamp} for h in history])
 
 @app.route('/api/get_quiz_history/<course_id>', methods=['GET'])
+@require_actions_auth
 def get_quiz_history(course_id):
     history = MoodleUserQuizHistory.query.filter_by(
         course_id=course_id
@@ -1317,6 +1398,7 @@ def get_quiz_history(course_id):
     return jsonify(response_data)
 
 @app.route('/api/get_llm_classroom_analysis/<course_id>', methods=['GET'])
+@require_actions_auth
 def get_llm_classroom_analysis(course_id):
     if not course_id:
         return jsonify({"error": "Missing course_id"}), 400
@@ -1329,7 +1411,18 @@ def get_llm_classroom_analysis(course_id):
 
     topics_ids = [m.topic_id for m in mastery_records]
     topics_ids = list(set(topics_ids))
-    response = requests.get(f"http://flask-server:8080/api/get_topics_from_ids", json={"topics_ids": topics_ids})
+    
+    actions_secret = os.environ.get("ENGIBOT_ACTIONS_API_SECRET")
+        
+    response = requests.get(
+        "http://flask-server:8080/api/get_topics_from_ids",
+
+        headers={
+            "Authorization": f"Bearer {actions_secret}"
+        },
+        json={"topics_ids": topics_ids}
+    )
+    
     if response.status_code == 200:
         topics_list = response.json()
         print(f"📚  Topics retrieved: {topics_list}")
@@ -1403,11 +1496,13 @@ def get_llm_classroom_analysis(course_id):
     return jsonify(llm_payload)
 
 @app.route("/api/get_topics", methods=["GET"])
+@require_actions_auth
 def get_topics():
     topics = Topics.query.all()
     return jsonify([{"id": topic.id, "name": topic.name} for topic in topics])
 
 @app.route("/api/get_topics_from_ids", methods=["GET"])
+@require_actions_auth
 def get_topics_from_ids():
     data = request.json
     topics_ids = data.get("topics_ids", [])
@@ -1418,6 +1513,7 @@ def get_topics_from_ids():
     return jsonify([{"id": topic.id, "name": topic.name} for topic in topics])
 
 @app.route("/api/save_topic", methods=["POST"])
+@require_actions_auth
 def save_topic():
     data = request.json
     topic_name = data.get("topic_name")
@@ -1436,14 +1532,8 @@ def save_topic():
 
     return jsonify({"message": "Topic saved", "id": topic.id})
 
-@app.route("/api/get_moodle_user/<email>", methods=["GET"])
-def get_moodle_user(email):
-    moodle_user = MoodleUsers.query.filter(MoodleUsers.email == email).first()
-    if not moodle_user:
-        return jsonify({"error": "Moodle user not found"}), 404
-    return jsonify({"id":str(moodle_user.id), "moodle_id": moodle_user.moodle_id, "email": moodle_user.email}) # "name": moodle_user.name
-
 @app.route("/api/save_student_moodle_messages", methods=["POST"])
+@require_actions_auth
 def save_student_moodle_messages():
     data = request.json
     user_id = data.get("user_id")
