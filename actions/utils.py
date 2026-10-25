@@ -69,7 +69,8 @@ MODEL_NAME = get_latest_gemini_pro_model() #"models/gemini-2.5-flash"
 print(f"✅  Using latest model found: {MODEL_NAME}")
 
 # Load Spacy model for NLP tasks
-nlp = spacy.load("en_core_web_sm")
+#nlp = spacy.load("en_core_web_sm")
+nlp = spacy.load("en_core_web_sm", exclude=["tokenizer"])
 
 # Load sentence transformer model
 model_path = "/app/models/all-MiniLM-L6-v2"

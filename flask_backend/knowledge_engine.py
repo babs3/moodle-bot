@@ -21,7 +21,8 @@ from yt_dlp import YoutubeDL
 from faster_whisper import WhisperModel
 
 # Load Spacy model for NLP tasks
-nlp = spacy.load("en_core_web_sm")
+#nlp = spacy.load("en_core_web_sm")
+nlp = spacy.load("en_core_web_sm", exclude=["tokenizer"])
 
 embedding_model = SentenceTransformer("/app/models/all-MiniLM-L6-v2")
 
